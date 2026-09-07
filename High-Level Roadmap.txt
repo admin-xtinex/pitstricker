@@ -1,0 +1,497 @@
+High-Level Roadmap
+Idea
+    ↓
+Research
+    ↓
+Game Design
+    ↓
+Learn Unity
+    ↓
+Prototype
+    ↓
+Core Gameplay
+    ↓
+Game Polish
+    ↓
+Testing
+    ↓
+Play Store
+    ↓
+Updates
+Phase 0 — Project Setup (1 Day)
+
+You already have:
+
+✅ GitHub Repository
+
+Now create the project structure.
+
+Pit-Striker/
+
+    Docs/
+        Vision
+        GDD
+        Physics
+        Rules
+
+    Unity/
+
+    Assets/
+
+    References/
+
+    Sounds/
+
+    Concepts/
+
+    Tasks/
+
+Don't write code yet.
+
+Phase 1 — Learn the Basics (1–2 Weeks)
+
+Since you're completely new, don't try to learn everything.
+
+Only learn:
+
+✅ Unity Interface
+
+✅ Scene
+
+✅ GameObject
+
+✅ Prefab
+
+✅ Rigidbody
+
+✅ Collider
+
+✅ Materials
+
+✅ Camera
+
+✅ Input
+
+That's enough.
+
+Ignore:
+
+❌ Multiplayer
+
+❌ AI
+
+❌ Optimization
+
+❌ Networking
+
+Phase 2 — Build a Sandbox
+
+Don't build Pit Striker yet.
+
+Build a tiny physics playground.
+
+Example
+
+One plane
+
+↓
+
+One sphere
+
+↓
+
+Swipe
+
+↓
+
+Sphere rolls
+
+↓
+
+Done.
+
+That's your first milestone.
+
+Phase 3 — Prototype
+
+Now build
+
+Grey Ground
+
+↓
+
+3 Small Pits
+
+↓
+
+1 Marble
+
+↓
+
+Swipe Control
+
+↓
+
+Camera
+
+↓
+
+Physics
+
+Nothing else.
+
+No menus.
+
+No music.
+
+No graphics.
+
+Phase 4 — Core Gameplay
+
+Now add
+
+Turn System
+
+↓
+
+Pit Detection
+
+↓
+
+Opening Throw
+
+↓
+
+Player Order
+
+↓
+
+Winner
+
+↓
+
+Restart
+
+Now it's a game.
+
+Phase 5 — Multiplayer (Local)
+
+2 Players
+
+↓
+
+3 Players
+
+↓
+
+4 Players
+
+Pass-and-play.
+
+No internet.
+
+Phase 6 — Art
+
+Replace
+
+Grey ground
+
+↓
+
+Beach
+
+↓
+
+Grass
+
+↓
+
+Clay
+
+↓
+
+Rough soil
+
+Phase 7 — Polish
+
+Camera
+
+Particles
+
+Animation
+
+Sound
+
+UI
+
+Menus
+
+Phase 8 — Play Testing
+
+Invite
+
+Friends
+
+↓
+
+Family
+
+↓
+
+Collect feedback
+
+↓
+
+Improve
+
+Repeat.
+
+Phase 9 — Play Store
+
+Developer Account
+
+↓
+
+Screenshots
+
+↓
+
+Icon
+
+↓
+
+Privacy Policy
+
+↓
+
+Upload
+
+↓
+
+Release
+
+Your Learning Path
+
+Don't try to learn Unity completely.
+
+Instead:
+
+Need camera?
+
+↓
+
+Learn camera.
+
+Need physics?
+
+↓
+
+Learn physics.
+
+Need animation?
+
+↓
+
+Learn animation.
+
+Need UI?
+
+↓
+
+Learn UI.
+
+This is called Just-in-Time Learning.
+
+Weekly Plan
+Week 1
+
+Project Setup
+
+Unity Basics
+
+Git
+
+Folders
+
+Week 2
+
+Physics
+
+Marble
+
+Camera
+
+Swipe
+
+Week 3
+
+3 Pits
+
+Turn System
+
+Opening Throw
+
+Week 4
+
+Playable Prototype
+
+Friends Testing
+
+GitHub Workflow
+
+Never code directly on main.
+
+main
+
+↓
+
+develop
+
+↓
+
+feature/swipe-system
+
+↓
+
+feature/physics
+
+↓
+
+feature/camera
+
+↓
+
+feature/ui
+
+↓
+
+feature/audio
+
+This will save you a lot of trouble later.
+
+Documents to Maintain
+Vision.md
+
+Game Rules.md
+
+Physics.md
+
+Camera.md
+
+Controls.md
+
+UI.md
+
+Art Style.md
+
+Roadmap.md
+
+Known Bugs.md
+
+Ideas.md
+
+Changelog.md
+Tools
+Purpose	Tool
+Game Engine	Unity 6 LTS
+Code	Visual Studio Community
+Version Control	Git + GitHub
+3D Models	Blender
+UI Design	Figma
+Image Editing	GIMP or Photoshop
+Audio	Audacity
+Project Tracking	GitHub Projects
+Milestones
+Milestone 1
+
+✅ Marble moves
+
+Milestone 2
+
+✅ Marble enters pit
+
+Milestone 3
+
+✅ Camera works
+
+Milestone 4
+
+✅ Two players
+
+Milestone 5
+
+✅ Four players
+
+Milestone 6
+
+✅ Complete match
+
+Milestone 7
+
+✅ Friends say:
+
+"Let's play one more game."
+
+This is your most important milestone.
+
+My Biggest Recommendation
+
+Don't try to build the whole game at once.
+
+Build it like LEGO.
+
+Brick 1
+
+↓
+
+Marble
+
+↓
+
+Brick 2
+
+↓
+
+Physics
+
+↓
+
+Brick 3
+
+↓
+
+Camera
+
+↓
+
+Brick 4
+
+↓
+
+Swipe
+
+↓
+
+Brick 5
+
+↓
+
+Pit Detection
+
+↓
+
+Brick 6
+
+↓
+
+Turns
+
+↓
+
+Brick 7
+
+↓
+
+Complete Match
+
+At every stage, you should have something that works.
