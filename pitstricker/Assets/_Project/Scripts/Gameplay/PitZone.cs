@@ -81,7 +81,7 @@ namespace PitStriker.Gameplay
         /// <summary>
         /// Explicitly marks this pit as sunk by the given marble, firing audio, VFX, and game events.
         /// </summary>
-        public void MarkSunk(MarbleController marble)
+        public void MarkSunk(MarbleController marble, bool fireEvent = true)
         {
             if (marble == null || marble.IsRetired) return;
 
@@ -100,7 +100,10 @@ namespace PitStriker.Gameplay
             }
 
             Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> {marble.name} settled and SUNK into Pit #{_pitNumber}!</color>");
-            OnMarbleSunk?.Invoke(this, marble);
+            if (fireEvent)
+            {
+                OnMarbleSunk?.Invoke(this, marble);
+            }
         }
 
         private void OnTriggerStay(Collider other)

@@ -242,6 +242,12 @@ namespace PitStriker.Gameplay
 
         private void HandleMarbleSunk(PitZone pit, MarbleController marble)
         {
+            // If already evaluating turn or match is concluded, ignore re-entrant events!
+            if (CurrentState == GameState.Evaluating || CurrentState == GameState.MatchVictory)
+            {
+                return;
+            }
+
             // Detect if we are in the Toss Phase (either aiming or in-flight)
             bool isTossPhase = (_tossResults != null && _tossResults.Count < _players.Count);
             if (isTossPhase)
@@ -251,14 +257,20 @@ namespace PitStriker.Gameplay
                 {
                     marble.Halt();
                     _pitSunkThisTurn = true;
-                    if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
-                    if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
-                    _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+                    if (_settleCoroutine != null)
+                    {
+                        StopCoroutine(_settleCoroutine);
+                        _settleCoroutine = null;
+                    }
+                    if (_evaluateCoroutine == null)
+                    {
+                        _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+                    }
                 }
                 return;
             }
 
-            if (ActivePlayer == null) return;
+            if (ActivePlayer == null || ActivePlayer.isFinished) return;
 
             // 1. If active player sank into their targeted pit: GOAL!
             if (marble == ActivePlayer.marble && pit.PitNumber == ActivePlayer.currentPit)
@@ -273,12 +285,10 @@ namespace PitStriker.Gameplay
                     StopCoroutine(_settleCoroutine);
                     _settleCoroutine = null;
                 }
-                if (_evaluateCoroutine != null)
+                if (_evaluateCoroutine == null)
                 {
-                    StopCoroutine(_evaluateCoroutine);
-                    _evaluateCoroutine = null;
+                    _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
                 }
-                _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             }
             // 2. If an opponent's marble was knocked into the pit:
             else if (marble != ActivePlayer.marble)
@@ -336,7 +346,7 @@ namespace PitStriker.Gameplay
                             if (pit.PitNumber == 3)
                             {
                                 _pitSunkThisTurn = true;
-                                pit.MarkSunk(marble);
+                                pit.MarkSunk(marble, false);
                                 Debug.Log($"<color=#00FFAA><b>[TOSS BULLSEYE]</b> {player.name} sank Pit 3!</color>");
                             }
                             else
@@ -357,7 +367,7 @@ namespace PitStriker.Gameplay
                                     // ACTIVE PLAYER SANK TARGET PIT!
                                     _pitSunkThisTurn = true;
                                     _bonusStrikeEarned = true;
-                                    pit.MarkSunk(marble);
+                                    pit.MarkSunk(marble, false);
                                     Debug.Log($"<color=#00FFAA><b>[PIT AUDIT GOAL]</b> Active player {player.name} is settled inside target Pit #{pit.PitNumber}!</color>");
                                 }
                                 else
@@ -585,7 +595,9 @@ namespace PitStriker.Gameplay
                         int nextPlace = place + 1;
                         string nextOrdinal = nextPlace == 2 ? "2nd" : (nextPlace == 3 ? "3rd" : $"{nextPlace}th");
                         OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} WINS {placeOrdinal.ToUpper()} PLACE! BATTLE FOR {nextOrdinal.ToUpper()}! ★");
+                        Debug.Log($"<color=#00FFAA><b>[TURN ADVANCE]</b> Savoring {ActivePlayer.name}'s win; advancing turn in 1.8s...</color>");
                         yield return new WaitForSeconds(1.8f);
+                        Debug.Log($"<color=#00FFAA><b>[TURN ADVANCE]</b> Calling AdvanceToNextActivePlayer() for {nextOrdinal} place...</color>");
                         AdvanceToNextActivePlayer();
                     }
                 }
