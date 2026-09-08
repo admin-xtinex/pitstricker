@@ -27,18 +27,43 @@ namespace PitStriker.EditorTools
             Undo.SetCurrentGroupName("Generate Pit Striker Arena");
             int group = Undo.GetCurrentGroup();
 
-            // Load Materials
+            AssetDatabase.Refresh();
+
+            // 0. Setup Canyon Desert & User Marble Materials
+            Material canyonMat = GetOrCreateCanyonMaterial();
             Material sandMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Ground_Sand.mat");
+            Texture2D groundAlbedo = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_albedo.jpg");
+            Texture2D groundNormal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_normal.jpg");
+
+            if (sandMat != null)
+            {
+                if (groundAlbedo != null)
+                {
+                    sandMat.SetTexture("_BaseMap", groundAlbedo);
+                    sandMat.SetTexture("_MainTex", groundAlbedo);
+                    sandMat.SetTextureScale("_BaseMap", new Vector2(6f, 18f));
+                }
+                if (groundNormal != null)
+                {
+                    sandMat.SetTexture("_BumpMap", groundNormal);
+                    sandMat.EnableKeyword("_NORMALMAP");
+                }
+                sandMat.SetColor("_BaseColor", new Color(0.92f, 0.70f, 0.48f, 1.0f));
+                sandMat.SetFloat("_Smoothness", 0.12f);
+                EditorUtility.SetDirty(sandMat);
+            }
+
             Material woodMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Boundary_Wood.mat");
             Material pitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Pit_Dark.mat");
             Material lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Trajectory_Cyan.mat");
 
+            // User-created custom glass marble colors (P1..P4)
             Material[] marbleMats = new Material[]
             {
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Blue.mat"),
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Red.mat"),
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Green.mat"),
-                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Amber.mat")
+                GetOrCreateMarbleMaterial("Assets/_Project/Art/Materials/M_Marble_Blue.mat", new Color(0.025f, 0.18f, 0.95f, 1.0f)),
+                GetOrCreateMarbleMaterial("Assets/_Project/Art/Materials/M_Marble_Red.mat", new Color(0.80f, 0.025f, 0.02f, 1.0f)),
+                GetOrCreateMarbleMaterial("Assets/_Project/Art/Materials/M_Marble_Green.mat", new Color(0.02f, 0.62f, 0.09f, 1.0f)),
+                GetOrCreateMarbleMaterial("Assets/_Project/Art/Materials/M_Marble_Amber.mat", new Color(0.95f, 0.58f, 0.02f, 1.0f))
             };
 
             PhysicsMaterial sandPhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Sand_Friction.physicMaterial");
@@ -67,6 +92,22 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
+            // 2.1 Canyon Desert Map Environment (flanking canyon ravine & towering sandstone cliffs)
+            GameObject canyonFbx = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Art/Models/CanyonDesert/Canyon_Ravine_Map.fbx");
+            if (canyonFbx != null)
+            {
+                GameObject canyonObj = (GameObject)PrefabUtility.InstantiatePrefab(canyonFbx, arenaRoot.transform);
+                canyonObj.name = "Environment_Canyon_Desert";
+                canyonObj.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+                canyonObj.transform.localRotation = Quaternion.identity;
+                canyonObj.transform.localScale = Vector3.one;
+
+                foreach (var r in canyonObj.GetComponentsInChildren<MeshRenderer>())
+                {
+                    r.sharedMaterial = canyonMat;
+                }
+            }
+
             // Master safety subfloor underneath the entire arena (48-meter fairway, 2x width 22m)
             CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(22f, 0.5f, 52f), sandMat, sandPhys);
 
@@ -81,10 +122,11 @@ namespace PitStriker.EditorTools
             CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 35.15f), new Vector3(2.8f, 0.5f, 5.7f), sandMat, sandPhys);
 
             // 3. Boundary Rails (Left, Right, Back, Front) - 2x wide layout (bounds: x = -8.2m to +8.2m)
-            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys);
+            // Invisible physics barriers ensure marbles never clip out while scenic canyon walls remain fully visible
+            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
+            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
+            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
+            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
 
             // 4. Create 3 TRUE ROUND PITS with 2x marble size (Diameter = 1.0m, R = 0.50m)
             CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1, sandMat, pitMat, woodMat, sandPhys);
@@ -94,21 +136,46 @@ namespace PitStriker.EditorTools
             // 5. Create Ground Chalk Launch Ring (Baseline Z = -6.0m)
             CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -6.0f), 1.0f);
 
-            // 6. Create 4 Player Striker Marbles (P1..P4) for Local Pass-and-Play Multiplayer
+            // 6. Create 4 Player Striker Marbles (P1..P4) using User-Created Custom Models
             string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
-            float[] xPositions = new float[] { -0.6f, -0.2f, 0.2f, 0.6f };
+            string[] customFbxPaths = new string[]
+            {
+                "Assets/_Project/Art/Models/Marbles/Marble_P1.fbx",
+                "Assets/_Project/Art/Models/Marbles/Marble_P2.fbx",
+                "Assets/_Project/Art/Models/Marbles/Marble_P3.fbx",
+                "Assets/_Project/Art/Models/Marbles/Marble_P4.fbx"
+            };
             MarbleController p1Marble = null;
 
             for (int i = 0; i < 4; i++)
             {
-                GameObject marbleObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                marbleObj.name = marbleNames[i];
+                GameObject customFbx = AssetDatabase.LoadAssetAtPath<GameObject>(customFbxPaths[i]);
+                GameObject marbleObj = null;
+
+                if (customFbx != null)
+                {
+                    marbleObj = (GameObject)PrefabUtility.InstantiatePrefab(customFbx);
+                    PrefabUtility.UnpackPrefabInstance(marbleObj, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+                    marbleObj.name = marbleNames[i];
+                    marbleObj.transform.localScale = Vector3.one;
+                }
+                else
+                {
+                    marbleObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    marbleObj.name = marbleNames[i];
+                    marbleObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+                }
+
+                marbleObj.transform.SetParent(arenaRoot.transform);
                 marbleObj.transform.position = new Vector3(0f, 0.3f, -6.0f);
-                marbleObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+                Undo.RegisterCreatedObjectUndo(marbleObj, "Create Marble " + marbleNames[i]);
 
-                if (marbleMats[i] != null) marbleObj.GetComponent<MeshRenderer>().sharedMaterial = marbleMats[i];
+                MeshRenderer mr = marbleObj.GetComponentInChildren<MeshRenderer>();
+                if (mr == null) mr = marbleObj.AddComponent<MeshRenderer>();
+                if (marbleMats[i] != null) mr.sharedMaterial = marbleMats[i];
 
-                Rigidbody rb = marbleObj.AddComponent<Rigidbody>();
+                Rigidbody rb = marbleObj.GetComponent<Rigidbody>();
+                if (rb == null) rb = marbleObj.AddComponent<Rigidbody>();
                 rb.mass = 1.0f;
                 rb.linearDamping = 0.3f;
                 rb.angularDamping = 0.8f;
@@ -116,18 +183,21 @@ namespace PitStriker.EditorTools
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
                 SphereCollider sc = marbleObj.GetComponent<SphereCollider>();
+                if (sc == null) sc = marbleObj.AddComponent<SphereCollider>();
                 sc.center = Vector3.zero;
-                sc.radius = 0.5f;
+                sc.radius = 0.25f; // User's marble geometry radius is 0.25m (0.50m diameter)
                 if (bouncePhys != null) sc.sharedMaterial = bouncePhys;
 
-                MarbleController mc = marbleObj.AddComponent<MarbleController>();
+                MarbleController mc = marbleObj.GetComponent<MarbleController>();
+                if (mc == null) mc = marbleObj.AddComponent<MarbleController>();
 
                 if (i == 0)
                 {
                     p1Marble = mc;
 
                     // Trajectory Line
-                    LineRenderer line = marbleObj.AddComponent<LineRenderer>();
+                    LineRenderer line = marbleObj.GetComponent<LineRenderer>();
+                    if (line == null) line = marbleObj.AddComponent<LineRenderer>();
                     line.startWidth = 0.08f;
                     line.endWidth = 0.16f;
                     line.startColor = new Color(0f, 0.85f, 1f, 0.95f);
@@ -136,7 +206,10 @@ namespace PitStriker.EditorTools
                     if (lineMat != null) line.sharedMaterial = lineMat;
                     line.enabled = false;
 
-                    marbleObj.AddComponent<SwipeLaunchController>();
+                    if (marbleObj.GetComponent<SwipeLaunchController>() == null)
+                    {
+                        marbleObj.AddComponent<SwipeLaunchController>();
+                    }
                 }
                 else
                 {
@@ -209,7 +282,7 @@ namespace PitStriker.EditorTools
             if (physMat != null) col.sharedMaterial = physMat;
         }
 
-        private static void CreateBoundaryWall(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
+        private static void CreateBoundaryWall(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat, bool hideRenderer = false)
         {
             GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = name;
@@ -217,9 +290,12 @@ namespace PitStriker.EditorTools
             wall.transform.position = position;
             wall.transform.localScale = scale;
 
-            if (mat != null) wall.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            MeshRenderer mr = wall.GetComponent<MeshRenderer>();
+            if (mat != null && mr != null) mr.sharedMaterial = mat;
+            if (hideRenderer && mr != null) mr.enabled = false;
+
             BoxCollider col = wall.GetComponent<BoxCollider>();
-            if (physMat != null) col.sharedMaterial = physMat;
+            if (physMat != null && col != null) col.sharedMaterial = physMat;
         }
 
         private static void CreateRoundPitTile(string name, Transform parent, Vector3 position, int pitNumber, Material sandMat, Material pitMat, Material woodMat, PhysicsMaterial physMat)
@@ -949,6 +1025,58 @@ namespace PitStriker.EditorTools
             t.alignment = TextAnchor.MiddleCenter;
             t.color = new Color(0.6f, 0.6f, 0.7f, 0.8f);
             t.text = "→";
+        }
+
+        private static Material GetOrCreateMarbleMaterial(string path, Color color)
+        {
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Shader uLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (uLit == null) uLit = Shader.Find("Standard");
+                mat = new Material(uLit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.SetColor("_BaseColor", color);
+            mat.SetColor("_Color", color);
+            mat.SetFloat("_Smoothness", 0.92f);
+            mat.SetFloat("_Metallic", 0.05f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static Material GetOrCreateCanyonMaterial()
+        {
+            string path = "Assets/_Project/Art/Materials/M_Canyon_Desert.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Shader uLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (uLit == null) uLit = Shader.Find("Standard");
+                mat = new Material(uLit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_cliff_02_albedo.jpg");
+            Texture2D normal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_cliff_02_normal.jpg");
+
+            if (albedo != null)
+            {
+                mat.SetTexture("_BaseMap", albedo);
+                mat.SetTexture("_MainTex", albedo);
+                mat.SetTextureScale("_BaseMap", new Vector2(4f, 4f));
+            }
+            if (normal != null)
+            {
+                mat.SetTexture("_BumpMap", normal);
+                mat.SetFloat("_BumpScale", 1.2f);
+                mat.EnableKeyword("_NORMALMAP");
+            }
+            mat.SetColor("_BaseColor", new Color(0.85f, 0.62f, 0.44f, 1.0f));
+            mat.SetFloat("_Smoothness", 0.18f);
+            mat.SetFloat("_Metallic", 0.0f);
+            EditorUtility.SetDirty(mat);
+            return mat;
         }
     }
 }
