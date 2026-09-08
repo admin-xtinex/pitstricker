@@ -19,38 +19,41 @@ def _focus_empty(name, location):
 def create_cameras(config):
     cameras = []
 
-    # Main reference-style camera: low to the dirt, slightly off-centre,
-    # looking directly down the mathematically straight pit line.
-    bpy.ops.object.camera_add(location=(1.65, -5.35, 0.72))
+    # Main gameplay camera: very low, nearly centered on the lane, with enough
+    # field of view to show Pit 1 prominently while Pit 2 and Pit 3 recede in a
+    # perfectly straight line. This composition is intentionally close to the
+    # approved Kerala-village reference.
+    bpy.ops.object.camera_add(location=(0.55, -5.20, 0.55))
     gameplay = bpy.context.object
     gameplay.name = "Camera_Gameplay"
-    gameplay.data.lens = 52
+    gameplay.data.lens = 46
     gameplay.data.sensor_width = 36
-    gameplay.data.clip_start = 0.05
-    gameplay.data.clip_end = 250.0
-    _look_at(gameplay, (0.0, config.pit_spacing * 0.78, 0.28))
+    gameplay.data.clip_start = 0.03
+    gameplay.data.clip_end = 300.0
+    _look_at(gameplay, (0.0, config.pit_spacing * 0.92, 0.18))
 
-    focus = _focus_empty("Camera_Focus_Pit1_Lane", (0.0, 3.8, 0.16))
+    focus = _focus_empty("Camera_Focus_Pit1_Lane", (0.0, 1.25, 0.14))
     gameplay.data.dof.use_dof = True
     gameplay.data.dof.focus_object = focus
-    gameplay.data.dof.aperture_fstop = 3.2
+    gameplay.data.dof.aperture_fstop = 4.5
     cameras.append(gameplay)
 
-    # Clean oblique overview for scene inspection and layout work.
+    # Oblique overview for editing and environment inspection.
     bpy.ops.object.camera_add(location=(9.0, 6.0, 8.5))
     overview = bpy.context.object
     overview.name = "Camera_Overview"
     overview.data.lens = 48
-    overview.data.clip_end = 250.0
+    overview.data.clip_end = 300.0
     _look_at(overview, (0.0, config.pit_spacing, 0.0))
     cameras.append(overview)
 
-    # Straight gameplay/debug camera for validating pit collinearity.
-    bpy.ops.object.camera_add(location=(0.0, -6.2, 1.35))
+    # Centered debug camera for checking that all three pit centers remain
+    # mathematically collinear after environment changes.
+    bpy.ops.object.camera_add(location=(0.0, -6.2, 1.20))
     straight = bpy.context.object
     straight.name = "Camera_Straight_Pit_Debug"
-    straight.data.lens = 58
-    straight.data.clip_end = 250.0
+    straight.data.lens = 55
+    straight.data.clip_end = 300.0
     _look_at(straight, (0.0, config.pit_spacing, 0.0))
     cameras.append(straight)
 
