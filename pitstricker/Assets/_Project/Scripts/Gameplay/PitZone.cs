@@ -50,13 +50,12 @@ namespace PitStriker.Gameplay
                 _pitNumber = 1;
             }
 
-            // Realistic trigger zone: covers the full cup interior below ground level.
-            // Center is submerged so it NEVER touches marbles rolling on the flat surface outside the pit rim!
+            // Submerged spherical trigger covers the full physical basin opening (0.75m radius)
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius = 0.65f;
+                sphereTrigger.radius = 0.75f;
                 sphereTrigger.center = new Vector3(0f, -0.15f, 0f);
             }
         }
@@ -66,32 +65,33 @@ namespace PitStriker.Gameplay
             MarbleController marble = other.GetComponent<MarbleController>();
             if (marble == null) return;
 
-            // If this marble was already captured and sunk in this pit, keep it settled
-            if (IsSunk && marble == _capturedMarble)
-            {
-                marble.Halt();
-                return;
-            }
-
             // 1. Elevation check: Marble center must be down inside the pit depression below the flat fairway
-            // On flat ground, marble center is at y ~ 0.25m. In the pit cup, center is <= 0.16m.
+            // On flat ground, marble center is at y ~ 0.25m. In the pit cup, center is <= 0.22m.
             float relativeY = marble.transform.position.y - transform.position.y;
-            bool isDownInPit = relativeY < 0.18f;
+            bool isDownInPit = relativeY < 0.22f;
 
-            // 2. Horizontal containment: must be within the pit rim radius
+            // 2. Horizontal containment: must be within the pit opening radius (0.75m)
             Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
             Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
-            bool isInsidePitHole = horizontalDist < 0.65f;
+            bool isInsidePitHole = horizontalDist < 0.75f;
 
             // 3. Settled speed check: Marble must have settled or slowed down inside the pit.
-            // Fast skimming marbles (> 0.65 m/s) will naturally roll through or lip out.
+            // Fast skimming marbles (> 0.85 m/s) will naturally roll through or lip out.
             bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
 
-            if (!IsSunk && isDownInPit && isInsidePitHole && isSettled)
+            if (isDownInPit && isInsidePitHole && isSettled)
             {
-                IsSunk = true;
+                // If this marble was already captured and registered, keep it settled
+                if (marble == _capturedMarble)
+                {
+                    marble.Halt();
+                    return;
+                }
+
+                // New marble settled in pit! Register capture
                 _capturedMarble = marble;
+                IsSunk = true;
                 marble.Halt();
 
                 // Audio & VFX Juice

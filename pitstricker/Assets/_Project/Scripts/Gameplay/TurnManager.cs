@@ -255,9 +255,10 @@ namespace PitStriker.Gameplay
                 return;
             }
 
-            if (ActivePlayer == null || marble != ActivePlayer.marble) return;
+            if (ActivePlayer == null) return;
 
-            if (pit.PitNumber == ActivePlayer.currentPit)
+            // 1. If active player sank into their targeted pit: GOAL!
+            if (marble == ActivePlayer.marble && pit.PitNumber == ActivePlayer.currentPit)
             {
                 _pitSunkThisTurn = true;
                 _bonusStrikeEarned = true;
@@ -268,6 +269,16 @@ namespace PitStriker.Gameplay
                 if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
                 _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             }
+            // 2. If an opponent's marble was knocked into the pit:
+            else if (marble != ActivePlayer.marble)
+            {
+                Debug.Log($"<color=#FF8800><b>[POCKETED OPPONENT]</b> Opponent {marble.name} was pocketed in Pit #{pit.PitNumber}! Relocating to fairway rim.</color>");
+                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                marble.ResetPosition(rimPos);
+                pit.ResetPit();
+                OnStatusMessage?.Invoke($"OPPONENT POCKETED! RELOCATED TO FAIRWAY");
+            }
+            // 3. Active player sank into the wrong pit (e.g. Pit 2 when aiming for Pit 1)
             else
             {
                 Debug.LogWarning($"[TURN MANAGER] {ActivePlayer.name} sank Pit #{pit.PitNumber}, but active target is Pit #{ActivePlayer.currentPit}!");

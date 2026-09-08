@@ -237,7 +237,7 @@ namespace PitStriker.Physics
         /// </summary>
         public void Halt()
         {
-            if (_rigidbody != null)
+            if (_rigidbody != null && !_rigidbody.isKinematic)
             {
                 _rigidbody.linearVelocity = Vector3.zero;
                 _rigidbody.angularVelocity = Vector3.zero;
@@ -254,8 +254,11 @@ namespace PitStriker.Physics
         {
             if (_rigidbody != null)
             {
-                _rigidbody.linearVelocity = Vector3.zero;
-                _rigidbody.angularVelocity = Vector3.zero;
+                if (!_rigidbody.isKinematic)
+                {
+                    _rigidbody.linearVelocity = Vector3.zero;
+                    _rigidbody.angularVelocity = Vector3.zero;
+                }
                 _rigidbody.position = newPosition;
             }
             transform.position = newPosition;
