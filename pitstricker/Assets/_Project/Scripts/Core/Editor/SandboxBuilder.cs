@@ -29,32 +29,15 @@ namespace PitStriker.EditorTools
 
             AssetDatabase.Refresh();
 
-            // 0. Setup Canyon Desert & User Marble Materials
-            Material canyonMat = GetOrCreateCanyonMaterial();
-            Material sandMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Ground_Sand.mat");
-            Texture2D groundAlbedo = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_albedo.jpg");
-            Texture2D groundNormal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_normal.jpg");
-
-            if (sandMat != null)
-            {
-                if (groundAlbedo != null)
-                {
-                    sandMat.SetTexture("_BaseMap", groundAlbedo);
-                    sandMat.SetTexture("_MainTex", groundAlbedo);
-                    sandMat.SetTextureScale("_BaseMap", new Vector2(6f, 18f));
-                }
-                if (groundNormal != null)
-                {
-                    sandMat.SetTexture("_BumpMap", groundNormal);
-                    sandMat.EnableKeyword("_NORMALMAP");
-                }
-                sandMat.SetColor("_BaseColor", new Color(0.92f, 0.70f, 0.48f, 1.0f));
-                sandMat.SetFloat("_Smoothness", 0.12f);
-                EditorUtility.SetDirty(sandMat);
-            }
-
-            Material woodMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Boundary_Wood.mat");
+            // 0. Setup Village Dirt Ground & User Marble Materials
+            Material sandMat = GetOrCreateVillageDirtMaterial();
+            Material woodMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Wood_Rustic.mat", new Color(0.28f, 0.16f, 0.08f, 1f), 0.20f);
+            Material chalkMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Chalk_White.mat", new Color(0.96f, 0.96f, 0.94f, 1f), 0.08f);
+            Material flagRedMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Flag_Red.mat", new Color(0.88f, 0.05f, 0.05f, 1f), 0.35f);
+            Material signTextMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Sign_White.mat", new Color(0.98f, 0.98f, 0.96f, 1f), 0.10f);
+            Material pebbleMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Stone_Pebble.mat", new Color(0.48f, 0.44f, 0.38f, 1f), 0.15f);
             Material pitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Pit_Dark.mat");
+            if (pitMat == null) pitMat = GetOrCreateMaterial("Assets/_Project/Art/Materials/M_Pit_Dark.mat", new Color(0.18f, 0.12f, 0.08f, 1f), 0.1f);
             Material lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Trajectory_Cyan.mat");
 
             // User-created custom glass marble colors (P1..P4)
@@ -79,6 +62,9 @@ namespace PitStriker.EditorTools
             GameObject oldArena = GameObject.Find("Arena_Sandbox");
             if (oldArena != null) Undo.DestroyObjectImmediate(oldArena);
 
+            GameObject oldVillage = GameObject.Find("VillageMap_Visuals");
+            if (oldVillage != null) Undo.DestroyObjectImmediate(oldVillage);
+
             // Clean up any existing marble controllers in the scene
             foreach (var m in Object.FindObjectsByType<MarbleController>(FindObjectsInactive.Exclude))
             {
@@ -92,21 +78,69 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // 2.1 Canyon Desert Map Environment (flanking canyon ravine & towering sandstone cliffs)
-            GameObject canyonFbx = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Art/Models/CanyonDesert/Canyon_Ravine_Map.fbx");
-            if (canyonFbx != null)
+            // 2.1 Village Gameplay Kit (Chalk Rings, Red Numbered Flags, Trajectory Arrows, PIT STRIKER Wooden Sign, Pebbles)
+            GameObject villageKitFbx = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Art/Models/VillageKit/Village_Gameplay_Kit.fbx");
+            if (villageKitFbx != null)
             {
-                GameObject canyonObj = (GameObject)PrefabUtility.InstantiatePrefab(canyonFbx, arenaRoot.transform);
-                canyonObj.name = "Environment_Canyon_Desert";
-                canyonObj.transform.localPosition = new Vector3(0f, -0.02f, 0f);
-                canyonObj.transform.localRotation = Quaternion.identity;
-                canyonObj.transform.localScale = Vector3.one;
+                GameObject kitObj = (GameObject)PrefabUtility.InstantiatePrefab(villageKitFbx, arenaRoot.transform);
+                kitObj.name = "Gameplay_Kit_Village";
+                kitObj.transform.localPosition = Vector3.zero;
+                kitObj.transform.localRotation = Quaternion.identity;
+                kitObj.transform.localScale = Vector3.one;
 
-                foreach (var r in canyonObj.GetComponentsInChildren<MeshRenderer>())
+                // Strip any colliders from kit props so marbles roll uninhibited
+                foreach (var col in kitObj.GetComponentsInChildren<Collider>(true))
                 {
-                    r.sharedMaterial = canyonMat;
+                    Undo.DestroyObjectImmediate(col);
+                }
+
+                // Apply dedicated materials by child name
+                foreach (var mr in kitObj.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string oName = mr.gameObject.name;
+                    if (oName.Contains("Chalk") || oName.Contains("Arrow"))
+                    {
+                        mr.sharedMaterial = chalkMat;
+                    }
+                    else if (oName.Contains("Flag"))
+                    {
+                        // Flag mesh has 3 submeshes: pole (wood), cloth (red), number (white)
+                        mr.sharedMaterials = new Material[] { woodMat, flagRedMat, signTextMat };
+                    }
+                    else if (oName.Contains("Signboard"))
+                    {
+                        // Signboard has 2 submeshes: wood board & posts, white text
+                        mr.sharedMaterials = new Material[] { woodMat, signTextMat };
+                    }
+                    else if (oName.Contains("Pebble"))
+                    {
+                        mr.sharedMaterial = pebbleMat;
+                    }
                 }
             }
+
+            // 2.2 Village Architecture Dressing (House, Stone Walls, Benches/Barricades, Outbuildings - Strictly WITHOUT Plants)
+            GameObject dressingRoot = new GameObject("Environment_Village_Dressing");
+            dressingRoot.transform.SetParent(arenaRoot.transform);
+            dressingRoot.transform.localPosition = Vector3.zero;
+
+            // Village House on left flank
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Home1.fbx", dressingRoot.transform, new Vector3(-11.5f, 0f, 7.5f), new Vector3(0f, 28f, 0f), Vector3.one * 1.35f, "VIS_VillageHome");
+
+            // Stone walls / rock fences framing the track
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-5.6f, 0f, -3.2f), new Vector3(0f, 45f, 0f), Vector3.one * 1.3f, "VIS_Stone_Dugout");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(6.5f, 0f, 2.0f), new Vector3(0f, -15f, 0f), Vector3.one * 1.4f, "VIS_Stone_Right_Front");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-6.8f, 0f, 18.0f), new Vector3(0f, 35f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_Mid");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(7.0f, 0f, 24.0f), new Vector3(0f, -40f, 0f), Vector3.one * 1.5f, "VIS_Stone_Right_Mid");
+
+            // Rustic wooden benches / barricades
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(-4.4f, 0f, -5.4f), new Vector3(0f, 15f, 0f), Vector3.one * 1.0f, "VIS_Bench_Dugout");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(6.8f, 0f, 12.0f), new Vector3(0f, -10f, 0f), Vector3.one * 1.0f, "VIS_Barricade_Right");
+
+            // Village outbuilding / stalls in background
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Base.fbx", dressingRoot.transform, new Vector3(9.8f, 0f, 32.0f), new Vector3(0f, -25f, 0f), Vector3.one * 0.9f, "VIS_VillageBase_Back");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/S1.fbx", dressingRoot.transform, new Vector3(-10.5f, 0f, 25.0f), new Vector3(0f, 90f, 0f), Vector3.one * 1.1f, "VIS_VillageStall_Left");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/s2.fbx", dressingRoot.transform, new Vector3(9.2f, 0f, 18.0f), new Vector3(0f, -90f, 0f), Vector3.one * 1.0f, "VIS_VillageStall_Right");
 
             // Master safety subfloor underneath the entire arena (48-meter fairway, 2x width 22m)
             CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(22f, 0.5f, 52f), sandMat, sandPhys);
@@ -122,7 +156,7 @@ namespace PitStriker.EditorTools
             CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 35.15f), new Vector3(2.8f, 0.5f, 5.7f), sandMat, sandPhys);
 
             // 3. Boundary Rails (Left, Right, Back, Front) - 2x wide layout (bounds: x = -8.2m to +8.2m)
-            // Invisible physics barriers ensure marbles never clip out while scenic canyon walls remain fully visible
+            // Invisible physics barriers ensure marbles never clip out while scenic village environment remains fully visible
             CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
@@ -133,10 +167,7 @@ namespace PitStriker.EditorTools
             CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2, sandMat, pitMat, woodMat, sandPhys);
             CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3, sandMat, pitMat, woodMat, sandPhys);
 
-            // 5. Create Ground Chalk Launch Ring (Baseline Z = -6.0m)
-            CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -6.0f), 1.0f);
-
-            // 6. Create 4 Player Striker Marbles (P1..P4) using User-Created Custom Models
+            // 5. Create 4 Player Striker Marbles (P1..P4) using User-Created Custom Models
             string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
             string[] customFbxPaths = new string[]
             {
@@ -167,7 +198,16 @@ namespace PitStriker.EditorTools
                 }
 
                 marbleObj.transform.SetParent(arenaRoot.transform);
-                marbleObj.transform.position = new Vector3(0f, 0.3f, -6.0f);
+                // Position active marble in chalk launch circle, and waiting marbles in the sideline dugout by the wooden sign
+                if (i == 0)
+                {
+                    marbleObj.transform.position = new Vector3(0f, 0.25f, -6.0f);
+                }
+                else
+                {
+                    // Sideline waiting area beside the PIT STRIKER wooden sign and rustic bench (Concept_Village_Path.png)
+                    marbleObj.transform.position = new Vector3(-2.2f - (i - 1) * 0.55f, 0.25f, -4.5f - (i - 1) * 0.35f);
+                }
                 Undo.RegisterCreatedObjectUndo(marbleObj, "Create Marble " + marbleNames[i]);
 
                 MeshRenderer mr = marbleObj.GetComponentInChildren<MeshRenderer>();
@@ -213,17 +253,17 @@ namespace PitStriker.EditorTools
                 }
                 else
                 {
-                    // Marbles P2..P4 are staged hidden until their respective turns
-                    mc.SetVisible(false);
+                    // Marbles P2..P4 sit ready on the sideline waiting area (Concept_Village_Path.png)
+                    mc.SetVisible(true);
                 }
             }
 
-            // 7. Main Camera Setup
+            // 6. Main Camera Setup (Low-angle perspective matching Concept_Village_Path.png)
             Camera cam = Camera.main;
             if (cam != null && p1Marble != null)
             {
-                cam.transform.position = new Vector3(0f, 2.8f, -10.0f);
-                cam.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
+                cam.transform.position = new Vector3(0f, 1.45f, -9.6f);
+                cam.transform.rotation = Quaternion.Euler(14f, 0f, 0f);
 
                 SmoothFollowCamera follow = cam.GetComponent<SmoothFollowCamera>();
                 if (follow == null)
@@ -231,6 +271,24 @@ namespace PitStriker.EditorTools
                     follow = cam.gameObject.AddComponent<SmoothFollowCamera>();
                 }
                 follow.SetTarget(p1Marble.transform);
+
+                SerializedObject camSo = new SerializedObject(follow);
+                var distProp = camSo.FindProperty("_distance");
+                if (distProp != null) distProp.floatValue = 3.6f;
+                var heightProp = camSo.FindProperty("_height");
+                if (heightProp != null) heightProp.floatValue = 1.45f;
+                var lookProp = camSo.FindProperty("_lookAtHeightOffset");
+                if (lookProp != null) lookProp.floatValue = 0.45f;
+                camSo.ApplyModifiedProperties();
+            }
+
+            // Directional Sun Light (Warm Golden Hour matching concept art)
+            Light sun = Object.FindAnyObjectByType<Light>();
+            if (sun != null && sun.type == LightType.Directional)
+            {
+                sun.transform.rotation = Quaternion.Euler(36f, 35f, 0f);
+                sun.color = new Color(1f, 0.95f, 0.88f, 1f);
+                sun.intensity = 1.35f;
             }
 
             // 8. Turn & Match Orchestrator (Phase 5 Multiplayer)
@@ -459,8 +517,8 @@ namespace PitStriker.EditorTools
             zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
             zoneSo.ApplyModifiedProperties();
 
-            // Production Marker Pole next to the pit (replaces red flag banner)
-            CreateMarkerPole("MarkerPole_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
+            // Red Numbered Flags (1, 2, 3) are provided cleanly by Gameplay_Kit_Village (SM_PitFlag_01..03)
+            // CreateMarkerPole("MarkerPole_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
         }
 
         private static void CreateMarkerPole(string name, Transform parent, Vector3 localPos, int number, Material woodMat)
@@ -1041,6 +1099,90 @@ namespace PitStriker.EditorTools
             mat.SetColor("_Color", color);
             mat.SetFloat("_Smoothness", 0.92f);
             mat.SetFloat("_Metallic", 0.05f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static void PlaceVillageProp(string assetPath, Transform parent, Vector3 pos, Vector3 euler, Vector3 scale, string name)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+            if (prefab == null) return;
+
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            if (instance == null) instance = Object.Instantiate(prefab, parent);
+
+            instance.name = name;
+            instance.transform.localPosition = pos;
+            instance.transform.localRotation = Quaternion.Euler(euler);
+            instance.transform.localScale = scale;
+
+            // Strip any colliders and rigidbodies so props never interfere with gameplay physics
+            foreach (var col in instance.GetComponentsInChildren<Collider>(true))
+            {
+                Undo.DestroyObjectImmediate(col);
+            }
+            foreach (var rb in instance.GetComponentsInChildren<Rigidbody>(true))
+            {
+                Undo.DestroyObjectImmediate(rb);
+            }
+        }
+
+        private static Material GetOrCreateMaterial(string path, Color color, float smoothness = 0.5f, float metallic = 0.0f)
+        {
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Shader uLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (uLit == null) uLit = Shader.Find("Standard");
+                mat = new Material(uLit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.SetColor("_BaseColor", color);
+            mat.SetColor("_Color", color);
+            mat.SetFloat("_Smoothness", smoothness);
+            mat.SetFloat("_Metallic", metallic);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static Material GetOrCreateVillageDirtMaterial()
+        {
+            string path = "Assets/_Project/Art/Materials/M_Ground_Sand.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Shader uLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (uLit == null) uLit = Shader.Find("Standard");
+                mat = new Material(uLit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+
+            // High-res village soil textures from CrashBash
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/ThirdParty/CrashBash/Fbx/1.jpg");
+            Texture2D normal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/ThirdParty/CrashBash/Fbx/1NM.jpg");
+
+            // Fallback to canyon ground if CrashBash 1.jpg is not found
+            if (albedo == null)
+                albedo = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_albedo.jpg");
+            if (normal == null)
+                normal = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/Textures/CanyonDesert/canyon_ground_01_normal.jpg");
+
+            if (albedo != null)
+            {
+                mat.SetTexture("_BaseMap", albedo);
+                mat.SetTexture("_MainTex", albedo);
+                mat.SetTextureScale("_BaseMap", new Vector2(4f, 16f));
+            }
+            if (normal != null)
+            {
+                mat.SetTexture("_BumpMap", normal);
+                mat.SetFloat("_BumpScale", 1.2f);
+                mat.EnableKeyword("_NORMALMAP");
+            }
+
+            mat.SetColor("_BaseColor", new Color(0.92f, 0.72f, 0.54f, 1.0f));
+            mat.SetFloat("_Smoothness", 0.12f);
+            mat.SetFloat("_Metallic", 0.0f);
             EditorUtility.SetDirty(mat);
             return mat;
         }
