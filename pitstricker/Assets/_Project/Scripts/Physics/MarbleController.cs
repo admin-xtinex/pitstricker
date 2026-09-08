@@ -30,6 +30,8 @@ namespace PitStriker.Physics
 
         // State Tracking
         private bool _wasMoving = false;
+        private float _launchGraceTimer = 0f;
+        private int _consecutiveRestFrames = 0;
 
         // Events
         public event Action OnMarbleLaunched;
@@ -37,7 +39,7 @@ namespace PitStriker.Physics
         public event Action<Collision> OnMarbleCollision;
         public static event Action<MarbleController, MarbleController> OnMarbleHitMarble; // (striker, hitTarget)
 
-        public bool IsMoving => _rigidbody != null && _rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold);
+        public bool IsMoving => _rigidbody != null && (_rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold) || _rigidbody.angularVelocity.sqrMagnitude > 0.5f);
         public Vector3 Velocity => _rigidbody != null ? _rigidbody.linearVelocity : Vector3.zero;
         public float CurrentSpeed => _rigidbody != null ? _rigidbody.linearVelocity.magnitude : 0f;
 
@@ -65,19 +67,21 @@ namespace PitStriker.Physics
         /// Launches the marble with a single physical impulse along a specified vector.
         /// Must only be called when authorized by input or turn controllers.
         /// </summary>
-        /// <param name="direction">Normalized ground direction vector (Y should be 0).</param>
+        /// <param name="direction">Normalized ground direction vector.</param>
         /// <param name="forceMagnitude">Impulse strength to apply.</param>
         public void ApplyImpulse(Vector3 direction, float forceMagnitude)
         {
             if (_rigidbody == null) return;
 
-            // Flatten direction to ground plane to prevent launching vertically
-            direction.y = 0f;
+            // Allow slight upward pitch if provided (for flick throw lob), clamped to prevent sky launches
+            direction.y = Mathf.Clamp(direction.y, 0f, 0.12f);
             Vector3 normalizedDir = direction.normalized;
 
             // Apply physical impulse
             _rigidbody.AddForce(normalizedDir * forceMagnitude, ForceMode.Impulse);
             _wasMoving = true;
+            _launchGraceTimer = 0.5f; // Guarantee physics integration time
+            _consecutiveRestFrames = 0;
 
             OnMarbleLaunched?.Invoke();
 
@@ -98,22 +102,35 @@ namespace PitStriker.Physics
         {
             if (_rigidbody == null) return;
 
+            if (_launchGraceTimer > 0f)
+            {
+                _launchGraceTimer -= Time.fixedDeltaTime;
+                _wasMoving = true;
+                _consecutiveRestFrames = 0;
+                return;
+            }
+
             bool currentlyMoving = IsMoving;
 
-            // Detect when marble transitions from moving to completely at rest
-            if (_wasMoving && !currentlyMoving)
-            {
-                // Force velocity cleanly to zero once under threshold to prevent micro-drifting
-                _rigidbody.linearVelocity = Vector3.zero;
-                _rigidbody.angularVelocity = Vector3.zero;
-                _wasMoving = false;
-
-                OnMarbleStopped?.Invoke();
-                Debug.Log("[MARBLE] Marble has come to a complete stop.");
-            }
-            else if (currentlyMoving)
+            if (currentlyMoving)
             {
                 _wasMoving = true;
+                _consecutiveRestFrames = 0;
+            }
+            else if (_wasMoving)
+            {
+                _consecutiveRestFrames++;
+                // Must be under stop threshold continuously for at least 15 physics steps (~0.3s)
+                if (_consecutiveRestFrames >= 15)
+                {
+                    _rigidbody.linearVelocity = Vector3.zero;
+                    _rigidbody.angularVelocity = Vector3.zero;
+                    _wasMoving = false;
+                    _consecutiveRestFrames = 0;
+
+                    OnMarbleStopped?.Invoke();
+                    Debug.Log("[MARBLE] Marble has come to a stable complete stop.");
+                }
             }
 
             // Safety catch: If marble ever drops into the void below the track, recover it
@@ -161,6 +178,8 @@ namespace PitStriker.Physics
                 _rigidbody.angularVelocity = Vector3.zero;
             }
             _wasMoving = false;
+            _launchGraceTimer = 0f;
+            _consecutiveRestFrames = 0;
         }
 
         /// <summary>
@@ -176,6 +195,8 @@ namespace PitStriker.Physics
             }
             transform.position = newPosition;
             _wasMoving = false;
+            _launchGraceTimer = 0f;
+            _consecutiveRestFrames = 0;
         }
 
         /// <summary>

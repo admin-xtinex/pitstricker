@@ -87,7 +87,8 @@ namespace PitStriker.Gameplay
             }
 
             // Check if marble has settled in the pit below ground elevation
-            if (!IsSunk && marble.transform.position.y < 0.15f && marble.CurrentSpeed <= _maxCaptureSpeed)
+            float captureSpeedThreshold = _maxCaptureSpeed * GameDifficulty.PitCatchRadiusMultiplier;
+            if (!IsSunk && marble.transform.position.y < 0.20f && marble.CurrentSpeed <= captureSpeedThreshold)
             {
                 IsSunk = true;
                 marble.Halt();

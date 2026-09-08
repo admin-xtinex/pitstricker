@@ -90,6 +90,7 @@ namespace PitStriker.Gameplay
         private bool _hitOpponentMarbleThisTurn = false;
         private bool _bonusStrikeEarned = false;
         private Coroutine _evaluateCoroutine;
+        private Coroutine _settleCoroutine;
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -210,6 +211,8 @@ namespace PitStriker.Gameplay
                 {
                     OnStatusMessage?.Invoke($"★ {_players[_tossPlayerIndex].name.ToUpper()} TOSS IN FLIGHT! ★");
                 }
+                if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
+                _settleCoroutine = StartCoroutine(WaitForMarblesToSettleRoutine());
                 return;
             }
 
@@ -224,14 +227,14 @@ namespace PitStriker.Gameplay
             SetState(GameState.Rolling);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
             OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}: STROKE #{ActivePlayer.totalStrokes}");
+
+            if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
+            _settleCoroutine = StartCoroutine(WaitForMarblesToSettleRoutine());
         }
 
         private void HandleMarbleStopped()
         {
-            if (CurrentState != GameState.Rolling) return;
-
-            if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
-            _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+            // Settle lifecycle is actively polled and orchestrated in WaitForMarblesToSettleRoutine
         }
 
         private void HandleMarbleSunk(PitZone pit, MarbleController marble)
@@ -240,6 +243,7 @@ namespace PitStriker.Gameplay
             {
                 // In toss phase, sinking into Pit 3 is an instant bullseye!
                 marble.Halt();
+                if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
                 if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
                 _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
                 return;
@@ -253,6 +257,8 @@ namespace PitStriker.Gameplay
                 _bonusStrikeEarned = true;
                 marble.Halt();
 
+                // Immediately cancel settle wait and evaluate captured pit
+                if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
                 if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
                 _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             }
@@ -261,6 +267,75 @@ namespace PitStriker.Gameplay
                 Debug.LogWarning($"[TURN MANAGER] {ActivePlayer.name} sank Pit #{pit.PitNumber}, but active target is Pit #{ActivePlayer.currentPit}!");
                 OnStatusMessage?.Invoke($"WRONG PIT! TARGET IS PIT {ActivePlayer.currentPit}");
             }
+        }
+
+        /// <summary>
+        /// Waits for launched marbles to complete their full roll and come to a stable stop
+        /// before advancing turns or displaying the next player.
+        /// </summary>
+        private IEnumerator WaitForMarblesToSettleRoutine()
+        {
+            SetState(GameState.Rolling);
+
+            // 1. Mandatory launch grace period: ensures marble has time to accelerate and roll
+            yield return new WaitForSeconds(0.6f);
+
+            // 2. Poll until all active marbles in the match have come to a stable stop
+            float settleTimer = 0f;
+            float maxWait = 14.0f; // Safety timeout in case of microscopic drift
+            float timeElapsed = 0f;
+
+            while (timeElapsed < maxWait)
+            {
+                timeElapsed += Time.deltaTime;
+
+                // If a pit was captured, HandleMarbleSunk will have immediately triggered evaluation
+                if (_pitSunkThisTurn)
+                {
+                    yield break;
+                }
+
+                // Check if any active marble is currently in motion
+                bool anyMoving = false;
+                for (int i = 0; i < _players.Count; i++)
+                {
+                    MarbleController m = _players[i].marble;
+                    if (m != null && m.gameObject.activeInHierarchy && m.IsMoving)
+                    {
+                        anyMoving = true;
+                        break;
+                    }
+                }
+
+                if (!anyMoving)
+                {
+                    settleTimer += Time.deltaTime;
+                    if (settleTimer >= 0.4f)
+                    {
+                        // Stably rested for 0.4 consecutive seconds!
+                        break;
+                    }
+                }
+                else
+                {
+                    settleTimer = 0f;
+                }
+
+                yield return null;
+            }
+
+            // Halt all active marbles to eliminate microscopic physics drift
+            for (int i = 0; i < _players.Count; i++)
+            {
+                if (_players[i].marble != null)
+                {
+                    _players[i].marble.Halt();
+                }
+            }
+
+            if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+            _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+            _settleCoroutine = null;
         }
 
         private IEnumerator EvaluateTurnOutcomeRoutine()
@@ -578,6 +653,12 @@ namespace PitStriker.Gameplay
 
         public void RestartMatch()
         {
+            if (_settleCoroutine != null)
+            {
+                StopCoroutine(_settleCoroutine);
+                _settleCoroutine = null;
+            }
+
             if (_evaluateCoroutine != null)
             {
                 StopCoroutine(_evaluateCoroutine);
