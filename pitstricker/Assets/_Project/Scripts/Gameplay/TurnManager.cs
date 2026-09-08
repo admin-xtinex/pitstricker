@@ -827,6 +827,14 @@ namespace PitStriker.Gameplay
             // Staging: Position this tossing player at the start line and make visible
             if (p.marble != null)
             {
+                p.marble.IsRetired = false;
+                Rigidbody rb = p.marble.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.isKinematic = false;
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
                 p.marble.ResetPosition(_startCenter);
                 p.marble.SetVisible(true);
             }
@@ -966,6 +974,7 @@ namespace PitStriker.Gameplay
             _placementPodium.Clear();
             _bonusStrikeEarned = false;
             _hitOpponentMarbleThisTurn = false;
+            _pitSunkThisTurn = false;
 
             // Reset Pits
             PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
@@ -985,6 +994,14 @@ namespace PitStriker.Gameplay
 
                 if (p.marble != null)
                 {
+                    p.marble.IsRetired = false;
+                    Rigidbody rb = p.marble.GetComponent<Rigidbody>();
+                    if (rb != null)
+                    {
+                        rb.isKinematic = false;
+                        rb.linearVelocity = Vector3.zero;
+                        rb.angularVelocity = Vector3.zero;
+                    }
                     p.marble.Halt();
                     p.marble.ResetPosition(_startCenter);
                     p.marble.SetVisible(false);
