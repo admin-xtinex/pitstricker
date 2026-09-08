@@ -10,6 +10,8 @@ namespace PitStriker.CameraSystem
     /// </summary>
     public class SmoothFollowCamera : MonoBehaviour
     {
+        public static SmoothFollowCamera Instance { get; private set; }
+
         [Header("Target Tracking")]
         [Tooltip("Target transform to follow (typically the active marble).")]
         [SerializeField] private Transform _target;
@@ -39,7 +41,32 @@ namespace PitStriker.CameraSystem
         private Vector2 _lastPointerPos;
         private bool _isOrbitDragging = false;
 
+        // Camera Impact Shake
+        private float _shakeTimer = 0f;
+        private float _shakeIntensity = 0f;
+
         public float ManualOrbitAngle => _manualOrbitAngle;
+
+        private void Awake()
+        {
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+            else if (Instance != this)
+            {
+                Destroy(gameObject);
+            }
+        }
+
+        /// <summary>
+        /// Triggers camera screen shake for high-energy direct strikes and heavy impacts.
+        /// </summary>
+        public void TriggerImpactShake(float intensity = 0.25f, float duration = 0.2f)
+        {
+            _shakeIntensity = intensity;
+            _shakeTimer = duration;
+        }
 
         public void SetTarget(Transform newTarget, Vector3? objectivePoint = null)
         {
@@ -169,6 +196,15 @@ namespace PitStriker.CameraSystem
 
             // Smoothly interpolate camera position
             transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref _currentVelocity, _smoothTime);
+
+            // Apply impact shake displacement if active
+            if (_shakeTimer > 0f)
+            {
+                _shakeTimer -= Time.deltaTime;
+                Vector3 shakeOffset = UnityEngine.Random.insideUnitSphere * _shakeIntensity;
+                shakeOffset.y *= 0.6f;
+                transform.position += shakeOffset;
+            }
 
             // Look at point ahead through the marble toward the target
             Vector3 lookTarget = _target.position + (currentAimDir * 1.5f) + (Vector3.up * _lookAtHeightOffset);

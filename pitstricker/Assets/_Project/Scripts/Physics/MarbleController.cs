@@ -217,13 +217,21 @@ namespace PitStriker.Physics
                                     _rigidbody.angularVelocity = _rigidbody.angularVelocity * 0.15f;
                                     _wasMoving = true;
 
-                                    // Audio & VFX Juice for powerful tactical hit
+                                    // Audio, VFX, Camera Shake & Haptics Juice for powerful tactical direct strike
                                     if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)
                                     {
                                         PitStriker.VFX.VFXManager.Instance.PlayCollisionSparks(collision.contacts[0].point, blastSpeed);
                                     }
 
-                                    Debug.Log($"<color=#00FFAA><b>[CARROM BLAST]</b> Striker halted. Target {otherMarble.name} blasted away with {blastSpeed:F1} m/s speed!</color>");
+                                    if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null)
+                                    {
+                                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.TriggerImpactShake(Mathf.Clamp(blastSpeed * 0.04f, 0.15f, 0.45f), 0.22f);
+                                    }
+#if UNITY_ANDROID || UNITY_IOS
+                                    Handheld.Vibrate();
+#endif
+
+                                    Debug.Log($"<color=#00FFAA><b>[DIRECT STRIKE BLAST]</b> Striker halted. Target {otherMarble.name} blasted away with {blastSpeed:F1} m/s speed!</color>");
                                 }
                             }
                         }

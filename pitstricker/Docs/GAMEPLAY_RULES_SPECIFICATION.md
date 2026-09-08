@@ -283,20 +283,20 @@ Each entry should include:
 
 ---
 
-# Strike Rule Matrix (To Be Completed)
+# Strike Rule Matrix (Approved Living Rules)
 
 | Scenario          | Expected Behaviour | Prototype Decision | Final Decision |
 | ----------------- | ------------------ | ------------------ | -------------- |
-| Direct Hit        | TBD                |                    |                |
-| Double Hit        | TBD                |                    |                |
-| Triple Hit        | TBD                |                    |                |
-| Push into Pit     | TBD                |                    |                |
-| Knock Out of Pit  | TBD                |                    |                |
-| Chain Collision   | TBD                |                    |                |
-| Self Collision    | TBD                |                    |                |
-| Simultaneous Stop | TBD                |                    |                |
-| Edge Bounce       | TBD                |                    |                |
-| Blocked Shot      | TBD                |                    |                |
+| Direct Strike     | Striker dumps forward momentum; target blasted forward. | +1 Extra Play awarded to Striker. | Approved |
+| Double Strike     | Two opponents hit in a single shot. | +1 Extra Play awarded; "DOUBLE STRIKE" combo banner displayed. | Approved |
+| Push into Pit     | Opponent is pushed into any pit. | Opponent relocated 2.5m to fairway rim; pit stays clear; no progress credited. | Approved |
+| Knock Out of Pit  | Opponent inside cup is struck. | Vertical pop-up (+3.2m/s) over rim. Opponent retains cleared pit status. | Approved |
+| Chain Collision   | Marble A hits Marble B, which hits Marble C. | Pure physics propagation. Extra play awarded to active striker. | Approved |
+| Grazing Hit       | Subtle contact (< 0.2 m/s closing speed). | Physical deflection only; minimum velocity threshold required for Extra Play. | Approved |
+| Self Collision    | Not applicable (one marble per player). | Single-marble ownership. | Approved |
+| Simultaneous Stop | Marbles stop rolling. | Turn evaluates only when all marbles come to a full stop (< 0.02 m/s). | Approved |
+| Edge Bounce       | Marbles bounce off earthen arena boundaries. | Elastic deflection retains marble inside the 16.4m fairway. | Approved |
+| Blocked Shot      | Opponent sits along fairway line to pit. | Striker may attempt bank shot, direct blast, or pit approach. | Approved |
 
 ---
 
@@ -304,21 +304,29 @@ Each entry should include:
 
 Every gameplay discussion should be recorded here instead of changing the core rules document.
 
-Format:
-
 **Scenario ID:** SC-001
+Situation: Player A has completed Pit 1 and is aiming for Pit 2. Player B performs a Strike and knocks Player A far away.
+Decision: Player A retains Pit 1 completion and must continue aiming for Pit 2 from the new position.
+Reason: Maintains progression fairness while rewarding tactical direct attacks.
+Status: Approved
 
-Situation:
-Player A has completed Pit 1 and is aiming for Pit 2. Player B performs a Strike and knocks Player A far away.
+**Scenario ID:** SC-002
+Situation: Player B strikes Player A, and Player A rolls into a pit (Pit 1, 2, or 3).
+Decision: Player A is pocketed and automatically relocated to the fairway rim (2.5m outside pit radius). Does not count as an official pit conquest for Player A.
+Reason: Prevents accidental/free pit progression via opponent strikes and keeps the pit cup open.
+Status: Approved
 
-Decision:
-Player A retains Pit 1 completion and must continue aiming for Pit 2 from the new position.
+**Scenario ID:** SC-003
+Situation: Opponent is resting inside a completed pit cup; Striker strikes it directly.
+Decision: Striker momentum is dumped (carrom dead-stop), and resting opponent is popped up (+3.2m/s) and launched over the rim onto the fairway.
+Reason: Prevents marbles from permanently camping inside pit cups and provides high spectator thrill.
+Status: Approved
 
-Reason:
-Maintains progress while rewarding tactical attacks.
-
-Status:
-Approved / Under Testing / Rejected
+**Scenario ID:** SC-004
+Situation: Striker executes a successful Direct Strike against any opponent marble.
+Decision: Striker is immediately granted an Extra Play (bonus stroke) upon all marbles settling.
+Reason: Preserves the core traditional competitive tactical marble mechanic.
+Status: Approved
 
 ---
 

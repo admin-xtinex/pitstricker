@@ -99,9 +99,12 @@ namespace PitStriker.Gameplay
         private int _tossPlayerIndex = 0;
         private bool _pitSunkThisTurn = false;
         private bool _hitOpponentMarbleThisTurn = false;
+        private int _opponentHitsThisTurn = 0;
         private bool _bonusStrikeEarned = false;
         private Coroutine _evaluateCoroutine;
         private Coroutine _settleCoroutine;
+
+        public bool HitOpponentThisTurn => _hitOpponentMarbleThisTurn;
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -235,12 +238,19 @@ namespace PitStriker.Gameplay
             if (CurrentState == GameState.TossPhase) return;
             if (ActivePlayer == null || striker != ActivePlayer.marble) return;
 
-            if (!_hitOpponentMarbleThisTurn)
+            _opponentHitsThisTurn++;
+            _hitOpponentMarbleThisTurn = true;
+            _bonusStrikeEarned = true;
+
+            if (_opponentHitsThisTurn == 1)
             {
-                _hitOpponentMarbleThisTurn = true;
-                _bonusStrikeEarned = true;
-                Debug.Log($"<color=#FFD700><b>[COMBO HIT]</b> {ActivePlayer.name} hit {hitTarget.name}! EXTRA PLAY AWARDED!</color>");
-                OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} HIT OPPONENT! EXTRA PLAY AWARDED! ★");
+                Debug.Log($"<color=#FFD700><b>[DIRECT STRIKE]</b> {ActivePlayer.name} struck {hitTarget.name}! EXTRA PLAY AWARDED!</color>");
+                BroadcastStatus($"★ DIRECT STRIKE! {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY! ★");
+            }
+            else
+            {
+                Debug.Log($"<color=#FF5500><b>[DOUBLE STRIKE]</b> {ActivePlayer.name} struck secondary target {hitTarget.name}! COMBO!</color>");
+                BroadcastStatus($"★ DOUBLE STRIKE COMBO! {ActivePlayer.name.ToUpper()} MULTI-HIT! ★");
             }
         }
 
@@ -266,6 +276,7 @@ namespace PitStriker.Gameplay
             ActivePlayer.hasTakenFirstShot = true;
             _pitSunkThisTurn = false;
             _hitOpponentMarbleThisTurn = false;
+            _opponentHitsThisTurn = 0;
             _bonusStrikeEarned = false;
 
             SetState(GameState.Rolling);
@@ -645,11 +656,12 @@ namespace PitStriker.Gameplay
             }
             else if (_bonusStrikeEarned)
             {
-                // Extra play awarded from hitting another player's marble!
+                // Extra play awarded from striking another player's marble!
                 _bonusStrikeEarned = false;
                 _hitOpponentMarbleThisTurn = false;
-                OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY! ★");
-                yield return new WaitForSeconds(0.5f);
+                _opponentHitsThisTurn = 0;
+                BroadcastStatus($"★ {ActivePlayer.name.ToUpper()}: BONUS STROKE READY! TAKE YOUR SHOT! ★");
+                yield return new WaitForSeconds(0.6f);
                 ActivateCurrentPlayer();
                 SetState(GameState.ReadyToAim);
             }
