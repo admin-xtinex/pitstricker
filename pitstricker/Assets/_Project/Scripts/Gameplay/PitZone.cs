@@ -50,19 +50,19 @@ namespace PitStriker.Gameplay
                 _pitNumber = 1;
             }
 
-            // Submerged spherical trigger covers the 2x marble basin opening (0.60m radius)
+            // Submerged spherical trigger covers the full basin and approach (1.50m radius)
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius = 0.60f;
-                sphereTrigger.center = new Vector3(0f, -0.14f, 0f);
+                sphereTrigger.radius = 1.50f;
+                sphereTrigger.center = Vector3.zero;
             }
         }
 
         /// <summary>
-        /// Deterministically evaluates whether a marble is physically contained within this pit basin.
-        /// Accounts for 2x marble cup dimensions (1.0m diameter, 0.28m depth).
+        /// Deterministically evaluates whether a marble is physically contained within or at this pit basin.
+        /// Generous 1.45m radius ensures any marble that reaches or lips the pit is 100% reliably scored.
         /// </summary>
         public bool IsMarbleInsidePit(MarbleController marble)
         {
@@ -73,9 +73,9 @@ namespace PitStriker.Gameplay
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
             float relativeY = marble.transform.position.y - transform.position.y;
 
-            // Pit basin opening is 0.50m radius (1.0m diameter = 2x marble size).
-            // A marble inside the cup is within 0.60m radius and sunken below fairway surface (relativeY < 0.26f).
-            return horizontalDist <= 0.60f && relativeY < 0.26f;
+            // Generous 1.45m radius: with pits 13.5m apart, any marble stopping within 1.45m is definitively at this pit.
+            // relativeY < 0.40m ensures the marble is on the ground or in the depression (not jumping high in the air).
+            return horizontalDist <= 1.45f && relativeY < 0.40f;
         }
 
         /// <summary>

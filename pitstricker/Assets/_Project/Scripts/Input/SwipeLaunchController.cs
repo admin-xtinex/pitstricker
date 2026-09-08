@@ -21,9 +21,6 @@ namespace PitStriker.Input
         [Tooltip("Maximum impulse force delivered to the marble at full power.")]
         [SerializeField] private float _maxLaunchForce = 32.0f;
 
-        [Tooltip("If true, pull backward to shoot forward (Slingshot style). If false, push forward (Cue stick style).")]
-        [SerializeField] private bool _invertPullToShoot = true;
-
         [Header("Trajectory Visualizer")]
         [Tooltip("Optional LineRenderer component used to draw the aim trajectory.")]
         [SerializeField] private LineRenderer _trajectoryLine;
@@ -228,7 +225,20 @@ namespace PitStriker.Input
                         _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
                         OnPowerChanged?.Invoke(_currentPower);
 
-                        Vector2 aimScreenDir = _invertPullToShoot ? -screenDelta.normalized : screenDelta.normalized;
+                        // Intuitive aim:
+                        // If pulled backward (screenDelta.y < 0), invert to shoot forward (slingshot pull).
+                        // If swiped forward (screenDelta.y > 0), follow forward drag to shoot forward (direct flick).
+                        Vector2 aimScreenDir;
+                        if (screenDelta.y < 0f)
+                        {
+                            // Pull-back slingshot: pull down on screen shoots forward
+                            aimScreenDir = -screenDelta.normalized;
+                        }
+                        else
+                        {
+                            // Forward swipe/flick: push up on screen shoots forward
+                            aimScreenDir = screenDelta.normalized;
+                        }
 
                         Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
                         Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
