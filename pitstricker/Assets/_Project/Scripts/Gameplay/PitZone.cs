@@ -89,6 +89,17 @@ namespace PitStriker.Gameplay
             {
                 IsSunk = true;
                 marble.Halt();
+
+                // Audio & VFX Juice
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayPitSink();
+                }
+                if (PitStriker.VFX.VFXManager.Instance != null)
+                {
+                    PitStriker.VFX.VFXManager.Instance.PlayPitCelebration(transform.position);
+                }
+
                 Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> Marble SUNK into Pit #{_pitNumber}!</color>");
                 OnMarbleSunk?.Invoke(this, marble);
             }

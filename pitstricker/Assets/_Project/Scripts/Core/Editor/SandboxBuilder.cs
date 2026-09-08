@@ -8,13 +8,16 @@ using PitStriker.Input;
 using PitStriker.CameraSystem;
 using PitStriker.Gameplay;
 using PitStriker.UI;
+using PitStriker.Audio;
+using PitStriker.VFX;
 
 namespace PitStriker.EditorTools
 {
     /// <summary>
     /// Studio Editor Automation:
     /// One-click generation of the complete Pit Striker Physics Arena
-    /// with Round Pits, Chalk Launch Reticle, and Full Concept HUD (Power Meter + Stage Beads).
+    /// with Round Pits, Chalk Launch Reticle, 4-Player Pass-and-Play Marbles,
+    /// Procedural Audio/VFX Juice, and Full Concept HUD (Power Meter, Stage Beads, Player Badges, Podium Modal).
     /// </summary>
     public static class SandboxBuilder
     {
@@ -27,9 +30,16 @@ namespace PitStriker.EditorTools
             // Load Materials
             Material sandMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Ground_Sand.mat");
             Material woodMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Boundary_Wood.mat");
-            Material marbleMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Blue.mat");
             Material pitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Pit_Dark.mat");
             Material lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Trajectory_Cyan.mat");
+
+            Material[] marbleMats = new Material[]
+            {
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Blue.mat"),
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Red.mat"),
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Green.mat"),
+                AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Amber.mat")
+            };
 
             PhysicsMaterial sandPhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Sand_Friction.physicMaterial");
             PhysicsMaterial bouncePhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Marble_Bouncy.physicMaterial");
@@ -44,8 +54,11 @@ namespace PitStriker.EditorTools
             GameObject oldArena = GameObject.Find("Arena_Sandbox");
             if (oldArena != null) Undo.DestroyObjectImmediate(oldArena);
 
-            GameObject oldMarble = GameObject.Find("PlayerMarble_Blue");
-            if (oldMarble != null) Undo.DestroyObjectImmediate(oldMarble);
+            // Clean up any existing marble controllers in the scene
+            foreach (var m in Object.FindObjectsByType<MarbleController>(FindObjectsSortMode.None))
+            {
+                Undo.DestroyObjectImmediate(m.gameObject);
+            }
 
             GameObject oldHUD = GameObject.Find("HUD_Canvas");
             if (oldHUD != null) Undo.DestroyObjectImmediate(oldHUD);
@@ -82,46 +95,55 @@ namespace PitStriker.EditorTools
             // 5. Create Ground Chalk Launch Ring (Concept Image 1 & 2 reference)
             CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -5.5f), 1.0f);
 
-            // 6. Create Player Striker Marble
-            GameObject marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marble.name = "PlayerMarble_Blue";
-            marble.transform.position = new Vector3(0f, 0.3f, -5.5f);
-            marble.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
+            // 6. Create 4 Player Striker Marbles (P1..P4) for Local Pass-and-Play Multiplayer
+            string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
+            float[] xPositions = new float[] { -0.6f, -0.2f, 0.2f, 0.6f };
+            MarbleController p1Marble = null;
 
-            if (marbleMat != null) marble.GetComponent<MeshRenderer>().sharedMaterial = marbleMat;
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject marbleObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                marbleObj.name = marbleNames[i];
+                marbleObj.transform.position = new Vector3(xPositions[i], 0.3f, -5.5f);
+                marbleObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
 
-            // Rigidbody
-            Rigidbody rb = marble.AddComponent<Rigidbody>();
-            rb.mass = 1.0f;
-            rb.linearDamping = 0.3f;
-            rb.angularDamping = 0.8f;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
+                if (marbleMats[i] != null) marbleObj.GetComponent<MeshRenderer>().sharedMaterial = marbleMats[i];
 
-            // SphereCollider
-            SphereCollider sc = marble.GetComponent<SphereCollider>();
-            sc.center = Vector3.zero;
-            sc.radius = 0.5f;
-            if (bouncePhys != null) sc.sharedMaterial = bouncePhys;
+                Rigidbody rb = marbleObj.AddComponent<Rigidbody>();
+                rb.mass = 1.0f;
+                rb.linearDamping = 0.3f;
+                rb.angularDamping = 0.8f;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-            // Core Marble Controller
-            MarbleController marbleController = marble.AddComponent<MarbleController>();
+                SphereCollider sc = marbleObj.GetComponent<SphereCollider>();
+                sc.center = Vector3.zero;
+                sc.radius = 0.5f;
+                if (bouncePhys != null) sc.sharedMaterial = bouncePhys;
 
-            // Trajectory Line
-            LineRenderer line = marble.AddComponent<LineRenderer>();
-            line.startWidth = 0.08f;
-            line.endWidth = 0.16f;
-            line.startColor = new Color(0.1f, 0.85f, 1f, 0.95f);
-            line.endColor = new Color(0.1f, 0.9f, 1f, 0.3f);
-            line.useWorldSpace = true;
-            if (lineMat != null) line.sharedMaterial = lineMat;
-            line.enabled = false;
+                MarbleController mc = marbleObj.AddComponent<MarbleController>();
 
-            SwipeLaunchController launcher = marble.AddComponent<SwipeLaunchController>();
+                if (i == 0)
+                {
+                    p1Marble = mc;
+
+                    // Trajectory Line
+                    LineRenderer line = marbleObj.AddComponent<LineRenderer>();
+                    line.startWidth = 0.08f;
+                    line.endWidth = 0.16f;
+                    line.startColor = new Color(0f, 0.85f, 1f, 0.95f);
+                    line.endColor = new Color(0f, 0.9f, 1f, 0.25f);
+                    line.useWorldSpace = true;
+                    if (lineMat != null) line.sharedMaterial = lineMat;
+                    line.enabled = false;
+
+                    marbleObj.AddComponent<SwipeLaunchController>();
+                }
+            }
 
             // 7. Main Camera Setup
             Camera cam = Camera.main;
-            if (cam != null)
+            if (cam != null && p1Marble != null)
             {
                 cam.transform.position = new Vector3(0f, 2.8f, -10.0f);
                 cam.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
@@ -131,10 +153,10 @@ namespace PitStriker.EditorTools
                 {
                     follow = cam.gameObject.AddComponent<SmoothFollowCamera>();
                 }
-                follow.SetTarget(marble.transform);
+                follow.SetTarget(p1Marble.transform);
             }
 
-            // 8. Turn & Match Orchestrator (Phase 4)
+            // 8. Turn & Match Orchestrator (Phase 5 Multiplayer)
             TurnManager tm = Object.FindFirstObjectByType<TurnManager>();
             if (tm == null)
             {
@@ -142,17 +164,32 @@ namespace PitStriker.EditorTools
                 tm = tmObj.AddComponent<TurnManager>();
             }
             SerializedObject tmSo = new SerializedObject(tm);
-            tmSo.FindProperty("_activeMarble").objectReferenceValue = marble.GetComponent<MarbleController>();
+            tmSo.FindProperty("_playerCount").intValue = 4;
             tmSo.ApplyModifiedProperties();
 
-            // 9. Create Concept HUD Canvas (Power Meter + Stage Beads + Scoreboard + Victory Modal)
+            // 9. Audio & Visual Juice Managers (Phase 7)
+            AudioManager audioMgr = Object.FindFirstObjectByType<AudioManager>();
+            if (audioMgr == null)
+            {
+                GameObject audioObj = new GameObject("AudioManager");
+                audioObj.AddComponent<AudioManager>();
+            }
+
+            VFXManager vfxMgr = Object.FindFirstObjectByType<VFXManager>();
+            if (vfxMgr == null)
+            {
+                GameObject vfxObj = new GameObject("VFXManager");
+                vfxObj.AddComponent<VFXManager>();
+            }
+
+            // 10. Create Concept HUD Canvas (Power Meter + Stage Beads + Scoreboard + Player Badges + Victory Modal)
             CreateHUDCanvas();
 
             Undo.CollapseUndoOperations(group);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
             UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with TurnManager, Round Pits, Scoreboard, and Victory Modal!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> 4-Player Arena rebuilt with Pass-and-Play, Audio/VFX Juice, Badges, and Podium Modal!</color>");
         }
 
         private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -618,7 +655,10 @@ namespace PitStriker.EditorTools
             parText.raycastTarget = false;
             parText.text = "COURSE PAR: 8";
 
-            // 6. Victory Modal (Center Overlay, initially inactive)
+            // 6. Player Badges Panel (Top-Right, Concept Art layout: P1..P4)
+            CreatePlayerBadgesPanel(canvasObj.transform, out Image[] badgeImages, out Text[] badgeTexts, out Image[] badgeGlows);
+
+            // 7. Victory Modal (Center Overlay, initially inactive)
             GameObject modalObj = new GameObject("Victory_Modal");
             modalObj.transform.SetParent(canvasObj.transform, false);
             RectTransform modalRect = modalObj.AddComponent<RectTransform>();
@@ -626,7 +666,7 @@ namespace PitStriker.EditorTools
             modalRect.anchorMax = new Vector2(0.5f, 0.5f);
             modalRect.pivot = new Vector2(0.5f, 0.5f);
             modalRect.anchoredPosition = Vector2.zero;
-            modalRect.sizeDelta = new Vector2(500f, 340f);
+            modalRect.sizeDelta = new Vector2(540f, 440f);
 
             Image modalBg = modalObj.AddComponent<Image>();
             modalBg.color = new Color(0.04f, 0.06f, 0.1f, 0.96f);
@@ -635,8 +675,8 @@ namespace PitStriker.EditorTools
             GameObject vHeaderObj = new GameObject("Header");
             vHeaderObj.transform.SetParent(modalObj.transform, false);
             RectTransform vHeaderRect = vHeaderObj.AddComponent<RectTransform>();
-            vHeaderRect.anchorMin = new Vector2(0f, 0.72f);
-            vHeaderRect.anchorMax = new Vector2(1f, 0.95f);
+            vHeaderRect.anchorMin = new Vector2(0f, 0.82f);
+            vHeaderRect.anchorMax = new Vector2(1f, 0.97f);
             vHeaderRect.sizeDelta = Vector2.zero;
             Text vHeader = vHeaderObj.AddComponent<Text>();
             vHeader.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -644,14 +684,14 @@ namespace PitStriker.EditorTools
             vHeader.fontStyle = FontStyle.Bold;
             vHeader.alignment = TextAnchor.MiddleCenter;
             vHeader.color = new Color(1f, 0.85f, 0.2f, 1f);
-            vHeader.text = "★ VICTORY! ★";
+            vHeader.text = "★ MATCH FINISHED! ★";
 
-            // Strokes Text
+            // Strokes / Winner Text
             GameObject vStrokesObj = new GameObject("Strokes");
             vStrokesObj.transform.SetParent(modalObj.transform, false);
             RectTransform vStrokesRect = vStrokesObj.AddComponent<RectTransform>();
-            vStrokesRect.anchorMin = new Vector2(0f, 0.52f);
-            vStrokesRect.anchorMax = new Vector2(1f, 0.72f);
+            vStrokesRect.anchorMin = new Vector2(0f, 0.66f);
+            vStrokesRect.anchorMax = new Vector2(1f, 0.82f);
             vStrokesRect.sizeDelta = Vector2.zero;
             Text vStrokes = vStrokesObj.AddComponent<Text>();
             vStrokes.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -659,43 +699,44 @@ namespace PitStriker.EditorTools
             vStrokes.fontStyle = FontStyle.Bold;
             vStrokes.alignment = TextAnchor.MiddleCenter;
             vStrokes.color = Color.white;
-            vStrokes.text = "TOTAL STROKES: 0";
+            vStrokes.text = "★ WINNER ★";
 
             // Course Par Text
             GameObject vParObj = new GameObject("CoursePar");
             vParObj.transform.SetParent(modalObj.transform, false);
             RectTransform vParRect = vParObj.AddComponent<RectTransform>();
-            vParRect.anchorMin = new Vector2(0f, 0.36f);
-            vParRect.anchorMax = new Vector2(1f, 0.52f);
+            vParRect.anchorMin = new Vector2(0f, 0.56f);
+            vParRect.anchorMax = new Vector2(1f, 0.66f);
             vParRect.sizeDelta = Vector2.zero;
             Text vPar = vParObj.AddComponent<Text>();
             vPar.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            vPar.fontSize = 18;
+            vPar.fontSize = 16;
             vPar.alignment = TextAnchor.MiddleCenter;
             vPar.color = new Color(0.7f, 0.85f, 1f, 1f);
             vPar.text = "COURSE PAR: 8";
 
-            // Rating Text
+            // Rating / Ranked Podium Text
             GameObject vRatingObj = new GameObject("Rating");
             vRatingObj.transform.SetParent(modalObj.transform, false);
             RectTransform vRatingRect = vRatingObj.AddComponent<RectTransform>();
-            vRatingRect.anchorMin = new Vector2(0f, 0.22f);
-            vRatingRect.anchorMax = new Vector2(1f, 0.36f);
+            vRatingRect.anchorMin = new Vector2(0.08f, 0.16f);
+            vRatingRect.anchorMax = new Vector2(0.92f, 0.55f);
             vRatingRect.sizeDelta = Vector2.zero;
             Text vRating = vRatingObj.AddComponent<Text>();
             vRating.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            vRating.fontSize = 20;
+            vRating.fontSize = 18;
             vRating.fontStyle = FontStyle.Bold;
+            vRating.lineSpacing = 1.25f;
             vRating.alignment = TextAnchor.MiddleCenter;
             vRating.color = new Color(0.2f, 1f, 0.5f, 1f);
-            vRating.text = "PAR (EVEN)";
+            vRating.text = "PODIUM STANDINGS";
 
             // Play Again Button
             GameObject againBtnObj = new GameObject("Play_Again_Button");
             againBtnObj.transform.SetParent(modalObj.transform, false);
             RectTransform againBtnRect = againBtnObj.AddComponent<RectTransform>();
-            againBtnRect.anchorMin = new Vector2(0.25f, 0.05f);
-            againBtnRect.anchorMax = new Vector2(0.75f, 0.2f);
+            againBtnRect.anchorMin = new Vector2(0.25f, 0.035f);
+            againBtnRect.anchorMax = new Vector2(0.75f, 0.14f);
             againBtnRect.sizeDelta = Vector2.zero;
 
             Image againImg = againBtnObj.AddComponent<Image>();
@@ -737,7 +778,111 @@ namespace PitStriker.EditorTools
             so.FindProperty("_victoryParText").objectReferenceValue = vPar;
             so.FindProperty("_victoryRatingText").objectReferenceValue = vRating;
             so.FindProperty("_playAgainButton").objectReferenceValue = againBtn;
+
+            // Wire Player Badges arrays
+            SerializedProperty bImgsProp = so.FindProperty("_playerBadgeImages");
+            bImgsProp.arraySize = 4;
+            for (int i = 0; i < 4; i++) bImgsProp.GetArrayElementAtIndex(i).objectReferenceValue = badgeImages[i];
+
+            SerializedProperty bTextsProp = so.FindProperty("_playerBadgeTexts");
+            bTextsProp.arraySize = 4;
+            for (int i = 0; i < 4; i++) bTextsProp.GetArrayElementAtIndex(i).objectReferenceValue = badgeTexts[i];
+
+            SerializedProperty bGlowsProp = so.FindProperty("_playerBadgeGlows");
+            bGlowsProp.arraySize = 4;
+            for (int i = 0; i < 4; i++) bGlowsProp.GetArrayElementAtIndex(i).objectReferenceValue = badgeGlows[i];
+
             so.ApplyModifiedProperties();
+        }
+
+        private static void CreatePlayerBadgesPanel(Transform parent, out Image[] badgeImages, out Text[] badgeTexts, out Image[] badgeGlows)
+        {
+            badgeImages = new Image[4];
+            badgeTexts = new Text[4];
+            badgeGlows = new Image[4];
+
+            GameObject panelObj = new GameObject("Player_Badges_Panel");
+            panelObj.transform.SetParent(parent, false);
+            RectTransform panelRect = panelObj.AddComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(1f, 1f);
+            panelRect.anchorMax = new Vector2(1f, 1f);
+            panelRect.pivot = new Vector2(1f, 1f);
+            panelRect.anchoredPosition = new Vector2(-40f, -30f);
+            panelRect.sizeDelta = new Vector2(340f, 80f);
+
+            Image panelBg = panelObj.AddComponent<Image>();
+            panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+            panelBg.raycastTarget = false;
+
+            Color[] playerColors = new Color[]
+            {
+                new Color(0f, 0.85f, 1f, 1f),    // P1: Cyan
+                new Color(1f, 0.25f, 0.25f, 1f), // P2: Crimson Red
+                new Color(0.2f, 1f, 0.4f, 1f),   // P3: Emerald Green
+                new Color(1f, 0.75f, 0.1f, 1f)   // P4: Amber Gold
+            };
+
+            float startX = 45f;
+            float stepX = 82f;
+
+            for (int i = 0; i < 4; i++)
+            {
+                float posX = startX + (i * stepX);
+
+                // Badge Container
+                GameObject container = new GameObject($"Badge_P{i + 1}");
+                container.transform.SetParent(panelObj.transform, false);
+                RectTransform cRect = container.AddComponent<RectTransform>();
+                cRect.anchorMin = new Vector2(0f, 0.5f);
+                cRect.anchorMax = new Vector2(0f, 0.5f);
+                cRect.pivot = new Vector2(0.5f, 0.5f);
+                cRect.anchoredPosition = new Vector2(posX, 0f);
+                cRect.sizeDelta = new Vector2(56f, 56f);
+
+                // Outer Glow / Ring (Active Turn Indicator)
+                GameObject glowObj = new GameObject("GlowRing");
+                glowObj.transform.SetParent(container.transform, false);
+                RectTransform gRect = glowObj.AddComponent<RectTransform>();
+                gRect.anchorMin = Vector2.zero;
+                gRect.anchorMax = Vector2.one;
+                gRect.sizeDelta = new Vector2(8f, 8f);
+                Image glowImg = glowObj.AddComponent<Image>();
+                glowImg.color = new Color(1f, 0.9f, 0.25f, 1f); // Vibrant Gold Glow
+                glowImg.raycastTarget = false;
+                glowImg.enabled = (i == 0); // P1 starts active
+                badgeGlows[i] = glowImg;
+
+                // Inner Disc
+                GameObject discObj = new GameObject("Disc");
+                discObj.transform.SetParent(container.transform, false);
+                RectTransform dRect = discObj.AddComponent<RectTransform>();
+                dRect.anchorMin = Vector2.zero;
+                dRect.anchorMax = Vector2.one;
+                dRect.sizeDelta = Vector2.zero;
+                Image discImg = discObj.AddComponent<Image>();
+                Color c = playerColors[i];
+                c.a = (i == 0) ? 1.0f : 0.45f;
+                discImg.color = c;
+                discImg.raycastTarget = false;
+                badgeImages[i] = discImg;
+
+                // Label Text
+                GameObject labelObj = new GameObject("Label");
+                labelObj.transform.SetParent(container.transform, false);
+                RectTransform lRect = labelObj.AddComponent<RectTransform>();
+                lRect.anchorMin = Vector2.zero;
+                lRect.anchorMax = Vector2.one;
+                lRect.sizeDelta = Vector2.zero;
+                Text labelText = labelObj.AddComponent<Text>();
+                labelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                labelText.fontSize = 20;
+                labelText.fontStyle = FontStyle.Bold;
+                labelText.alignment = TextAnchor.MiddleCenter;
+                labelText.color = Color.white;
+                labelText.raycastTarget = false;
+                labelText.text = $"P{i + 1}";
+                badgeTexts[i] = labelText;
+            }
         }
 
         private static Image CreateBead(string name, Transform parent, Vector2 pos, string number)

@@ -30,6 +30,11 @@ namespace PitStriker.UI
         [SerializeField] private Text _strokeCounterText;
         [SerializeField] private Text _parText;
 
+        [Header("Player Roster Badges (Concept Art layout)")]
+        [SerializeField] private Image[] _playerBadgeImages; // P1..P4 badge backgrounds
+        [SerializeField] private Text[] _playerBadgeTexts;   // P1..P4 labels
+        [SerializeField] private Image[] _playerBadgeGlows;   // Active turn ring highlights
+
         [Header("Victory Modal Panel")]
         [SerializeField] private GameObject _victoryModal;
         [SerializeField] private Text _victoryStrokesText;
@@ -92,18 +97,20 @@ namespace PitStriker.UI
         private void OnEnable()
         {
             SwipeLaunchController.OnPowerChanged += HandlePowerChanged;
+            TurnManager.OnActivePlayerChanged += HandleActivePlayerChanged;
             TurnManager.OnStrokeCountChanged += HandleStrokeCountChanged;
             TurnManager.OnTargetPitChanged += HandleTargetPitChanged;
-            TurnManager.OnMatchWon += HandleMatchWon;
+            TurnManager.OnMatchVictory += HandleMatchVictory;
             TurnManager.OnStatusMessage += HandleStatusMessage;
         }
 
         private void OnDisable()
         {
             SwipeLaunchController.OnPowerChanged -= HandlePowerChanged;
+            TurnManager.OnActivePlayerChanged -= HandleActivePlayerChanged;
             TurnManager.OnStrokeCountChanged -= HandleStrokeCountChanged;
             TurnManager.OnTargetPitChanged -= HandleTargetPitChanged;
-            TurnManager.OnMatchWon -= HandleMatchWon;
+            TurnManager.OnMatchVictory -= HandleMatchVictory;
             TurnManager.OnStatusMessage -= HandleStatusMessage;
         }
 
@@ -111,8 +118,45 @@ namespace PitStriker.UI
         {
             UpdateObjectiveUI();
             HandlePowerChanged(0f);
-            HandleStrokeCountChanged(0, 0);
+            HandleStrokeCountChanged(0, 8);
             if (_victoryModal != null) _victoryModal.SetActive(false);
+        }
+
+        private void HandleActivePlayerChanged(TurnManager.PlayerData activePlayer)
+        {
+            if (activePlayer == null) return;
+
+            // Highlight active player badge; dim others
+            if (_playerBadgeGlows != null)
+            {
+                for (int i = 0; i < _playerBadgeGlows.Length; i++)
+                {
+                    if (_playerBadgeGlows[i] != null)
+                    {
+                        bool isActive = (i + 1) == activePlayer.id;
+                        _playerBadgeGlows[i].enabled = isActive;
+                    }
+                }
+            }
+
+            if (_playerBadgeImages != null)
+            {
+                for (int i = 0; i < _playerBadgeImages.Length; i++)
+                {
+                    if (_playerBadgeImages[i] != null)
+                    {
+                        bool isActive = (i + 1) == activePlayer.id;
+                        Color c = _playerBadgeImages[i].color;
+                        c.a = isActive ? 1.0f : 0.45f;
+                        _playerBadgeImages[i].color = c;
+                    }
+                }
+            }
+
+            if (_strokeCounterText != null)
+            {
+                _strokeCounterText.text = $"{activePlayer.name.ToUpper()}: {activePlayer.totalStrokes} STROKES";
+            }
         }
 
         private void HandleSliderValueChanged(float val)
@@ -201,7 +245,7 @@ namespace PitStriker.UI
             }
         }
 
-        private void HandleMatchWon(int totalStrokes, int coursePar, string rating)
+        private void HandleMatchVictory(TurnManager.PlayerData winner, List<TurnManager.PlayerData> leaderboard)
         {
             if (_victoryModal != null)
             {
@@ -209,26 +253,32 @@ namespace PitStriker.UI
             }
             else
             {
-                CreateRuntimeVictoryModal(totalStrokes, coursePar, rating);
+                CreateRuntimeVictoryModal(winner, leaderboard);
             }
 
-            if (_victoryStrokesText != null)
+            if (_victoryStrokesText != null && winner != null)
             {
-                _victoryStrokesText.text = $"TOTAL STROKES: {totalStrokes}";
+                _victoryStrokesText.text = $"★ {winner.name.ToUpper()} WINS! ★\nTOTAL STROKES: {winner.totalStrokes}";
             }
 
             if (_victoryParText != null)
             {
-                _victoryParText.text = $"COURSE PAR: {coursePar}";
+                _victoryParText.text = $"COURSE PAR: 8";
             }
 
-            if (_victoryRatingText != null)
+            if (_victoryRatingText != null && leaderboard != null)
             {
-                _victoryRatingText.text = $"RATING: {rating}";
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                for (int i = 0; i < leaderboard.Count; i++)
+                {
+                    string medal = i == 0 ? "🥇" : (i == 1 ? "🥈" : (i == 2 ? "🥉" : "  "));
+                    sb.AppendLine($"{medal} {leaderboard[i].name}: {leaderboard[i].totalStrokes} strokes");
+                }
+                _victoryRatingText.text = sb.ToString();
             }
         }
 
-        private void CreateRuntimeVictoryModal(int totalStrokes, int coursePar, string rating)
+        private void CreateRuntimeVictoryModal(TurnManager.PlayerData winner, List<TurnManager.PlayerData> leaderboard)
         {
             GameObject modalObj = new GameObject("Victory_Modal_Runtime");
             modalObj.transform.SetParent(transform, false);
@@ -237,7 +287,7 @@ namespace PitStriker.UI
             modalRect.anchorMax = new Vector2(0.5f, 0.5f);
             modalRect.pivot = new Vector2(0.5f, 0.5f);
             modalRect.anchoredPosition = Vector2.zero;
-            modalRect.sizeDelta = new Vector2(500f, 320f);
+            modalRect.sizeDelta = new Vector2(520f, 360f);
 
             Image modalBg = modalObj.AddComponent<Image>();
             modalBg.color = new Color(0.04f, 0.06f, 0.1f, 0.96f);
@@ -246,38 +296,48 @@ namespace PitStriker.UI
             GameObject titleObj = new GameObject("Title");
             titleObj.transform.SetParent(modalObj.transform, false);
             RectTransform titleRect = titleObj.AddComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0f, 0.7f);
-            titleRect.anchorMax = new Vector2(1f, 0.95f);
+            titleRect.anchorMin = new Vector2(0f, 0.75f);
+            titleRect.anchorMax = new Vector2(1f, 0.98f);
             titleRect.sizeDelta = Vector2.zero;
             Text title = titleObj.AddComponent<Text>();
             title.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            title.fontSize = 28;
+            title.fontSize = 26;
             title.fontStyle = FontStyle.Bold;
             title.alignment = TextAnchor.MiddleCenter;
             title.color = new Color(1f, 0.85f, 0.2f, 1f);
-            title.text = "★ VICTORY! ★";
+            title.text = winner != null ? $"★ {winner.name.ToUpper()} WINS! ★" : "★ MATCH VICTORY! ★";
 
-            // Stats
-            GameObject statsObj = new GameObject("Stats");
+            // Leaderboard Text
+            GameObject statsObj = new GameObject("Leaderboard");
             statsObj.transform.SetParent(modalObj.transform, false);
             RectTransform statsRect = statsObj.AddComponent<RectTransform>();
-            statsRect.anchorMin = new Vector2(0f, 0.25f);
-            statsRect.anchorMax = new Vector2(1f, 0.7f);
+            statsRect.anchorMin = new Vector2(0.08f, 0.24f);
+            statsRect.anchorMax = new Vector2(0.92f, 0.74f);
             statsRect.sizeDelta = Vector2.zero;
             Text stats = statsObj.AddComponent<Text>();
             stats.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            stats.fontSize = 20;
+            stats.fontSize = 18;
             stats.fontStyle = FontStyle.Bold;
             stats.alignment = TextAnchor.MiddleCenter;
             stats.color = Color.white;
-            stats.text = $"TOTAL STROKES: {totalStrokes}\nCOURSE PAR: {coursePar}\nRATING: {rating}";
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            if (leaderboard != null)
+            {
+                for (int i = 0; i < leaderboard.Count; i++)
+                {
+                    string medal = i == 0 ? "🥇" : (i == 1 ? "🥈" : (i == 2 ? "🥉" : "   "));
+                    sb.AppendLine($"{medal} {leaderboard[i].name} — {leaderboard[i].totalStrokes} Strokes (Pit {leaderboard[i].currentPit})");
+                }
+            }
+            stats.text = sb.ToString();
 
             // Play Again Button
             GameObject btnObj = new GameObject("PlayAgainBtn");
             btnObj.transform.SetParent(modalObj.transform, false);
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
-            btnRect.anchorMin = new Vector2(0.25f, 0.06f);
-            btnRect.anchorMax = new Vector2(0.75f, 0.22f);
+            btnRect.anchorMin = new Vector2(0.25f, 0.05f);
+            btnRect.anchorMax = new Vector2(0.75f, 0.2f);
             btnRect.sizeDelta = Vector2.zero;
             Image btnImg = btnObj.AddComponent<Image>();
             btnImg.color = new Color(0f, 0.8f, 0.4f, 1f);
