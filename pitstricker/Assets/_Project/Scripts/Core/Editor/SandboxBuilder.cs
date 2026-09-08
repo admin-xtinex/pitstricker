@@ -88,17 +88,27 @@ namespace PitStriker.EditorTools
                 kitObj.transform.localRotation = Quaternion.identity;
                 kitObj.transform.localScale = Vector3.one;
 
-                // Strip any colliders from kit props so marbles roll uninhibited
+                // Strip colliders from decorative props so marbles roll uninhibited
                 foreach (var col in kitObj.GetComponentsInChildren<Collider>(true))
                 {
-                    Undo.DestroyObjectImmediate(col);
+                    if (!col.gameObject.name.Contains("Ground"))
+                    {
+                        Undo.DestroyObjectImmediate(col);
+                    }
                 }
 
-                // Apply dedicated materials by child name
+                // Apply dedicated materials and colliders by child name
                 foreach (var mr in kitObj.GetComponentsInChildren<MeshRenderer>(true))
                 {
                     string oName = mr.gameObject.name;
-                    if (oName.Contains("Chalk") || oName.Contains("Arrow"))
+                    if (oName.Contains("Ground"))
+                    {
+                        mr.sharedMaterial = sandMat;
+                        MeshCollider mc = mr.gameObject.GetComponent<MeshCollider>();
+                        if (mc == null) mc = mr.gameObject.AddComponent<MeshCollider>();
+                        if (sandPhys != null) mc.sharedMaterial = sandPhys;
+                    }
+                    else if (oName.Contains("Chalk") || oName.Contains("Arrow"))
                     {
                         mr.sharedMaterial = chalkMat;
                     }
@@ -119,53 +129,48 @@ namespace PitStriker.EditorTools
                 }
             }
 
-            // 2.2 Village Architecture Dressing (House, Stone Walls, Benches/Barricades, Outbuildings - Strictly WITHOUT Plants)
+            // 2.2 Village Architecture Dressing (House, Continuous Stone Walls, Benches/Barricades, Outbuildings - Strictly WITHOUT Plants)
             GameObject dressingRoot = new GameObject("Environment_Village_Dressing");
             dressingRoot.transform.SetParent(arenaRoot.transform);
             dressingRoot.transform.localPosition = Vector3.zero;
 
-            // Village House on left flank
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Home1.fbx", dressingRoot.transform, new Vector3(-11.5f, 0f, 7.5f), new Vector3(0f, 28f, 0f), Vector3.one * 1.35f, "VIS_VillageHome");
+            // Traditional Village House on left flank
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Home1.fbx", dressingRoot.transform, new Vector3(-11.0f, 0.15f, 7.5f), new Vector3(0f, 26f, 0f), Vector3.one * 1.35f, "VIS_VillageHome");
 
-            // Stone walls / rock fences framing the track
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-5.6f, 0f, -3.2f), new Vector3(0f, 45f, 0f), Vector3.one * 1.3f, "VIS_Stone_Dugout");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(6.5f, 0f, 2.0f), new Vector3(0f, -15f, 0f), Vector3.one * 1.4f, "VIS_Stone_Right_Front");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-6.8f, 0f, 18.0f), new Vector3(0f, 35f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_Mid");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(7.0f, 0f, 24.0f), new Vector3(0f, -40f, 0f), Vector3.one * 1.5f, "VIS_Stone_Right_Mid");
+            // Continuous rustic stone boundary wall along the left fairway border (matching Concept_Village_Path.png)
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-5.2f, 0f, -3.5f), new Vector3(0f, 40f, 0f), Vector3.one * 1.3f, "VIS_Stone_Left_01");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-5.8f, 0f, 4.0f), new Vector3(0f, 10f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_02");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-6.2f, 0f, 12.0f), new Vector3(0f, -15f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_03");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-6.5f, 0f, 20.0f), new Vector3(0f, 25f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_04");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(-6.8f, 0f, 28.0f), new Vector3(0f, -10f, 0f), Vector3.one * 1.4f, "VIS_Stone_Left_05");
+
+            // Right side stone boundary wall
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(5.5f, 0f, 2.0f), new Vector3(0f, -20f, 0f), Vector3.one * 1.4f, "VIS_Stone_Right_01");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(6.2f, 0f, 14.0f), new Vector3(0f, 15f, 0f), Vector3.one * 1.4f, "VIS_Stone_Right_02");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Stone.fbx", dressingRoot.transform, new Vector3(6.8f, 0f, 26.0f), new Vector3(0f, -30f, 0f), Vector3.one * 1.5f, "VIS_Stone_Right_03");
 
             // Rustic wooden benches / barricades
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(-4.4f, 0f, -5.4f), new Vector3(0f, 15f, 0f), Vector3.one * 1.0f, "VIS_Bench_Dugout");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(6.8f, 0f, 12.0f), new Vector3(0f, -10f, 0f), Vector3.one * 1.0f, "VIS_Barricade_Right");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(-4.2f, 0f, -5.2f), new Vector3(0f, 15f, 0f), Vector3.one * 1.0f, "VIS_Bench_Dugout");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Barr.fbx", dressingRoot.transform, new Vector3(5.8f, 0f, 8.0f), new Vector3(0f, -15f, 0f), Vector3.one * 1.0f, "VIS_Barricade_Right");
 
             // Village outbuilding / stalls in background
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Base.fbx", dressingRoot.transform, new Vector3(9.8f, 0f, 32.0f), new Vector3(0f, -25f, 0f), Vector3.one * 0.9f, "VIS_VillageBase_Back");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/S1.fbx", dressingRoot.transform, new Vector3(-10.5f, 0f, 25.0f), new Vector3(0f, 90f, 0f), Vector3.one * 1.1f, "VIS_VillageStall_Left");
-            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/s2.fbx", dressingRoot.transform, new Vector3(9.2f, 0f, 18.0f), new Vector3(0f, -90f, 0f), Vector3.one * 1.0f, "VIS_VillageStall_Right");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/Base.fbx", dressingRoot.transform, new Vector3(9.5f, 0.2f, 32.0f), new Vector3(0f, -25f, 0f), Vector3.one * 0.9f, "VIS_VillageBase_Back");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/S1.fbx", dressingRoot.transform, new Vector3(-10.5f, 0.2f, 25.0f), new Vector3(0f, 90f, 0f), Vector3.one * 1.1f, "VIS_VillageStall_Left");
+            PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/s2.fbx", dressingRoot.transform, new Vector3(9.2f, 0.2f, 18.0f), new Vector3(0f, -90f, 0f), Vector3.one * 1.0f, "VIS_VillageStall_Right");
 
-            // Master safety subfloor underneath the entire arena (48-meter fairway, 2x width 22m)
-            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(22f, 0.5f, 52f), sandMat, sandPhys);
+            // Master safety subfloor underneath the arena
+            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -2.0f, 15f), new Vector3(28f, 0.5f, 60f), sandMat, sandPhys, true);
 
-            // Left & Right Bank Slabs (2x wide, covering x: -8.2m to +8.2m)
-            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
-
-            // Center Track Slabs connecting seamlessly with round pit tiles (Z: -8.5m to Z: 38.0m)
-            CreateGroundSlab("Ground_Center_Start", arenaRoot.transform, new Vector3(0f, -0.25f, -3.4f), new Vector3(2.8f, 0.5f, 10.2f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_Bridge_1_2", arenaRoot.transform, new Vector3(0f, -0.25f, 9.75f), new Vector3(2.8f, 0.5f, 10.9f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_Bridge_2_3", arenaRoot.transform, new Vector3(0f, -0.25f, 23.75f), new Vector3(2.8f, 0.5f, 11.9f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 35.15f), new Vector3(2.8f, 0.5f, 5.7f), sandMat, sandPhys);
-
-            // 3. Boundary Rails (Left, Right, Back, Front) - 2x wide layout (bounds: x = -8.2m to +8.2m)
-            // Invisible physics barriers ensure marbles never clip out while scenic village environment remains fully visible
+            // 3. Boundary Rails (Left, Right, Back, Front) - Invisible physics barriers
             CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
 
-            // 4. Create 3 TRUE ROUND PITS with 2x marble size (Diameter = 1.0m, R = 0.50m)
-            CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1, sandMat, pitMat, woodMat, sandPhys);
-            CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2, sandMat, pitMat, woodMat, sandPhys);
-            CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3, sandMat, pitMat, woodMat, sandPhys);
+            // 4. Create 3 TRUE ROUND PIT TRIGGERS (built into the continuous earthen ground)
+            CreatePitTrigger("Pit_01_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1);
+            CreatePitTrigger("Pit_02_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2);
+            CreatePitTrigger("Pit_03_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3);
 
             // 5. Create 4 Player Striker Marbles (P1..P4) using User-Created Custom Models
             string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
@@ -289,7 +294,19 @@ namespace PitStriker.EditorTools
                 sun.transform.rotation = Quaternion.Euler(36f, 35f, 0f);
                 sun.color = new Color(1f, 0.95f, 0.88f, 1f);
                 sun.intensity = 1.35f;
+                sun.shadows = LightShadows.Soft;
             }
+
+            // Atmospheric Village Golden Hour Haze (eliminates void cutoffs, gives cinematic village depth)
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogStartDistance = 24f;
+            RenderSettings.fogEndDistance = 65f;
+            RenderSettings.fogColor = new Color(0.92f, 0.82f, 0.70f, 1.0f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.85f, 0.80f, 0.72f, 1.0f);
+            RenderSettings.ambientEquatorColor = new Color(0.70f, 0.60f, 0.48f, 1.0f);
+            RenderSettings.ambientGroundColor = new Color(0.40f, 0.30f, 0.20f, 1.0f);
 
             // 8. Turn & Match Orchestrator (Phase 5 Multiplayer)
             TurnManager tm = Object.FindAnyObjectByType<TurnManager>();
@@ -327,7 +344,7 @@ namespace PitStriker.EditorTools
             Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> 4-Player Arena rebuilt with Pass-and-Play, Audio/VFX Juice, Badges, and Podium Modal!</color>");
         }
 
-        private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
+        private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat, bool hideRenderer = false)
         {
             GameObject slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
             slab.name = name;
@@ -335,9 +352,30 @@ namespace PitStriker.EditorTools
             slab.transform.position = position;
             slab.transform.localScale = scale;
 
-            if (mat != null) slab.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            MeshRenderer mr = slab.GetComponent<MeshRenderer>();
+            if (mat != null && mr != null) mr.sharedMaterial = mat;
+            if (hideRenderer && mr != null) mr.enabled = false;
+
             BoxCollider col = slab.GetComponent<BoxCollider>();
-            if (physMat != null) col.sharedMaterial = physMat;
+            if (physMat != null && col != null) col.sharedMaterial = physMat;
+        }
+
+        private static void CreatePitTrigger(string name, Transform parent, Vector3 position, int pitNumber)
+        {
+            GameObject pitObj = new GameObject(name);
+            pitObj.transform.SetParent(parent);
+            pitObj.transform.position = position;
+
+            SphereCollider trigger = pitObj.AddComponent<SphereCollider>();
+            trigger.isTrigger = true;
+            trigger.radius = 0.55f;
+            trigger.center = new Vector3(0f, -0.14f, 0f);
+
+            PitZone zone = pitObj.AddComponent<PitZone>();
+            zone.SetPitNumber(pitNumber);
+            SerializedObject zoneSo = new SerializedObject(zone);
+            zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
+            zoneSo.ApplyModifiedProperties();
         }
 
         private static void CreateBoundaryWall(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat, bool hideRenderer = false)
