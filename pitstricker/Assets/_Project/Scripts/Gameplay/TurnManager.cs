@@ -85,6 +85,7 @@ namespace PitStriker.Gameplay
 
         // Toss & Bonus Play Tracking
         private List<TossResult> _tossResults = new List<TossResult>();
+        private List<PlayerData> _placementPodium = new List<PlayerData>();
         private int _tossPlayerIndex = 0;
         private bool _pitSunkThisTurn = false;
         private bool _hitOpponentMarbleThisTurn = false;
@@ -277,12 +278,12 @@ namespace PitStriker.Gameplay
         {
             SetState(GameState.Rolling);
 
-            // 1. Mandatory launch grace period: ensures marble has time to accelerate and roll
-            yield return new WaitForSeconds(0.6f);
+            // 1. Snappy launch grace period: ensures impulse integration before checking rest
+            yield return new WaitForSeconds(0.35f);
 
             // 2. Poll until all active marbles in the match have come to a stable stop
             float settleTimer = 0f;
-            float maxWait = 14.0f; // Safety timeout in case of microscopic drift
+            float maxWait = CurrentState == GameState.TossPhase ? 7.5f : 5.0f; // Bounded turn duration
             float timeElapsed = 0f;
 
             while (timeElapsed < maxWait)
@@ -310,9 +311,9 @@ namespace PitStriker.Gameplay
                 if (!anyMoving)
                 {
                     settleTimer += Time.deltaTime;
-                    if (settleTimer >= 0.4f)
+                    if (settleTimer >= 0.20f)
                     {
-                        // Stably rested for 0.4 consecutive seconds!
+                        // Stably rested!
                         break;
                     }
                 }
@@ -377,20 +378,61 @@ namespace PitStriker.Gameplay
                 }
                 else
                 {
-                    // Player has completed all 3 pits!
+                    // Player has conquered all 3 pits!
                     ActivePlayer.isFinished = true;
                     ActivePlayer.currentPit = 3;
                     OnTargetPitChanged?.Invoke(3);
-                    Debug.Log($"<color=#FFD700><b>[COURSE COMPLETE]</b> {ActivePlayer.name} finished in {ActivePlayer.totalStrokes} strokes!</color>");
 
-                    if (AreAllPlayersFinished())
+                    if (!_placementPodium.Contains(ActivePlayer))
                     {
+                        _placementPodium.Add(ActivePlayer);
+                    }
+
+                    int place = _placementPodium.Count;
+                    string placeOrdinal = place == 1 ? "1st" : (place == 2 ? "2nd" : (place == 3 ? "3rd" : $"{place}th"));
+                    Debug.Log($"<color=#FFD700><b>[PODIUM]</b> {ActivePlayer.name} takes {placeOrdinal} Place in {ActivePlayer.totalStrokes} strokes!</color>");
+
+                    if (Audio.AudioManager.Instance != null)
+                    {
+                        Audio.AudioManager.Instance.PlayPitSink();
+                    }
+
+                    // Retire finished marble from fairway so it doesn't obstruct remaining players
+                    if (ActivePlayer.marble != null)
+                    {
+                        ActivePlayer.marble.Halt();
+                        ActivePlayer.marble.SetVisible(false);
+                    }
+
+                    // Count remaining active competitors
+                    int remainingActive = 0;
+                    foreach (var p in _players)
+                    {
+                        if (!p.isFinished) remainingActive++;
+                    }
+
+                    if (remainingActive <= 1)
+                    {
+                        // Tournament concluded! Award final placement to the last standing player
+                        foreach (var p in _players)
+                        {
+                            if (!p.isFinished && !_placementPodium.Contains(p))
+                            {
+                                p.isFinished = true;
+                                _placementPodium.Add(p);
+                            }
+                        }
+
+                        OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} TAKES {placeOrdinal.ToUpper()}! TOURNAMENT COMPLETE! ★");
+                        yield return new WaitForSeconds(1.2f);
                         DeclareMatchVictory();
                     }
                     else
                     {
-                        OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} FINISHED! ADVANCING TO NEXT PLAYER ★");
-                        yield return new WaitForSeconds(1.0f);
+                        int nextPlace = place + 1;
+                        string nextOrdinal = nextPlace == 2 ? "2nd" : (nextPlace == 3 ? "3rd" : $"{nextPlace}th");
+                        OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} WINS {placeOrdinal.ToUpper()} PLACE! BATTLE FOR {nextOrdinal.ToUpper()}! ★");
+                        yield return new WaitForSeconds(1.8f);
                         AdvanceToNextActivePlayer();
                     }
                 }
@@ -536,6 +578,15 @@ namespace PitStriker.Gameplay
             while (ActivePlayer != null && ActivePlayer.isFinished && attempts <= _players.Count);
 
             ActivateCurrentPlayer();
+
+            // Display battle objective for remaining places
+            if (_placementPodium.Count > 0)
+            {
+                int targetPlace = _placementPodium.Count + 1;
+                string targetOrdinal = targetPlace == 2 ? "2nd" : (targetPlace == 3 ? "3rd" : $"{targetPlace}th");
+                OnStatusMessage?.Invoke($"BATTLE FOR {targetOrdinal.ToUpper()} PLACE • {ActivePlayer.name.ToUpper()}'s TURN • PIT {ActivePlayer.currentPit}");
+            }
+
             SetState(GameState.ReadyToAim);
         }
 
@@ -615,11 +666,14 @@ namespace PitStriker.Gameplay
         {
             SetState(GameState.MatchVictory);
 
-            // Sort leaderboard by fewest strokes
-            List<PlayerData> ranked = new List<PlayerData>(_players);
-            ranked.Sort((a, b) => a.totalStrokes.CompareTo(b.totalStrokes));
+            // Assemble leaderboard ordered strictly by podium finish (1st, 2nd, 3rd, 4th)
+            List<PlayerData> ranked = new List<PlayerData>(_placementPodium);
+            foreach (var p in _players)
+            {
+                if (!ranked.Contains(p)) ranked.Add(p);
+            }
 
-            PlayerData winner = ranked[0];
+            PlayerData winner = ranked.Count > 0 ? ranked[0] : null;
 
             if (Audio.AudioManager.Instance != null)
             {
@@ -627,7 +681,16 @@ namespace PitStriker.Gameplay
             }
 
             OnMatchVictory?.Invoke(winner, ranked);
-            OnStatusMessage?.Invoke($"★ {winner.name.ToUpper()} WINS WITH {winner.totalStrokes} STROKES! ★");
+
+            string summary = "★ PODIUM: ";
+            for (int i = 0; i < ranked.Count; i++)
+            {
+                string ord = i == 0 ? "1st" : (i == 1 ? "2nd" : (i == 2 ? "3rd" : $"{i + 1}th"));
+                summary += $"{ord}: {ranked[i].name.ToUpper()}{(i < ranked.Count - 1 ? " | " : "")}";
+            }
+            summary += " ★";
+
+            OnStatusMessage?.Invoke(summary);
         }
 
         private void RelocateToNextTee(MarbleController marble, int nextPit)
@@ -668,6 +731,7 @@ namespace PitStriker.Gameplay
             CurrentPlayerIndex = 0;
             _tossPlayerIndex = 0;
             _tossResults.Clear();
+            _placementPodium.Clear();
             _bonusStrikeEarned = false;
             _hitOpponentMarbleThisTurn = false;
 

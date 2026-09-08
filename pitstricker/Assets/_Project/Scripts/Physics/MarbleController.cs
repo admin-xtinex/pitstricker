@@ -22,14 +22,14 @@ namespace PitStriker.Physics
         [SerializeField] private float _angularDrag = 0.8f;
 
         [Tooltip("Speed below which the marble is considered completely stopped.")]
-        [SerializeField] private float _stopThreshold = 0.05f;
+        [SerializeField] private float _stopThreshold = 0.12f;
 
         // Cached Components
         private Rigidbody _rigidbody;
         private SphereCollider _collider;
 
         // State Tracking
-        private bool _wasMoving = false;
+        public bool _wasMoving = false;
         private float _launchGraceTimer = 0f;
         private int _consecutiveRestFrames = 0;
 
@@ -39,7 +39,7 @@ namespace PitStriker.Physics
         public event Action<Collision> OnMarbleCollision;
         public static event Action<MarbleController, MarbleController> OnMarbleHitMarble; // (striker, hitTarget)
 
-        public bool IsMoving => _rigidbody != null && (_rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold) || _rigidbody.angularVelocity.sqrMagnitude > 0.5f);
+        public bool IsMoving => _rigidbody != null && (_rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold) || _rigidbody.angularVelocity.sqrMagnitude > 0.6f);
         public Vector3 Velocity => _rigidbody != null ? _rigidbody.linearVelocity : Vector3.zero;
         public float CurrentSpeed => _rigidbody != null ? _rigidbody.linearVelocity.magnitude : 0f;
 
@@ -80,7 +80,7 @@ namespace PitStriker.Physics
             // Apply physical impulse
             _rigidbody.AddForce(normalizedDir * forceMagnitude, ForceMode.Impulse);
             _wasMoving = true;
-            _launchGraceTimer = 0.5f; // Guarantee physics integration time
+            _launchGraceTimer = 0.4f; // Guarantee physics integration time
             _consecutiveRestFrames = 0;
 
             OnMarbleLaunched?.Invoke();
@@ -110,6 +110,16 @@ namespace PitStriker.Physics
                 return;
             }
 
+            // Snappy tail-end braking to eliminate endless micro-crawls on the course
+            Vector3 horizVel = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z);
+            float horizSpeed = horizVel.magnitude;
+            if (horizSpeed < 0.75f && horizSpeed > 0f)
+            {
+                float brake = Time.fixedDeltaTime * 2.2f;
+                _rigidbody.linearVelocity = Vector3.MoveTowards(_rigidbody.linearVelocity, Vector3.zero, brake);
+                _rigidbody.angularVelocity = Vector3.MoveTowards(_rigidbody.angularVelocity, Vector3.zero, brake * 1.5f);
+            }
+
             bool currentlyMoving = IsMoving;
 
             if (currentlyMoving)
@@ -120,8 +130,8 @@ namespace PitStriker.Physics
             else if (_wasMoving)
             {
                 _consecutiveRestFrames++;
-                // Must be under stop threshold continuously for at least 15 physics steps (~0.3s)
-                if (_consecutiveRestFrames >= 15)
+                // Must be under stop threshold continuously for 8 physics steps (~0.16s)
+                if (_consecutiveRestFrames >= 8)
                 {
                     _rigidbody.linearVelocity = Vector3.zero;
                     _rigidbody.angularVelocity = Vector3.zero;
@@ -150,14 +160,46 @@ namespace PitStriker.Physics
             if (isMarble)
             {
                 OnMarbleHitMarble?.Invoke(this, otherMarble);
+
+                // Carrom / 8-Ball Pool Elastic Momentum Transfer:
+                // Strike target marble with amplified impulse along the contact normal
+                if (collision.contactCount > 0)
+                {
+                    Vector3 normal = collision.contacts[0].normal;
+                    Vector3 pushDir = -normal;
+                    pushDir.y = 0f;
+                    if (pushDir.sqrMagnitude > 0.001f)
+                    {
+                        pushDir.Normalize();
+                        float relSpeed = collision.relativeVelocity.magnitude;
+                        if (relSpeed > 0.12f)
+                        {
+                            // Kinetic transfer impulse directly along contact normal
+                            float transferImpulse = relSpeed * _mass * 1.55f;
+
+                            Rigidbody otherRb = otherMarble.GetComponent<Rigidbody>();
+                            if (otherRb != null)
+                            {
+                                otherRb.AddForce(pushDir * transferImpulse, ForceMode.Impulse);
+                                otherMarble._wasMoving = true;
+                            }
+
+                            // Deflect and slow down striker like a carrom striker hitting a coin
+                            if (_rigidbody != null)
+                            {
+                                _rigidbody.AddForce(-pushDir * (transferImpulse * 0.45f), ForceMode.Impulse);
+                            }
+                        }
+                    }
+                }
             }
 
             float speed = collision.relativeVelocity.magnitude;
-            if (speed > 0.4f)
+            if (speed > 0.25f)
             {
                 if (PitStriker.Audio.AudioManager.Instance != null)
                 {
-                    PitStriker.Audio.AudioManager.Instance.PlayCollision(speed, isMarble);
+                    PitStriker.Audio.AudioManager.Instance.PlayCollision(isMarble ? speed * 1.4f : speed, isMarble);
                 }
 
                 if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)
