@@ -48,7 +48,9 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // 3. Segmented Ground Structure (Leaving actual physical holes at Z: 1, 6, 11)
+            // Master safety subfloor underneath the entire arena
+            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 5f), new Vector3(12f, 0.5f, 26f), sandMat, sandPhys);
+
             // Left & Right Bank Slabs
             CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-2.7f, -0.25f, 5f), new Vector3(2.6f, 0.5f, 22f), sandMat, sandPhys);
             CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(2.7f, -0.25f, 5f), new Vector3(2.6f, 0.5f, 22f), sandMat, sandPhys);
@@ -66,9 +68,9 @@ namespace PitStriker.EditorTools
             CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 16.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
 
             // 5. Create 3 Real Recessed Sunken Pits
-            CreateSunkenPit("Pit_01", arenaRoot.transform, new Vector3(0f, 0f, 1f), 1, pitMat, woodMat);
-            CreateSunkenPit("Pit_02", arenaRoot.transform, new Vector3(0f, 0f, 6f), 2, pitMat, woodMat);
-            CreateSunkenPit("Pit_03", arenaRoot.transform, new Vector3(0f, 0f, 11f), 3, pitMat, woodMat);
+            CreateSunkenPit("Pit_01", arenaRoot.transform, new Vector3(0f, 0f, 1f), 1, pitMat);
+            CreateSunkenPit("Pit_02", arenaRoot.transform, new Vector3(0f, 0f, 6f), 2, pitMat);
+            CreateSunkenPit("Pit_03", arenaRoot.transform, new Vector3(0f, 0f, 11f), 3, pitMat);
 
             // 6. Create Player Striker Marble
             GameObject marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -154,36 +156,34 @@ namespace PitStriker.EditorTools
             if (physMat != null) col.sharedMaterial = physMat;
         }
 
-        private static void CreateSunkenPit(string name, Transform parent, Vector3 position, int pitNumber, Material pitMat, Material rimMat)
+        private static void CreateSunkenPit(string name, Transform parent, Vector3 position, int pitNumber, Material pitMat)
         {
             GameObject pitRoot = new GameObject(name);
             pitRoot.transform.SetParent(parent);
             pitRoot.transform.position = position;
 
-            // 1. Sunken Basin Floor (Solid surface at depth Y: -0.38)
-            GameObject basinFloor = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            // 1. Solid Pit Floor (Thick Box completely sealing the 2.8m x 2.4m hole)
+            GameObject basinFloor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             basinFloor.name = "Basin_Floor";
             basinFloor.transform.SetParent(pitRoot.transform);
-            basinFloor.transform.localPosition = new Vector3(0f, -0.38f, 0f);
-            basinFloor.transform.localScale = new Vector3(1.8f, 0.05f, 1.8f);
+            basinFloor.transform.localPosition = new Vector3(0f, -0.7f, 0f);
+            basinFloor.transform.localScale = new Vector3(2.8f, 0.8f, 2.4f);
             if (pitMat != null) basinFloor.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
 
-            // 2. Beveled Funnel Rim (Sloped cylinder funneling marbles down)
-            GameObject rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            rim.name = "Basin_Rim";
-            rim.transform.SetParent(pitRoot.transform);
-            rim.transform.localPosition = new Vector3(0f, -0.2f, 0f);
-            rim.transform.localScale = new Vector3(2.1f, 0.15f, 2.1f);
-            if (pitMat != null) rim.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
-
-            // Remove solid collider from rim so marble drops through freely
-            Object.DestroyImmediate(rim.GetComponent<Collider>());
+            // 2. Circular Visual Pit Cup on the floor of the hole
+            GameObject cupVisual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cupVisual.name = "Cup_Visual";
+            cupVisual.transform.SetParent(pitRoot.transform);
+            cupVisual.transform.localPosition = new Vector3(0f, -0.28f, 0f);
+            cupVisual.transform.localScale = new Vector3(2.0f, 0.02f, 2.0f);
+            if (pitMat != null) cupVisual.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
+            Object.DestroyImmediate(cupVisual.GetComponent<Collider>());
 
             // 3. Trigger Zone inside the cup
             SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 1.0f;
-            trigger.center = new Vector3(0f, -0.15f, 0f);
+            trigger.radius = 1.1f;
+            trigger.center = new Vector3(0f, -0.1f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
         }

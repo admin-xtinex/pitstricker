@@ -103,6 +103,13 @@ namespace PitStriker.Physics
             {
                 _wasMoving = true;
             }
+
+            // Safety catch: If marble ever drops into the void below the track, recover it
+            if (transform.position.y < -2.0f)
+            {
+                ResetPosition(new Vector3(0f, 0.3f, -4.5f));
+                Debug.LogWarning("<color=#FFAA00><b>[SAFETY RESPAWN]</b> Marble recovered from void and placed safely at launch baseline.</color>");
+            }
         }
 
         private void OnCollisionEnter(Collision collision)
