@@ -8,9 +8,28 @@ def _look_at(obj, target):
     obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
 
 
+def _set_render_engine(scene):
+    """Pick the Eevee enum exposed by the current Blender build."""
+    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
+        try:
+            scene.render.engine = engine
+            print(f"Pit Striker render engine: {engine}")
+            return engine
+        except (TypeError, ValueError):
+            continue
+
+    # Last-resort fallback so scene generation still completes.
+    try:
+        scene.render.engine = "BLENDER_WORKBENCH"
+        print("Pit Striker render engine: BLENDER_WORKBENCH (fallback)")
+        return "BLENDER_WORKBENCH"
+    except Exception as exc:
+        raise RuntimeError("No supported Blender render engine could be selected") from exc
+
+
 def setup_world_and_lighting(config):
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    _set_render_engine(scene)
     scene.render.resolution_x = 1920
     scene.render.resolution_y = 1080
     scene.render.resolution_percentage = 100
