@@ -165,6 +165,9 @@ namespace PitStriker.Gameplay
 
                 if (marble != null)
                 {
+                    marble.IsRetired = false;
+                    Rigidbody rb = marble.GetComponent<Rigidbody>();
+                    if (rb != null) rb.isKinematic = false;
                     marble.OnMarbleLaunched += HandleMarbleLaunched;
                     marble.OnMarbleStopped += HandleMarbleStopped;
                 }
@@ -265,8 +268,16 @@ namespace PitStriker.Gameplay
                 marble.Halt();
 
                 // Immediately cancel settle wait and evaluate captured pit
-                if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
-                if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+                if (_settleCoroutine != null)
+                {
+                    StopCoroutine(_settleCoroutine);
+                    _settleCoroutine = null;
+                }
+                if (_evaluateCoroutine != null)
+                {
+                    StopCoroutine(_evaluateCoroutine);
+                    _evaluateCoroutine = null;
+                }
                 _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             }
             // 2. If an opponent's marble was knocked into the pit:
@@ -306,7 +317,7 @@ namespace PitStriker.Gameplay
                 foreach (var player in _players)
                 {
                     MarbleController marble = player.marble;
-                    if (marble == null || !marble.gameObject.activeInHierarchy) continue;
+                    if (marble == null || !marble.gameObject.activeInHierarchy || player.isFinished || marble.IsRetired) continue;
 
                     float dist = Vector2.Distance(new Vector2(marble.transform.position.x, marble.transform.position.z), new Vector2(pit.transform.position.x, pit.transform.position.z));
                     float relY = marble.transform.position.y - pit.transform.position.y;
@@ -393,9 +404,10 @@ namespace PitStriker.Gameplay
             {
                 timeElapsed += Time.deltaTime;
 
-                // If a pit was captured, HandleMarbleSunk will have immediately triggered evaluation
-                if (_pitSunkThisTurn)
+                // If a pit was captured or evaluation is active, terminate settle wait immediately
+                if (_pitSunkThisTurn || _evaluateCoroutine != null || (ActivePlayer != null && ActivePlayer.isFinished))
                 {
+                    _settleCoroutine = null;
                     yield break;
                 }
 
@@ -404,7 +416,7 @@ namespace PitStriker.Gameplay
                 for (int i = 0; i < _players.Count; i++)
                 {
                     MarbleController m = _players[i].marble;
-                    if (m != null && m.gameObject.activeInHierarchy && m.IsMoving)
+                    if (m != null && m.gameObject.activeInHierarchy && !m.IsRetired && m.IsMoving)
                     {
                         anyMoving = true;
                         break;
@@ -431,13 +443,18 @@ namespace PitStriker.Gameplay
             // Halt all active marbles to eliminate microscopic physics drift
             for (int i = 0; i < _players.Count; i++)
             {
-                if (_players[i].marble != null)
+                if (_players[i].marble != null && !_players[i].isFinished)
                 {
                     _players[i].marble.Halt();
                 }
             }
 
-            if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+            if (_evaluateCoroutine != null || (ActivePlayer != null && ActivePlayer.isFinished))
+            {
+                _settleCoroutine = null;
+                yield break;
+            }
+
             _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             _settleCoroutine = null;
         }
@@ -461,7 +478,11 @@ namespace PitStriker.Gameplay
             }
 
             // 2. MAIN MATCH EVALUATION
-            if (ActivePlayer == null) yield break;
+            if (ActivePlayer == null || ActivePlayer.isFinished)
+            {
+                _evaluateCoroutine = null;
+                yield break;
+            }
 
             if (_pitSunkThisTurn)
             {
@@ -506,12 +527,31 @@ namespace PitStriker.Gameplay
                         Audio.AudioManager.Instance.PlayPitSink();
                     }
 
-                    // Retire finished marble from fairway so it doesn't obstruct remaining players
+                    // Retire finished marble to the Winner's Showcase beside Pit 3:
+                    // Place it safely along the right sideline (+3.5m on X) so it stands proud on the podium
+                    // and cannot obstruct remaining players or trigger safety respawn!
                     if (ActivePlayer.marble != null)
                     {
                         ActivePlayer.marble.Halt();
-                        ActivePlayer.marble.ResetPosition(new Vector3(0f, -50f, 0f));
-                        ActivePlayer.marble.SetVisible(false);
+                        Vector3 pit3Pos = new Vector3(0f, 0.25f, 31.0f);
+                        PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
+                        foreach (var p in allPits)
+                        {
+                            if (p.PitNumber == 3)
+                            {
+                                pit3Pos = p.transform.position;
+                                break;
+                            }
+                        }
+                        Vector3 podiumPos = pit3Pos + new Vector3(3.5f + (place - 1) * 1.1f, 0.25f, 0f);
+                        ActivePlayer.marble.ResetPosition(podiumPos);
+                        ActivePlayer.marble.IsRetired = true;
+                        ActivePlayer.marble.SetVisible(true);
+                        Rigidbody rb = ActivePlayer.marble.GetComponent<Rigidbody>();
+                        if (rb != null)
+                        {
+                            rb.isKinematic = true;
+                        }
                     }
 
                     // Immediately reset Pit 3 and all pits so subsequent players battling for 2nd / 3rd place can sink into Pit 3!
@@ -663,6 +703,9 @@ namespace PitStriker.Gameplay
 
                     if (p.marble != null)
                     {
+                        p.marble.IsRetired = false;
+                        Rigidbody rb = p.marble.GetComponent<Rigidbody>();
+                        if (rb != null) rb.isKinematic = false;
                         p.marble.Halt();
                         p.marble.ResetPosition(_startCenter);
                         p.marble.SetVisible(false);
@@ -700,6 +743,12 @@ namespace PitStriker.Gameplay
                 attempts++;
             }
             while (ActivePlayer != null && ActivePlayer.isFinished && attempts <= _players.Count);
+
+            if (ActivePlayer == null || ActivePlayer.isFinished)
+            {
+                DeclareMatchVictory();
+                return;
+            }
 
             ActivateCurrentPlayer();
 

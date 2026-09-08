@@ -43,6 +43,12 @@ namespace PitStriker.Physics
         public Vector3 Velocity => _rigidbody != null ? _rigidbody.linearVelocity : Vector3.zero;
         public float CurrentSpeed => _rigidbody != null ? _rigidbody.linearVelocity.magnitude : 0f;
 
+        /// <summary>
+        /// True when this marble has finished the course and taken its place on the podium.
+        /// When retired, physics forces, collisions, and safety respawns are suspended.
+        /// </summary>
+        public bool IsRetired { get; set; } = false;
+
         private void Awake()
         {
             _rigidbody = GetComponent<Rigidbody>();
@@ -71,7 +77,7 @@ namespace PitStriker.Physics
         /// <param name="forceMagnitude">Impulse strength to apply.</param>
         public void ApplyImpulse(Vector3 direction, float forceMagnitude)
         {
-            if (_rigidbody == null) return;
+            if (IsRetired || _rigidbody == null) return;
 
             // Allow slight upward pitch if provided (for flick throw lob), clamped to prevent sky launches
             direction.y = Mathf.Clamp(direction.y, 0f, 0.12f);
@@ -100,7 +106,7 @@ namespace PitStriker.Physics
 
         private void FixedUpdate()
         {
-            if (_rigidbody == null) return;
+            if (IsRetired || _rigidbody == null) return;
 
             if (_launchGraceTimer > 0f)
             {
@@ -155,6 +161,8 @@ namespace PitStriker.Physics
 
         private void OnCollisionEnter(Collision collision)
         {
+            if (IsRetired) return;
+
             OnMarbleCollision?.Invoke(collision);
 
             MarbleController otherMarble = collision.collider.GetComponent<MarbleController>();
