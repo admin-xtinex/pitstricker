@@ -43,6 +43,13 @@ namespace PitStriker.Gameplay
             MarbleController marble = other.GetComponent<MarbleController>();
             if (marble == null) return;
 
+            // Once captured and sunk, keep marble stationary in the basin
+            if (IsSunk)
+            {
+                marble.Halt();
+                return;
+            }
+
             Rigidbody rb = marble.GetComponent<Rigidbody>();
             if (rb != null)
             {
@@ -55,13 +62,14 @@ namespace PitStriker.Gameplay
 
                 // Dampen horizontal velocity so the marble settles naturally inside the cup
                 Vector3 horizontalVel = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-                rb.linearVelocity -= horizontalVel * (0.05f);
+                rb.linearVelocity -= horizontalVel * (0.08f);
             }
 
             // Check if marble has settled in the pit below ground elevation
-            if (!IsSunk && marble.transform.position.y < 0.1f && marble.CurrentSpeed <= _maxCaptureSpeed)
+            if (!IsSunk && marble.transform.position.y < 0.15f && marble.CurrentSpeed <= _maxCaptureSpeed)
             {
                 IsSunk = true;
+                marble.Halt();
                 Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> Marble SUNK into Pit #{_pitNumber}!</color>");
                 OnMarbleSunk?.Invoke(this, marble);
             }

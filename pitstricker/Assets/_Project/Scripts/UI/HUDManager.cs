@@ -57,6 +57,17 @@ namespace PitStriker.UI
                 }
             }
 
+            // Ensure TurnManager is active in the scene even if arena was not regenerated
+            if (TurnManager.Instance == null)
+            {
+                TurnManager existingTm = Object.FindFirstObjectByType<TurnManager>();
+                if (existingTm == null)
+                {
+                    GameObject tmObj = new GameObject("TurnManager");
+                    tmObj.AddComponent<TurnManager>();
+                }
+            }
+
             if (_strikeButton != null)
             {
                 _strikeButton.onClick.AddListener(HandleStrikeClicked);

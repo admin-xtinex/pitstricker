@@ -27,8 +27,8 @@ namespace PitStriker.Gameplay
         [Tooltip("Active marble being controlled.")]
         [SerializeField] private MarbleController _activeMarble;
 
-        [Tooltip("Starting tee position for Pit 1.")]
-        [SerializeField] private Vector3 _startPosition = new Vector3(0f, 0.25f, -2.0f);
+        [Tooltip("Starting tee position for Pit 1 (Chalk Circle).")]
+        [SerializeField] private Vector3 _startPosition = new Vector3(0f, 0.3f, -5.5f);
 
         [Header("Par Configuration")]
         [SerializeField] private int[] _pitPars = new int[] { 2, 3, 3 }; // Pit 1: Par 2, Pit 2: Par 3, Pit 3: Par 3
@@ -194,6 +194,11 @@ namespace PitStriker.Gameplay
             if (pit.PitNumber == CurrentTargetPit)
             {
                 _currentPitSunkThisTurn = true;
+                marble.Halt();
+
+                // Immediately trigger evaluation so player isn't stuck waiting
+                if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+                _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
             }
             else
             {
@@ -212,13 +217,13 @@ namespace PitStriker.Gameplay
             Vector3 nextTeePos;
             if (nextPit == 2)
             {
-                // Ahead of Pit 1 (Pit 1 is at Z = 7.0m)
-                nextTeePos = new Vector3(0f, 0.25f, 8.5f);
+                // Ahead of Pit 1 (Pit 1 is at Z = 2.0m)
+                nextTeePos = new Vector3(0f, 0.3f, 3.5f);
             }
             else if (nextPit == 3)
             {
-                // Ahead of Pit 2 (Pit 2 is at Z = 18.0m)
-                nextTeePos = new Vector3(0f, 0.25f, 19.5f);
+                // Ahead of Pit 2 (Pit 2 is at Z = 13.0m)
+                nextTeePos = new Vector3(0f, 0.3f, 14.5f);
             }
             else
             {
@@ -226,6 +231,7 @@ namespace PitStriker.Gameplay
             }
 
             _activeMarble.ResetPosition(nextTeePos);
+            Debug.Log($"<color=#00FFAA><b>[TEE PLACEMENT]</b> Marble placed at {nextTeePos} ready to strike for Pit {nextPit}!</color>");
         }
 
         /// <summary>
