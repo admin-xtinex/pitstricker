@@ -235,13 +235,13 @@ Everything should feel natural.
 
 ---
 
-# 12. Vettu (Attack)
+# 12. Strike (Attack)
 
 Instead of aiming for the next pit,
 
 a player may attack an opponent.
 
-Successful Vettu
+Successful Strike
 
 * Moves opponent away
 * Changes field positioning
@@ -333,7 +333,7 @@ wins the match.
 
 ---
 
-# 18. Raja Mode (Future Rule)
+# 18. Winner Mode (Future Rule)
 
 Alternative game mode.
 
@@ -341,7 +341,7 @@ Player completes all three pits.
 
 ↓
 
-Becomes Raja.
+Becomes Winner.
 
 ↓
 
@@ -349,7 +349,7 @@ May hunt remaining players.
 
 ↓
 
-Match ends after Raja eliminates all remaining opponents.
+Match ends after Winner eliminates all remaining opponents.
 
 This mode will be balanced after prototype testing.
 
@@ -425,7 +425,7 @@ Pit Progression
 
 ↓
 
-Vettu Battles
+Strike Battles
 
 ↓
 
@@ -449,7 +449,7 @@ Rematch
 # 23. Future Game Modes
 
 * Classic Mode
-* Raja Mode
+* Winner Mode
 * Quick Match
 * Tournament
 * Ranked

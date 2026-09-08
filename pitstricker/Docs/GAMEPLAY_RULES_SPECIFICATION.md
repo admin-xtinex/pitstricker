@@ -1,6 +1,6 @@
 # Pit Striker
 
-## Gameplay Scenarios & Vettu Rules Specification
+## Gameplay Scenarios & Strike Rules Specification
 
 **Version:** 1.0 (Living Design Document)
 
@@ -8,7 +8,7 @@
 
 # Purpose
 
-This document defines every gameplay scenario, edge case, interaction, collision rule, Vettu rule, and special gameplay condition.
+This document defines every gameplay scenario, edge case, interaction, collision rule, Strike rule, and special gameplay condition.
 
 Unlike the main Game Rules document, this specification focuses on **"What happens if..."** situations.
 
@@ -52,13 +52,13 @@ Examples:
 
 ---
 
-## Section C — Vettu Rules
+## Section C — Strike Rules
 
 This becomes the official specification for every attacking mechanic.
 
 Example topics:
 
-### Direct Hit
+### Direct Strike
 
 Player intentionally hits opponent.
 
@@ -80,7 +80,7 @@ How are turns evaluated?
 
 ---
 
-### Double Vettu
+### Double Strike
 
 One shot hits two opponents.
 
@@ -108,7 +108,7 @@ Should this be allowed?
 
 ---
 
-### Simultaneous Vettu
+### Simultaneous Strike
 
 Two marbles collide repeatedly before stopping.
 
@@ -120,7 +120,7 @@ How is the final state determined?
 
 Very small contact.
 
-Should it count as Vettu?
+Should it count as Strike?
 
 Minimum collision threshold?
 
@@ -138,7 +138,7 @@ How is progression evaluated?
 
 ---
 
-## Section D — Pit + Vettu Combined Cases
+## Section D — Pit + Strike Combined Cases
 
 Examples
 
@@ -257,7 +257,7 @@ Player reaches Pit 3.
 
 Two players finish in same turn.
 
-Player wins via Raja Mode.
+Player wins via Winner Mode.
 
 Opponent quits.
 
@@ -283,7 +283,7 @@ Each entry should include:
 
 ---
 
-# Vettu Rule Matrix (To Be Completed)
+# Strike Rule Matrix (To Be Completed)
 
 | Scenario          | Expected Behaviour | Prototype Decision | Final Decision |
 | ----------------- | ------------------ | ------------------ | -------------- |
@@ -309,7 +309,7 @@ Format:
 **Scenario ID:** SC-001
 
 Situation:
-Player A has completed Pit 1 and is aiming for Pit 2. Player B performs a Vettu and knocks Player A far away.
+Player A has completed Pit 1 and is aiming for Pit 2. Player B performs a Strike and knocks Player A far away.
 
 Decision:
 Player A retains Pit 1 completion and must continue aiming for Pit 2 from the new position.

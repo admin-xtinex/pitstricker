@@ -12,7 +12,7 @@ namespace PitStriker.AI
     /// Autonomous AI Marble Controller:
     /// Drives opponent marbles with human-like strategic decision making,
     /// natural aim trajectory preview, physics-calibrated distance-to-force calculation,
-    /// and tactical Vettu (attack) decisions.
+    /// and tactical strike decisions.
     /// </summary>
     public class AIMarbleController : MonoBehaviour
     {
@@ -27,7 +27,7 @@ namespace PitStriker.AI
         [Range(0f, 0.15f)]
         [SerializeField] private float _forceVariance = 0.04f;
 
-        [Tooltip("Probability of choosing tactical Vettu attack over direct pit progression when an opponent is vulnerable.")]
+        [Tooltip("Probability of choosing tactical Strike attack over direct pit progression when an opponent is vulnerable.")]
         [Range(0f, 1f)]
         [SerializeField] private float _tacticalAggression = 0.70f;
 
@@ -73,7 +73,7 @@ namespace PitStriker.AI
             bool isTossPhase = (TurnManager.Instance.CurrentState == TurnManager.GameState.TossPhase);
             Vector3 marblePos = aiPlayer.marble.transform.position;
             Vector3 targetPos;
-            bool isVettuAttack = false;
+            bool isStrikeAttack = false;
             string targetDesc = "";
 
             if (isTossPhase)
@@ -84,33 +84,32 @@ namespace PitStriker.AI
             }
             else
             {
-                // Main Match: Evaluate line of sight to target pit vs. tactical Vettu attack on opponent
+                // Main Match: Evaluate line of sight to target pit vs. tactical strike on opponent
                 Vector3 pitPos = TurnManager.Instance.GetPitPosition(aiPlayer.currentPit);
-                TurnManager.PlayerData bestTargetOpponent = EvaluateTacticalVettu(aiPlayer, pitPos);
+                TurnManager.PlayerData bestTargetOpponent = EvaluateTacticalStrike(aiPlayer, pitPos);
 
                 if (bestTargetOpponent != null && bestTargetOpponent.marble != null && UnityEngine.Random.value < _tacticalAggression)
                 {
                     targetPos = bestTargetOpponent.marble.transform.position;
-                    isVettuAttack = true;
-                    targetDesc = $"Vettu Attack on {bestTargetOpponent.name}";
-                    Debug.Log($"<color=#FFD700><b>[AI TACTICAL VETTU]</b> {aiPlayer.name} strategically chose to strike {bestTargetOpponent.name}!</color>");
+                    isStrikeAttack = true;
+                    targetDesc = $"Strike Attack on {bestTargetOpponent.name}";
+                    Debug.Log($"<color=#FFD700><b>[AI TACTICAL STRIKE]</b> {aiPlayer.name} strategically chose to strike {bestTargetOpponent.name}!</color>");
                 }
                 else
                 {
                     targetPos = pitPos;
-                    isVettuAttack = false;
+                    isStrikeAttack = false;
                     targetDesc = $"Target Pit #{aiPlayer.currentPit}";
                     Debug.Log($"<color=#00FFAA><b>[AI PIT SHOT]</b> {aiPlayer.name} advancing towards Pit #{aiPlayer.currentPit}.</color>");
                 }
             }
 
             // 2. Trajectory & Ballistic Calculations
-            Vector3 flatToTarget = Vector3.ProjectOnPlane(targetPos - marblePos, Vector3.up);
-            float distance = flatToTarget.magnitude;
-            Vector3 baseDir = distance > 0.05f ? flatToTarget.normalized : Vector3.forward;
+            float distance = Vector3.Distance(marblePos, targetPos);
+            Vector3 baseDir = (targetPos - marblePos).normalized;
 
             // Physics-calibrated force
-            float calibratedForce = CalculateRequiredForce(distance, isTossPhase, isVettuAttack);
+            float calibratedForce = CalculateRequiredForce(distance, isTossPhase, isStrikeAttack);
 
             // Natural humanized imperfection: small gaussian-like angular and force noise
             float angleOffset = UnityEngine.Random.Range(-_aimAngleVariance, _aimAngleVariance);
@@ -138,7 +137,7 @@ namespace PitStriker.AI
                 yield return null;
             }
 
-            // 4. Release & Fire Physical Impulse
+            // 4. Fire impulse physically
             if (SwipeLaunchController.Instance != null)
             {
                 SwipeLaunchController.Instance.HideAimPreview();
@@ -162,10 +161,10 @@ namespace PitStriker.AI
         }
 
         /// <summary>
-        /// Evaluates all active opponents to find the highest-value tactical Vettu opportunity.
+        /// Evaluates all active opponents to find the highest-value tactical strike opportunity.
         /// An opponent is high-value if they are threatening a pit win or blocking the fairway lane.
         /// </summary>
-        private TurnManager.PlayerData EvaluateTacticalVettu(TurnManager.PlayerData aiPlayer, Vector3 pitPos)
+        private TurnManager.PlayerData EvaluateTacticalStrike(TurnManager.PlayerData aiPlayer, Vector3 pitPos)
         {
             if (TurnManager.Instance == null || TurnManager.Instance.Players == null) return null;
 
@@ -230,7 +229,7 @@ namespace PitStriker.AI
             }
             else if (isAttack)
             {
-                // Vettu attack applies +18% force to punch through target marble and maximize knockback
+                // Strike attack applies +18% force to punch through target marble and maximize knockback
                 baseForce *= 1.18f;
             }
 
