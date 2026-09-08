@@ -11,7 +11,7 @@ namespace PitStriker.EditorTools
     /// <summary>
     /// Studio Editor Automation:
     /// One-click generation of the complete Pit Striker Physics Arena
-    /// matching the concept art layouts.
+    /// with REAL PHYSICAL HOLES and recessed pit basins.
     /// </summary>
     public static class SandboxBuilder
     {
@@ -31,7 +31,7 @@ namespace PitStriker.EditorTools
             PhysicsMaterial sandPhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Sand_Friction.physicMaterial");
             PhysicsMaterial bouncePhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Marble_Bouncy.physicMaterial");
 
-            // 1. Clean up old test objects if present in scene
+            // 1. Clean up old objects
             GameObject oldGround = GameObject.Find("Ground");
             if (oldGround != null) Undo.DestroyObjectImmediate(oldGround);
 
@@ -48,32 +48,32 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // 3. Solid Ground Box (prevents tunneling completely)
-            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            ground.name = "Arena_Ground";
-            ground.transform.SetParent(arenaRoot.transform);
-            ground.transform.position = new Vector3(0f, -0.25f, 5f);
-            ground.transform.localScale = new Vector3(8f, 0.5f, 22f);
+            // 3. Segmented Ground Structure (Leaving actual physical holes at Z: 1, 6, 11)
+            // Left & Right Bank Slabs
+            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-2.7f, -0.25f, 5f), new Vector3(2.6f, 0.5f, 22f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(2.7f, -0.25f, 5f), new Vector3(2.6f, 0.5f, 22f), sandMat, sandPhys);
 
-            if (sandMat != null) ground.GetComponent<MeshRenderer>().sharedMaterial = sandMat;
-            BoxCollider groundCollider = ground.GetComponent<BoxCollider>();
-            if (sandPhys != null) groundCollider.sharedMaterial = sandPhys;
+            // Center Track Slabs between the pits
+            CreateGroundSlab("Ground_Center_Start", arenaRoot.transform, new Vector3(0f, -0.25f, -3.1f), new Vector3(2.8f, 0.5f, 5.8f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_Bridge_1_2", arenaRoot.transform, new Vector3(0f, -0.25f, 3.5f), new Vector3(2.8f, 0.5f, 2.6f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_Bridge_2_3", arenaRoot.transform, new Vector3(0f, -0.25f, 8.5f), new Vector3(2.8f, 0.5f, 2.6f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 14.1f), new Vector3(2.8f, 0.5f, 3.8f), sandMat, sandPhys);
 
             // 4. Boundary Rails (Left, Right, Back, Front)
-            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.3f, 5f), new Vector3(0.3f, 0.7f, 22f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.3f, 5f), new Vector3(0.3f, 0.7f, 22f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.3f, -6.1f), new Vector3(8.5f, 0.7f, 0.3f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.3f, 16.1f), new Vector3(8.5f, 0.7f, 0.3f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.35f, 5f), new Vector3(0.3f, 0.8f, 22f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.35f, 5f), new Vector3(0.3f, 0.8f, 22f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -6.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 16.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
 
-            // 5. Create 3 Numbered Pits along the track
-            CreatePit("Pit_01", arenaRoot.transform, new Vector3(0f, 0.01f, 1f), 1, pitMat);
-            CreatePit("Pit_02", arenaRoot.transform, new Vector3(0f, 0.01f, 6f), 2, pitMat);
-            CreatePit("Pit_03", arenaRoot.transform, new Vector3(0f, 0.01f, 11f), 3, pitMat);
+            // 5. Create 3 Real Recessed Sunken Pits
+            CreateSunkenPit("Pit_01", arenaRoot.transform, new Vector3(0f, 0f, 1f), 1, pitMat, woodMat);
+            CreateSunkenPit("Pit_02", arenaRoot.transform, new Vector3(0f, 0f, 6f), 2, pitMat, woodMat);
+            CreateSunkenPit("Pit_03", arenaRoot.transform, new Vector3(0f, 0f, 11f), 3, pitMat, woodMat);
 
             // 6. Create Player Striker Marble
             GameObject marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marble.name = "PlayerMarble_Blue";
-            marble.transform.position = new Vector3(0f, 0.25f, -4f);
+            marble.transform.position = new Vector3(0f, 0.3f, -4.5f);
             marble.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
 
             if (marbleMat != null) marble.GetComponent<MeshRenderer>().sharedMaterial = marbleMat;
@@ -98,8 +98,8 @@ namespace PitStriker.EditorTools
             // Trajectory Line
             LineRenderer line = marble.AddComponent<LineRenderer>();
             line.startWidth = 0.08f;
-            line.endWidth = 0.15f;
-            line.startColor = new Color(0.1f, 0.8f, 1f, 0.9f);
+            line.endWidth = 0.16f;
+            line.startColor = new Color(0.1f, 0.85f, 1f, 0.95f);
             line.endColor = new Color(0.1f, 0.9f, 1f, 0.3f);
             line.useWorldSpace = true;
             if (lineMat != null) line.sharedMaterial = lineMat;
@@ -111,8 +111,8 @@ namespace PitStriker.EditorTools
             Camera cam = Camera.main;
             if (cam != null)
             {
-                cam.transform.position = new Vector3(0f, 2.5f, -8.5f);
-                cam.transform.rotation = Quaternion.Euler(20f, 0f, 0f);
+                cam.transform.position = new Vector3(0f, 2.8f, -9.0f);
+                cam.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
 
                 SmoothFollowCamera follow = cam.GetComponent<SmoothFollowCamera>();
                 if (follow == null)
@@ -125,7 +125,20 @@ namespace PitStriker.EditorTools
             Undo.CollapseUndoOperations(group);
             Selection.activeGameObject = marble;
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena successfully generated with verified URP materials!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with REAL SUNKEN PITS! Marbles will now fall directly into the pit cups.</color>");
+        }
+
+        private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
+        {
+            GameObject slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            slab.name = name;
+            slab.transform.SetParent(parent);
+            slab.transform.position = position;
+            slab.transform.localScale = scale;
+
+            if (mat != null) slab.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            BoxCollider col = slab.GetComponent<BoxCollider>();
+            if (physMat != null) col.sharedMaterial = physMat;
         }
 
         private static void CreateBoundaryWall(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -141,24 +154,38 @@ namespace PitStriker.EditorTools
             if (physMat != null) col.sharedMaterial = physMat;
         }
 
-        private static void CreatePit(string name, Transform parent, Vector3 position, int pitNumber, Material mat)
+        private static void CreateSunkenPit(string name, Transform parent, Vector3 position, int pitNumber, Material pitMat, Material rimMat)
         {
-            GameObject pit = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pit.name = name;
-            pit.transform.SetParent(parent);
-            pit.transform.position = position;
-            pit.transform.localScale = new Vector3(1.2f, 0.02f, 1.2f);
+            GameObject pitRoot = new GameObject(name);
+            pitRoot.transform.SetParent(parent);
+            pitRoot.transform.position = position;
 
-            if (mat != null) pit.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            // 1. Sunken Basin Floor (Solid surface at depth Y: -0.38)
+            GameObject basinFloor = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            basinFloor.name = "Basin_Floor";
+            basinFloor.transform.SetParent(pitRoot.transform);
+            basinFloor.transform.localPosition = new Vector3(0f, -0.38f, 0f);
+            basinFloor.transform.localScale = new Vector3(1.8f, 0.05f, 1.8f);
+            if (pitMat != null) basinFloor.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
 
-            // Remove default solid collider and add trigger zone
-            Object.DestroyImmediate(pit.GetComponent<Collider>());
-            SphereCollider trigger = pit.AddComponent<SphereCollider>();
+            // 2. Beveled Funnel Rim (Sloped cylinder funneling marbles down)
+            GameObject rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            rim.name = "Basin_Rim";
+            rim.transform.SetParent(pitRoot.transform);
+            rim.transform.localPosition = new Vector3(0f, -0.2f, 0f);
+            rim.transform.localScale = new Vector3(2.1f, 0.15f, 2.1f);
+            if (pitMat != null) rim.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
+
+            // Remove solid collider from rim so marble drops through freely
+            Object.DestroyImmediate(rim.GetComponent<Collider>());
+
+            // 3. Trigger Zone inside the cup
+            SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 0.7f;
-            trigger.center = new Vector3(0f, 0.1f, 0f);
+            trigger.radius = 1.0f;
+            trigger.center = new Vector3(0f, -0.15f, 0f);
 
-            PitZone zone = pit.AddComponent<PitZone>();
+            PitZone zone = pitRoot.AddComponent<PitZone>();
         }
     }
 }
