@@ -26,6 +26,17 @@ namespace PitStriker.UI
         [SerializeField] private Image _bead3Image;
         [SerializeField] private Text _statusBanner;
 
+        [Header("Score & Stroke Tracking")]
+        [SerializeField] private Text _strokeCounterText;
+        [SerializeField] private Text _parText;
+
+        [Header("Victory Modal Panel")]
+        [SerializeField] private GameObject _victoryModal;
+        [SerializeField] private Text _victoryStrokesText;
+        [SerializeField] private Text _victoryParText;
+        [SerializeField] private Text _victoryRatingText;
+        [SerializeField] private Button _playAgainButton;
+
         // Current Stage Progression (1 -> 2 -> 3)
         private int _currentObjectivePit = 1;
 
@@ -55,24 +66,42 @@ namespace PitStriker.UI
             {
                 _powerSlider.onValueChanged.AddListener(HandleSliderValueChanged);
             }
+
+            if (_playAgainButton != null)
+            {
+                _playAgainButton.onClick.AddListener(HandlePlayAgainClicked);
+            }
+
+            if (_victoryModal != null)
+            {
+                _victoryModal.SetActive(false);
+            }
         }
 
         private void OnEnable()
         {
             SwipeLaunchController.OnPowerChanged += HandlePowerChanged;
-            PitZone.OnMarbleSunk += HandleMarbleSunk;
+            TurnManager.OnStrokeCountChanged += HandleStrokeCountChanged;
+            TurnManager.OnTargetPitChanged += HandleTargetPitChanged;
+            TurnManager.OnMatchWon += HandleMatchWon;
+            TurnManager.OnStatusMessage += HandleStatusMessage;
         }
 
         private void OnDisable()
         {
             SwipeLaunchController.OnPowerChanged -= HandlePowerChanged;
-            PitZone.OnMarbleSunk -= HandleMarbleSunk;
+            TurnManager.OnStrokeCountChanged -= HandleStrokeCountChanged;
+            TurnManager.OnTargetPitChanged -= HandleTargetPitChanged;
+            TurnManager.OnMatchWon -= HandleMatchWon;
+            TurnManager.OnStatusMessage -= HandleStatusMessage;
         }
 
         private void Start()
         {
             UpdateObjectiveUI();
             HandlePowerChanged(0f);
+            HandleStrokeCountChanged(0, 0);
+            if (_victoryModal != null) _victoryModal.SetActive(false);
         }
 
         private void HandleSliderValueChanged(float val)
@@ -97,6 +126,19 @@ namespace PitStriker.UI
             }
         }
 
+        private void HandlePlayAgainClicked()
+        {
+            if (_victoryModal != null)
+            {
+                _victoryModal.SetActive(false);
+            }
+
+            if (TurnManager.Instance != null)
+            {
+                TurnManager.Instance.RestartMatch();
+            }
+        }
+
         private void HandlePowerChanged(float power01)
         {
             if (_powerSlider != null)
@@ -116,31 +158,58 @@ namespace PitStriker.UI
             }
         }
 
-        private void HandleMarbleSunk(PitZone pit, Physics.MarbleController marble)
+        private void HandleStrokeCountChanged(int pitStrokes, int totalStrokes)
         {
-            if (pit.PitNumber == _currentObjectivePit)
+            if (_strokeCounterText != null)
             {
-                Debug.Log($"<color=#00FF88><b>[PROGRESSION]</b> Objective Complete! Pit {_currentObjectivePit} conquered!</color>");
-                _currentObjectivePit++;
-
-                if (_currentObjectivePit > 3)
-                {
-                    if (_statusBanner != null) _statusBanner.text = "★ VICTORY! ALL PITS CONQUERED! ★";
-                }
-                else
-                {
-                    if (_statusBanner != null) _statusBanner.text = $"TARGET: PIT {_currentObjectivePit}";
-                }
-
-                UpdateObjectiveUI();
+                _strokeCounterText.text = $"STROKES: {totalStrokes}";
             }
-            else
+
+            if (_parText != null && TurnManager.Instance != null)
             {
-                Debug.LogWarning($"[PROGRESSION] Sunk into Pit #{pit.PitNumber}, but current target is Pit #{_currentObjectivePit}!");
-                if (_statusBanner != null)
-                {
-                    _statusBanner.text = $"Wrong Pit! Next target is Pit {_currentObjectivePit}";
-                }
+                _parText.text = $"COURSE PAR: {TurnManager.Instance.CoursePar}  (PIT {TurnManager.Instance.CurrentTargetPit}: PAR {TurnManager.Instance.CurrentPitPar})";
+            }
+        }
+
+        private void HandleTargetPitChanged(int newTargetPit)
+        {
+            _currentObjectivePit = newTargetPit;
+            UpdateObjectiveUI();
+
+            if (_parText != null && TurnManager.Instance != null)
+            {
+                _parText.text = $"COURSE PAR: {TurnManager.Instance.CoursePar}  (PIT {TurnManager.Instance.CurrentTargetPit}: PAR {TurnManager.Instance.CurrentPitPar})";
+            }
+        }
+
+        private void HandleStatusMessage(string message)
+        {
+            if (_statusBanner != null)
+            {
+                _statusBanner.text = message;
+            }
+        }
+
+        private void HandleMatchWon(int totalStrokes, int coursePar, string rating)
+        {
+            if (_victoryModal != null)
+            {
+                _victoryModal.SetActive(true);
+            }
+
+            if (_victoryStrokesText != null)
+            {
+                _victoryStrokesText.text = $"TOTAL STROKES: {totalStrokes}";
+            }
+
+            if (_victoryParText != null)
+            {
+                _victoryParText.text = $"COURSE PAR: {coursePar}";
+            }
+
+            if (_victoryRatingText != null)
+            {
+                _victoryRatingText.text = $"RATING: {rating}";
             }
         }
 
@@ -153,11 +222,6 @@ namespace PitStriker.UI
             if (_bead1Image != null) _bead1Image.color = _currentObjectivePit > 1 ? completedColor : (_currentObjectivePit == 1 ? activeColor : lockedColor);
             if (_bead2Image != null) _bead2Image.color = _currentObjectivePit > 2 ? completedColor : (_currentObjectivePit == 2 ? activeColor : lockedColor);
             if (_bead3Image != null) _bead3Image.color = _currentObjectivePit > 3 ? completedColor : (_currentObjectivePit == 3 ? activeColor : lockedColor);
-
-            if (_statusBanner != null && _currentObjectivePit <= 3)
-            {
-                _statusBanner.text = $"YOUR TURN  •  TARGET: PIT {_currentObjectivePit}";
-            }
         }
     }
 }

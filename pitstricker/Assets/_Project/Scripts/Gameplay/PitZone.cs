@@ -75,5 +75,13 @@ namespace PitStriker.Gameplay
                 IsSunk = false;
             }
         }
+
+        /// <summary>
+        /// Resets the pit capture flag for match restarts.
+        /// </summary>
+        public void ResetPit()
+        {
+            IsSunk = false;
+        }
     }
 }
