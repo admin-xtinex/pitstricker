@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using PitStriker.Physics;
+using PitStriker.Gameplay;
 
 namespace PitStriker.Input
 {
@@ -74,6 +75,8 @@ namespace PitStriker.Input
             // Keyboard shortcut test launch for instant testing (Spacebar)
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
+                if (!TurnManager.CanAim()) return;
+
                 _marble.Halt();
                 _marble.ApplyImpulse(Vector3.forward, 22.0f);
                 Debug.Log("<color=#00FFAA><b>[TEST LAUNCH]</b> Spacebar pressed! Marble launched forward with 22N force.</color>");
@@ -85,6 +88,12 @@ namespace PitStriker.Input
 
         private void HandlePointerInput()
         {
+            if (!TurnManager.CanAim())
+            {
+                if (_isDragging) CancelDrag();
+                return;
+            }
+
             Vector2 screenPos = Vector2.zero;
             bool isPressed = false;
             bool justPressed = false;
@@ -190,6 +199,8 @@ namespace PitStriker.Input
         /// </summary>
         public void LaunchStrike(float powerFraction = -1f)
         {
+            if (!TurnManager.CanAim()) return;
+
             float power = powerFraction >= 0f ? powerFraction : (_currentPower > 0.05f ? _currentPower : 0.65f);
             Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
 

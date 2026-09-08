@@ -134,14 +134,25 @@ namespace PitStriker.EditorTools
                 follow.SetTarget(marble.transform);
             }
 
-            // 8. Create Concept HUD Canvas (Power Meter + Stage Beads 1 -> 2 -> 3)
+            // 8. Turn & Match Orchestrator (Phase 4)
+            TurnManager tm = Object.FindFirstObjectByType<TurnManager>();
+            if (tm == null)
+            {
+                GameObject tmObj = new GameObject("TurnManager");
+                tm = tmObj.AddComponent<TurnManager>();
+            }
+            SerializedObject tmSo = new SerializedObject(tm);
+            tmSo.FindProperty("_activeMarble").objectReferenceValue = marble.GetComponent<MarbleController>();
+            tmSo.ApplyModifiedProperties();
+
+            // 9. Create Concept HUD Canvas (Power Meter + Stage Beads + Scoreboard + Victory Modal)
             CreateHUDCanvas();
 
             Undo.CollapseUndoOperations(group);
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
             UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with 100% ROUND PITS, Numbered Flags, Chalk Ring, and Concept HUD (Power Meter & Strike)!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with TurnManager, Round Pits, Scoreboard, and Victory Modal!</color>");
         }
 
         private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -322,6 +333,10 @@ namespace PitStriker.EditorTools
             trigger.center = new Vector3(0f, -depth * 0.5f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
+            zone.SetPitNumber(pitNumber);
+            SerializedObject zoneSo = new SerializedObject(zone);
+            zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
+            zoneSo.ApplyModifiedProperties();
 
             // Numbered Flag Marker next to the pit
             CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(radius + 0.35f, 0f, 0f), pitNumber, woodMat);
@@ -555,6 +570,156 @@ namespace PitStriker.EditorTools
             CreateArrowText("Arrow_2_3", stagePanel.transform, new Vector2(70f, -22f));
             Image bead3 = CreateBead("Bead_3", stagePanel.transform, new Vector2(117f, -22f), "3");
 
+            // 5. Stroke & Par Scoreboard (Top-Left)
+            GameObject scorePanel = new GameObject("Score_Panel");
+            scorePanel.transform.SetParent(canvasObj.transform, false);
+            RectTransform scoreRect = scorePanel.AddComponent<RectTransform>();
+            scoreRect.anchorMin = new Vector2(0f, 1f);
+            scoreRect.anchorMax = new Vector2(0f, 1f);
+            scoreRect.pivot = new Vector2(0f, 1f);
+            scoreRect.anchoredPosition = new Vector2(40f, -30f);
+            scoreRect.sizeDelta = new Vector2(280f, 80f);
+
+            Image scoreBg = scorePanel.AddComponent<Image>();
+            scoreBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+            scoreBg.raycastTarget = false;
+
+            // Stroke Text
+            GameObject strokeTextObj = new GameObject("Stroke_Text");
+            strokeTextObj.transform.SetParent(scorePanel.transform, false);
+            RectTransform strokeRectTransform = strokeTextObj.AddComponent<RectTransform>();
+            strokeRectTransform.anchorMin = new Vector2(0.06f, 0.5f);
+            strokeRectTransform.anchorMax = new Vector2(0.94f, 0.95f);
+            strokeRectTransform.sizeDelta = Vector2.zero;
+
+            Text strokeText = strokeTextObj.AddComponent<Text>();
+            strokeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            strokeText.fontSize = 20;
+            strokeText.fontStyle = FontStyle.Bold;
+            strokeText.alignment = TextAnchor.MiddleLeft;
+            strokeText.color = Color.white;
+            strokeText.raycastTarget = false;
+            strokeText.text = "STROKES: 0";
+
+            // Par Text
+            GameObject parTextObj = new GameObject("Par_Text");
+            parTextObj.transform.SetParent(scorePanel.transform, false);
+            RectTransform parRectTransform = parTextObj.AddComponent<RectTransform>();
+            parRectTransform.anchorMin = new Vector2(0.06f, 0.05f);
+            parRectTransform.anchorMax = new Vector2(0.94f, 0.5f);
+            parRectTransform.sizeDelta = Vector2.zero;
+
+            Text parText = parTextObj.AddComponent<Text>();
+            parText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            parText.fontSize = 14;
+            parText.fontStyle = FontStyle.Bold;
+            parText.alignment = TextAnchor.MiddleLeft;
+            parText.color = new Color(0.5f, 0.85f, 1f, 0.9f);
+            parText.raycastTarget = false;
+            parText.text = "COURSE PAR: 8";
+
+            // 6. Victory Modal (Center Overlay, initially inactive)
+            GameObject modalObj = new GameObject("Victory_Modal");
+            modalObj.transform.SetParent(canvasObj.transform, false);
+            RectTransform modalRect = modalObj.AddComponent<RectTransform>();
+            modalRect.anchorMin = new Vector2(0.5f, 0.5f);
+            modalRect.anchorMax = new Vector2(0.5f, 0.5f);
+            modalRect.pivot = new Vector2(0.5f, 0.5f);
+            modalRect.anchoredPosition = Vector2.zero;
+            modalRect.sizeDelta = new Vector2(500f, 340f);
+
+            Image modalBg = modalObj.AddComponent<Image>();
+            modalBg.color = new Color(0.04f, 0.06f, 0.1f, 0.96f);
+
+            // Header
+            GameObject vHeaderObj = new GameObject("Header");
+            vHeaderObj.transform.SetParent(modalObj.transform, false);
+            RectTransform vHeaderRect = vHeaderObj.AddComponent<RectTransform>();
+            vHeaderRect.anchorMin = new Vector2(0f, 0.72f);
+            vHeaderRect.anchorMax = new Vector2(1f, 0.95f);
+            vHeaderRect.sizeDelta = Vector2.zero;
+            Text vHeader = vHeaderObj.AddComponent<Text>();
+            vHeader.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            vHeader.fontSize = 28;
+            vHeader.fontStyle = FontStyle.Bold;
+            vHeader.alignment = TextAnchor.MiddleCenter;
+            vHeader.color = new Color(1f, 0.85f, 0.2f, 1f);
+            vHeader.text = "★ VICTORY! ★";
+
+            // Strokes Text
+            GameObject vStrokesObj = new GameObject("Strokes");
+            vStrokesObj.transform.SetParent(modalObj.transform, false);
+            RectTransform vStrokesRect = vStrokesObj.AddComponent<RectTransform>();
+            vStrokesRect.anchorMin = new Vector2(0f, 0.52f);
+            vStrokesRect.anchorMax = new Vector2(1f, 0.72f);
+            vStrokesRect.sizeDelta = Vector2.zero;
+            Text vStrokes = vStrokesObj.AddComponent<Text>();
+            vStrokes.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            vStrokes.fontSize = 22;
+            vStrokes.fontStyle = FontStyle.Bold;
+            vStrokes.alignment = TextAnchor.MiddleCenter;
+            vStrokes.color = Color.white;
+            vStrokes.text = "TOTAL STROKES: 0";
+
+            // Course Par Text
+            GameObject vParObj = new GameObject("CoursePar");
+            vParObj.transform.SetParent(modalObj.transform, false);
+            RectTransform vParRect = vParObj.AddComponent<RectTransform>();
+            vParRect.anchorMin = new Vector2(0f, 0.36f);
+            vParRect.anchorMax = new Vector2(1f, 0.52f);
+            vParRect.sizeDelta = Vector2.zero;
+            Text vPar = vParObj.AddComponent<Text>();
+            vPar.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            vPar.fontSize = 18;
+            vPar.alignment = TextAnchor.MiddleCenter;
+            vPar.color = new Color(0.7f, 0.85f, 1f, 1f);
+            vPar.text = "COURSE PAR: 8";
+
+            // Rating Text
+            GameObject vRatingObj = new GameObject("Rating");
+            vRatingObj.transform.SetParent(modalObj.transform, false);
+            RectTransform vRatingRect = vRatingObj.AddComponent<RectTransform>();
+            vRatingRect.anchorMin = new Vector2(0f, 0.22f);
+            vRatingRect.anchorMax = new Vector2(1f, 0.36f);
+            vRatingRect.sizeDelta = Vector2.zero;
+            Text vRating = vRatingObj.AddComponent<Text>();
+            vRating.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            vRating.fontSize = 20;
+            vRating.fontStyle = FontStyle.Bold;
+            vRating.alignment = TextAnchor.MiddleCenter;
+            vRating.color = new Color(0.2f, 1f, 0.5f, 1f);
+            vRating.text = "PAR (EVEN)";
+
+            // Play Again Button
+            GameObject againBtnObj = new GameObject("Play_Again_Button");
+            againBtnObj.transform.SetParent(modalObj.transform, false);
+            RectTransform againBtnRect = againBtnObj.AddComponent<RectTransform>();
+            againBtnRect.anchorMin = new Vector2(0.25f, 0.05f);
+            againBtnRect.anchorMax = new Vector2(0.75f, 0.2f);
+            againBtnRect.sizeDelta = Vector2.zero;
+
+            Image againImg = againBtnObj.AddComponent<Image>();
+            againImg.color = new Color(0f, 0.8f, 0.4f, 1f);
+
+            Button againBtn = againBtnObj.AddComponent<Button>();
+
+            GameObject againTextObj = new GameObject("Text");
+            againTextObj.transform.SetParent(againBtnObj.transform, false);
+            RectTransform againTextRect = againTextObj.AddComponent<RectTransform>();
+            againTextRect.anchorMin = Vector2.zero;
+            againTextRect.anchorMax = Vector2.one;
+            againTextRect.sizeDelta = Vector2.zero;
+
+            Text againText = againTextObj.AddComponent<Text>();
+            againText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            againText.fontSize = 18;
+            againText.fontStyle = FontStyle.Bold;
+            againText.alignment = TextAnchor.MiddleCenter;
+            againText.color = Color.white;
+            againText.text = "PLAY AGAIN";
+
+            modalObj.SetActive(false);
+
             // Wire to HUDManager via SerializedObject
             SerializedObject so = new SerializedObject(hud);
             so.FindProperty("_powerSlider").objectReferenceValue = slider;
@@ -565,6 +730,13 @@ namespace PitStriker.EditorTools
             so.FindProperty("_bead2Image").objectReferenceValue = bead2;
             so.FindProperty("_bead3Image").objectReferenceValue = bead3;
             so.FindProperty("_statusBanner").objectReferenceValue = bannerText;
+            so.FindProperty("_strokeCounterText").objectReferenceValue = strokeText;
+            so.FindProperty("_parText").objectReferenceValue = parText;
+            so.FindProperty("_victoryModal").objectReferenceValue = modalObj;
+            so.FindProperty("_victoryStrokesText").objectReferenceValue = vStrokes;
+            so.FindProperty("_victoryParText").objectReferenceValue = vPar;
+            so.FindProperty("_victoryRatingText").objectReferenceValue = vRating;
+            so.FindProperty("_playAgainButton").objectReferenceValue = againBtn;
             so.ApplyModifiedProperties();
         }
 

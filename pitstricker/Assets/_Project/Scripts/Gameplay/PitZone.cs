@@ -25,11 +25,30 @@ namespace PitStriker.Gameplay
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
 
+        public void SetPitNumber(int number)
+        {
+            _pitNumber = number;
+        }
+
         // Events
         public static event Action<PitZone, MarbleController> OnMarbleSunk;
 
         private void Awake()
         {
+            // Auto-detect pit number from GameObject name if uninitialized or mismatch
+            if (gameObject.name.Contains("2") || gameObject.name.Contains("02"))
+            {
+                _pitNumber = 2;
+            }
+            else if (gameObject.name.Contains("3") || gameObject.name.Contains("03"))
+            {
+                _pitNumber = 3;
+            }
+            else if (gameObject.name.Contains("1") || gameObject.name.Contains("01"))
+            {
+                _pitNumber = 1;
+            }
+
             // Only set SphereCollider as trigger, never touch MeshCollider
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
@@ -43,6 +62,13 @@ namespace PitStriker.Gameplay
             MarbleController marble = other.GetComponent<MarbleController>();
             if (marble == null) return;
 
+            // Once captured and sunk, keep marble stationary in the basin
+            if (IsSunk)
+            {
+                marble.Halt();
+                return;
+            }
+
             Rigidbody rb = marble.GetComponent<Rigidbody>();
             if (rb != null)
             {
@@ -55,13 +81,14 @@ namespace PitStriker.Gameplay
 
                 // Dampen horizontal velocity so the marble settles naturally inside the cup
                 Vector3 horizontalVel = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-                rb.linearVelocity -= horizontalVel * (0.05f);
+                rb.linearVelocity -= horizontalVel * (0.08f);
             }
 
             // Check if marble has settled in the pit below ground elevation
-            if (!IsSunk && marble.transform.position.y < 0.1f && marble.CurrentSpeed <= _maxCaptureSpeed)
+            if (!IsSunk && marble.transform.position.y < 0.15f && marble.CurrentSpeed <= _maxCaptureSpeed)
             {
                 IsSunk = true;
+                marble.Halt();
                 Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> Marble SUNK into Pit #{_pitNumber}!</color>");
                 OnMarbleSunk?.Invoke(this, marble);
             }
@@ -74,6 +101,14 @@ namespace PitStriker.Gameplay
             {
                 IsSunk = false;
             }
+        }
+
+        /// <summary>
+        /// Resets the pit capture flag for match restarts.
+        /// </summary>
+        public void ResetPit()
+        {
+            IsSunk = false;
         }
     }
 }
