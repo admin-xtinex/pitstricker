@@ -2,17 +2,19 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 using PitStriker.Physics;
 using PitStriker.Input;
 using PitStriker.CameraSystem;
 using PitStriker.Gameplay;
+using PitStriker.UI;
 
 namespace PitStriker.EditorTools
 {
     /// <summary>
     /// Studio Editor Automation:
     /// One-click generation of the complete Pit Striker Physics Arena
-    /// featuring mathematically smooth, perfectly ROUND pits matching concept art.
+    /// with Round Pits, Chalk Launch Reticle, and Full Concept HUD (Power Meter + Stage Beads).
     /// </summary>
     public static class SandboxBuilder
     {
@@ -45,6 +47,9 @@ namespace PitStriker.EditorTools
             GameObject oldMarble = GameObject.Find("PlayerMarble_Blue");
             if (oldMarble != null) Undo.DestroyObjectImmediate(oldMarble);
 
+            GameObject oldHUD = GameObject.Find("HUD_Canvas");
+            if (oldHUD != null) Undo.DestroyObjectImmediate(oldHUD);
+
             // 2. Root Arena Container
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
@@ -74,7 +79,10 @@ namespace PitStriker.EditorTools
             CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 13.0f), 2, sandMat, pitMat, woodMat, sandPhys);
             CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 25.0f), 3, sandMat, pitMat, woodMat, sandPhys);
 
-            // 5. Create Player Striker Marble
+            // 5. Create Ground Chalk Launch Ring (Concept Image 1 & 2 reference)
+            CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -5.5f), 1.0f);
+
+            // 6. Create Player Striker Marble
             GameObject marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marble.name = "PlayerMarble_Blue";
             marble.transform.position = new Vector3(0f, 0.3f, -5.5f);
@@ -111,11 +119,11 @@ namespace PitStriker.EditorTools
 
             SwipeLaunchController launcher = marble.AddComponent<SwipeLaunchController>();
 
-            // 6. Main Camera Setup
+            // 7. Main Camera Setup
             Camera cam = Camera.main;
             if (cam != null)
             {
-                cam.transform.position = new Vector3(0f, 2.8f, -9.0f);
+                cam.transform.position = new Vector3(0f, 2.8f, -10.0f);
                 cam.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
 
                 SmoothFollowCamera follow = cam.GetComponent<SmoothFollowCamera>();
@@ -126,10 +134,13 @@ namespace PitStriker.EditorTools
                 follow.SetTarget(marble.transform);
             }
 
+            // 8. Create Concept HUD Canvas (Power Meter + Stage Beads 1 -> 2 -> 3)
+            CreateHUDCanvas();
+
             Undo.CollapseUndoOperations(group);
             Selection.activeGameObject = marble;
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with 100% ROUND CIRCULAR PITS and numbered flags!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with 100% ROUND PITS, Numbered Flags, Chalk Ring, and Concept HUD!</color>");
         }
 
         private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -158,9 +169,6 @@ namespace PitStriker.EditorTools
             if (physMat != null) col.sharedMaterial = physMat;
         }
 
-        /// <summary>
-        /// Procedurally generates a seamless ground tile containing a perfectly ROUND 3D hole and recessed cup.
-        /// </summary>
         private static void CreateRoundPitTile(string name, Transform parent, Vector3 position, int pitNumber, Material sandMat, Material pitMat, Material woodMat, PhysicsMaterial physMat)
         {
             GameObject pitRoot = new GameObject(name);
@@ -314,7 +322,7 @@ namespace PitStriker.EditorTools
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
 
-            // 4. Numbered Flag Marker next to the pit (like concept art!)
+            // Numbered Flag Marker next to the pit
             CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(radius + 0.35f, 0f, 0f), pitNumber, woodMat);
         }
 
@@ -344,6 +352,210 @@ namespace PitStriker.EditorTools
             redMat.color = new Color(0.9f, 0.15f, 0.15f, 1f);
             banner.GetComponent<MeshRenderer>().sharedMaterial = redMat;
             Object.DestroyImmediate(banner.GetComponent<Collider>());
+        }
+
+        private static void CreateChalkRing(string name, Transform parent, Vector3 position, float radius)
+        {
+            GameObject ring = new GameObject(name);
+            ring.transform.SetParent(parent);
+            ring.transform.position = position;
+
+            LineRenderer line = ring.AddComponent<LineRenderer>();
+            line.useWorldSpace = false;
+            line.loop = true;
+            line.startWidth = 0.04f;
+            line.endWidth = 0.04f;
+
+            int segments = 32;
+            line.positionCount = segments;
+            for (int i = 0; i < segments; i++)
+            {
+                float angle = i * Mathf.PI * 2f / segments;
+                line.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+            }
+
+            Material chalkMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            chalkMat.color = new Color(1f, 1f, 1f, 0.5f);
+            line.sharedMaterial = chalkMat;
+        }
+
+        /// <summary>
+        /// Generates the complete Concept Art HUD UI Canvas (Power Meter + Sequential Tracker).
+        /// </summary>
+        private static void CreateHUDCanvas()
+        {
+            // 1. Root Canvas
+            GameObject canvasObj = new GameObject("HUD_Canvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            canvasObj.AddComponent<GraphicRaycaster>();
+
+            HUDManager hud = canvasObj.AddComponent<HUDManager>();
+
+            // Ensure EventSystem exists
+            if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            {
+                GameObject es = new GameObject("EventSystem");
+                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            }
+
+            // 2. Power Meter Panel (Bottom-Left)
+            GameObject powerPanel = new GameObject("Power_Meter_Panel");
+            powerPanel.transform.SetParent(canvasObj.transform, false);
+            RectTransform powerRect = powerPanel.AddComponent<RectTransform>();
+            powerRect.anchorMin = new Vector2(0f, 0f);
+            powerRect.anchorMax = new Vector2(0f, 0f);
+            powerRect.pivot = new Vector2(0f, 0f);
+            powerRect.anchoredPosition = new Vector2(50f, 50f);
+            powerRect.sizeDelta = new Vector2(340f, 60f);
+
+            Image panelBg = powerPanel.AddComponent<Image>();
+            panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+
+            // Power Slider
+            GameObject sliderObj = new GameObject("Power_Slider");
+            sliderObj.transform.SetParent(powerPanel.transform, false);
+            RectTransform sliderRect = sliderObj.AddComponent<RectTransform>();
+            sliderRect.anchorMin = new Vector2(0.32f, 0.25f);
+            sliderRect.anchorMax = new Vector2(0.95f, 0.75f);
+            sliderRect.sizeDelta = Vector2.zero;
+
+            Slider slider = sliderObj.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+
+            // Fill Area
+            GameObject fillArea = new GameObject("Fill_Area");
+            fillArea.transform.SetParent(sliderObj.transform, false);
+            RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
+            fillAreaRect.anchorMin = Vector2.zero;
+            fillAreaRect.anchorMax = Vector2.one;
+            fillAreaRect.sizeDelta = Vector2.zero;
+
+            // Fill Image
+            GameObject fillImgObj = new GameObject("Fill");
+            fillImgObj.transform.SetParent(fillArea.transform, false);
+            RectTransform fillRect = fillImgObj.AddComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.sizeDelta = Vector2.zero;
+
+            Image fillImage = fillImgObj.AddComponent<Image>();
+            fillImage.color = new Color(0f, 0.85f, 1f, 1f);
+            slider.fillRect = fillRect;
+
+            // Power Label
+            GameObject labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(powerPanel.transform, false);
+            RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.05f, 0f);
+            labelRect.anchorMax = new Vector2(0.3f, 1f);
+            labelRect.sizeDelta = Vector2.zero;
+
+            Text powerLabel = labelObj.AddComponent<Text>();
+            powerLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            powerLabel.fontSize = 18;
+            powerLabel.fontStyle = FontStyle.Bold;
+            powerLabel.alignment = TextAnchor.MiddleCenter;
+            powerLabel.color = Color.white;
+            powerLabel.text = "POWER";
+
+            // 3. Sequential Stage Tracker (Top-Center: 1 -> 2 -> 3)
+            GameObject stagePanel = new GameObject("Stage_Tracker_Panel");
+            stagePanel.transform.SetParent(canvasObj.transform, false);
+            RectTransform stageRect = stagePanel.AddComponent<RectTransform>();
+            stageRect.anchorMin = new Vector2(0.5f, 1f);
+            stageRect.anchorMax = new Vector2(0.5f, 1f);
+            stageRect.pivot = new Vector2(0.5f, 1f);
+            stageRect.anchoredPosition = new Vector2(0f, -30f);
+            stageRect.sizeDelta = new Vector2(400f, 85f);
+
+            Image stageBg = stagePanel.AddComponent<Image>();
+            stageBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+
+            // Banner Text
+            GameObject bannerObj = new GameObject("Banner_Text");
+            bannerObj.transform.SetParent(stagePanel.transform, false);
+            RectTransform bannerRect = bannerObj.AddComponent<RectTransform>();
+            bannerRect.anchorMin = new Vector2(0f, 0.55f);
+            bannerRect.anchorMax = new Vector2(1f, 1f);
+            bannerRect.sizeDelta = Vector2.zero;
+
+            Text bannerText = bannerObj.AddComponent<Text>();
+            bannerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bannerText.fontSize = 16;
+            bannerText.fontStyle = FontStyle.Bold;
+            bannerText.alignment = TextAnchor.MiddleCenter;
+            bannerText.color = new Color(0f, 0.85f, 1f, 1f);
+            bannerText.text = "YOUR TURN  •  TARGET: PIT 1";
+
+            // Beads Container
+            Image bead1 = CreateBead("Bead_1", stagePanel.transform, new Vector2(-70f, -22f), "1");
+            CreateArrowText("Arrow_1_2", stagePanel.transform, new Vector2(-23f, -22f));
+            Image bead2 = CreateBead("Bead_2", stagePanel.transform, new Vector2(23f, -22f), "2");
+            CreateArrowText("Arrow_2_3", stagePanel.transform, new Vector2(70f, -22f));
+            Image bead3 = CreateBead("Bead_3", stagePanel.transform, new Vector2(117f, -22f), "3");
+
+            // Wire to HUDManager via SerializedObject
+            SerializedObject so = new SerializedObject(hud);
+            so.FindProperty("_powerSlider").objectReferenceValue = slider;
+            so.FindProperty("_powerFillImage").objectReferenceValue = fillImage;
+            so.FindProperty("_powerLabel").objectReferenceValue = powerLabel;
+            so.FindProperty("_bead1Image").objectReferenceValue = bead1;
+            so.FindProperty("_bead2Image").objectReferenceValue = bead2;
+            so.FindProperty("_bead3Image").objectReferenceValue = bead3;
+            so.FindProperty("_statusBanner").objectReferenceValue = bannerText;
+            so.ApplyModifiedProperties();
+        }
+
+        private static Image CreateBead(string name, Transform parent, Vector2 pos, string number)
+        {
+            GameObject beadObj = new GameObject(name);
+            beadObj.transform.SetParent(parent, false);
+            RectTransform rect = beadObj.AddComponent<RectTransform>();
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = new Vector2(34f, 34f);
+
+            Image img = beadObj.AddComponent<Image>();
+            img.color = new Color(0.2f, 0.25f, 0.3f, 1f);
+
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(beadObj.transform, false);
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero;
+
+            Text t = textObj.AddComponent<Text>();
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.fontSize = 16;
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.color = Color.white;
+            t.text = number;
+
+            return img;
+        }
+
+        private static void CreateArrowText(string name, Transform parent, Vector2 pos)
+        {
+            GameObject arrowObj = new GameObject(name);
+            arrowObj.transform.SetParent(parent, false);
+            RectTransform rect = arrowObj.AddComponent<RectTransform>();
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = new Vector2(25f, 30f);
+
+            Text t = arrowObj.AddComponent<Text>();
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.fontSize = 16;
+            t.fontStyle = FontStyle.Bold;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.color = new Color(0.6f, 0.6f, 0.7f, 0.8f);
+            t.text = "→";
         }
     }
 }

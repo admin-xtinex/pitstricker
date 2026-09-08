@@ -35,6 +35,9 @@ namespace PitStriker.Input
         private MarbleController _marble;
         private Camera _mainCamera;
 
+        // Events
+        public static event System.Action<float> OnPowerChanged;
+
         // Drag State
         private bool _isDragging = false;
         private Vector3 _dragWorldStart;
@@ -146,6 +149,7 @@ namespace PitStriker.Input
             if (pullDist < _minDragDistance)
             {
                 _trajectoryLine.enabled = false;
+                OnPowerChanged?.Invoke(0f);
                 return;
             }
 
@@ -155,6 +159,8 @@ namespace PitStriker.Input
             Vector3 shootDir = _invertPullToShoot ? pullVector.normalized : -pullVector.normalized;
             float powerFraction = Mathf.Clamp01(pullDist / _maxDragDistance);
             float visualLength = powerFraction * _maxVisualTrajectoryLength;
+
+            OnPowerChanged?.Invoke(powerFraction);
 
             Vector3 startPos = transform.position;
             startPos.y += 0.05f; // Elevate slightly above ground to prevent z-fighting
@@ -188,6 +194,7 @@ namespace PitStriker.Input
         private void CancelDrag()
         {
             _isDragging = false;
+            OnPowerChanged?.Invoke(0f);
             if (_trajectoryLine != null)
             {
                 _trajectoryLine.enabled = false;
