@@ -239,13 +239,19 @@ namespace PitStriker.Gameplay
 
         private void HandleMarbleSunk(PitZone pit, MarbleController marble)
         {
-            if (CurrentState == GameState.TossPhase)
+            // Detect if we are in the Toss Phase (either aiming or in-flight)
+            bool isTossPhase = (_tossResults != null && _tossResults.Count < _players.Count);
+            if (isTossPhase)
             {
                 // In toss phase, sinking into Pit 3 is an instant bullseye!
-                marble.Halt();
-                if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
-                if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
-                _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+                if (pit.PitNumber == 3)
+                {
+                    marble.Halt();
+                    _pitSunkThisTurn = true;
+                    if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
+                    if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+                    _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+                }
                 return;
             }
 
@@ -373,15 +379,23 @@ namespace PitStriker.Gameplay
                     ResetAllPits();
 
                     SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
-                    if (cam != null)
+                    if (cam != null && ActivePlayer.marble != null)
                     {
-                        cam.SetObjectiveTarget(GetPitPosition(ActivePlayer.currentPit));
+                        cam.SetTarget(ActivePlayer.marble.transform, GetPitPosition(ActivePlayer.currentPit));
+                    }
+
+                    if (SwipeLaunchController.Instance != null && ActivePlayer.marble != null)
+                    {
+                        SwipeLaunchController.Instance.SetAimMode(SwipeLaunchController.AimMode.PrecisionPullBack);
+                        SwipeLaunchController.Instance.SetActiveMarble(ActivePlayer.marble);
                     }
 
                     yield return new WaitForSeconds(0.4f);
                     _bonusStrikeEarned = false;
                     _hitOpponentMarbleThisTurn = false;
                     SetState(GameState.ReadyToAim);
+                    OnActivePlayerChanged?.Invoke(ActivePlayer);
+                    OnStatusMessage?.Invoke($"★ EXTRA PLAY! AIM FOR PIT {ActivePlayer.currentPit} ★");
                 }
                 else
                 {
@@ -492,12 +506,18 @@ namespace PitStriker.Gameplay
 
             PlayerData tossingPlayer = _players[_tossPlayerIndex];
             float dist = Vector3.Distance(tossingPlayer.marble.transform.position, pit3Pos);
-            bool isSunk = pit3Zone != null && pit3Zone.IsSunk;
+            bool isSunk = (pit3Zone != null && pit3Zone.IsSunk) || _pitSunkThisTurn;
             if (isSunk)
             {
                 dist = 0.01f;
-                pit3Zone.ResetPit(); // Free pit for next throws
+                // Place bullseye marble cleanly next to the rim so Pit 3 stays open for remaining tossers
+                if (tossingPlayer.marble != null)
+                {
+                    tossingPlayer.marble.ResetPosition(pit3Pos + new Vector3(0.5f, 0.25f, 0f));
+                }
+                if (pit3Zone != null) pit3Zone.ResetPit();
             }
+            _pitSunkThisTurn = false;
 
             _tossResults.Add(new TossResult
             {

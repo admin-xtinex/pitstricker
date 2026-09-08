@@ -19,7 +19,7 @@ namespace PitStriker.Gameplay
 
         [Header("Capture Thresholds")]
         [Tooltip("Maximum velocity allowed for a marble to count as sunk. Prevents skimming or rolling through.")]
-        [SerializeField] private float _maxCaptureSpeed = 0.35f;
+        [SerializeField] private float _maxCaptureSpeed = 0.65f;
 
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
@@ -50,14 +50,14 @@ namespace PitStriker.Gameplay
                 _pitNumber = 1;
             }
 
-            // Realistic trigger zone: strictly sized to the lower basin floor so it NEVER
-            // extends onto the fairway outside the pit rim!
+            // Realistic trigger zone: covers the full cup interior below ground level.
+            // Center is submerged so it NEVER touches marbles rolling on the flat surface outside the pit rim!
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius = 0.32f;
-                sphereTrigger.center = new Vector3(0f, -0.11f, 0f);
+                sphereTrigger.radius = 0.65f;
+                sphereTrigger.center = new Vector3(0f, -0.15f, 0f);
             }
         }
 
@@ -73,23 +73,22 @@ namespace PitStriker.Gameplay
                 return;
             }
 
-            // 1. Elevation check: Marble center must be down in the basin below the flat fairway
-            // On flat ground, marble center is at y ~ 0.25m. In the shallow pit cup, center is < 0.08m.
+            // 1. Elevation check: Marble center must be down inside the pit depression below the flat fairway
+            // On flat ground, marble center is at y ~ 0.25m. In the pit cup, center is <= 0.16m.
             float relativeY = marble.transform.position.y - transform.position.y;
-            bool isDownInBasin = relativeY < 0.08f;
+            bool isDownInPit = relativeY < 0.18f;
 
-            // 2. Centered check: Marble must be inside the basin cup radius, not on the outer rim
+            // 2. Horizontal containment: must be within the pit rim radius
             Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
             Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
-            bool isCenteredInCup = horizontalDist < 0.38f;
+            bool isInsidePitHole = horizontalDist < 0.65f;
 
-            // 3. Settled speed check: Marble must have settled to low speed.
-            // If it is rolling at normal or fast speed, it will naturally roll through the bowl,
-            // climb the opposite slope, and lip out onto the fairway!
+            // 3. Settled speed check: Marble must have settled or slowed down inside the pit.
+            // Fast skimming marbles (> 0.65 m/s) will naturally roll through or lip out.
             bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
 
-            if (!IsSunk && isDownInBasin && isCenteredInCup && isSettled)
+            if (!IsSunk && isDownInPit && isInsidePitHole && isSettled)
             {
                 IsSunk = true;
                 _capturedMarble = marble;
