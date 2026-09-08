@@ -25,19 +25,30 @@ namespace PitStriker.EditorTools
             Material sandMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Ground_Sand.mat");
             Material woodMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Boundary_Wood.mat");
             Material marbleMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Marble_Blue.mat");
+            Material pitMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Pit_Dark.mat");
+            Material lineMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Art/Materials/M_Trajectory_Cyan.mat");
+
             PhysicsMaterial sandPhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Sand_Friction.physicMaterial");
             PhysicsMaterial bouncePhys = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Physics/PM_Marble_Bouncy.physicMaterial");
 
-            // 1. Root Arena Container
-            GameObject arenaRoot = GameObject.Find("Arena_Sandbox");
-            if (arenaRoot != null)
-            {
-                Undo.DestroyObjectImmediate(arenaRoot);
-            }
-            arenaRoot = new GameObject("Arena_Sandbox");
+            // 1. Clean up old test objects if present in scene
+            GameObject oldGround = GameObject.Find("Ground");
+            if (oldGround != null) Undo.DestroyObjectImmediate(oldGround);
+
+            GameObject oldTestMarble = GameObject.Find("TestMarble");
+            if (oldTestMarble != null) Undo.DestroyObjectImmediate(oldTestMarble);
+
+            GameObject oldArena = GameObject.Find("Arena_Sandbox");
+            if (oldArena != null) Undo.DestroyObjectImmediate(oldArena);
+
+            GameObject oldMarble = GameObject.Find("PlayerMarble_Blue");
+            if (oldMarble != null) Undo.DestroyObjectImmediate(oldMarble);
+
+            // 2. Root Arena Container
+            GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // 2. Solid Ground Box (Cube prevents any tunneling)
+            // 3. Solid Ground Box (prevents tunneling completely)
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ground.name = "Arena_Ground";
             ground.transform.SetParent(arenaRoot.transform);
@@ -48,24 +59,19 @@ namespace PitStriker.EditorTools
             BoxCollider groundCollider = ground.GetComponent<BoxCollider>();
             if (sandPhys != null) groundCollider.sharedMaterial = sandPhys;
 
-            // 3. Boundary Rails (Left, Right, Back, Front)
+            // 4. Boundary Rails (Left, Right, Back, Front)
             CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.3f, 5f), new Vector3(0.3f, 0.7f, 22f), woodMat, bouncePhys);
             CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.3f, 5f), new Vector3(0.3f, 0.7f, 22f), woodMat, bouncePhys);
             CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.3f, -6.1f), new Vector3(8.5f, 0.7f, 0.3f), woodMat, bouncePhys);
             CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.3f, 16.1f), new Vector3(8.5f, 0.7f, 0.3f), woodMat, bouncePhys);
 
-            // 4. Create 3 Numbered Pits (Pit 1, Pit 2, Pit 3 along the track)
-            CreatePit("Pit_01", arenaRoot.transform, new Vector3(0f, 0.01f, 1f), 1);
-            CreatePit("Pit_02", arenaRoot.transform, new Vector3(0f, 0.01f, 6f), 2);
-            CreatePit("Pit_03", arenaRoot.transform, new Vector3(0f, 0.01f, 11f), 3);
+            // 5. Create 3 Numbered Pits along the track
+            CreatePit("Pit_01", arenaRoot.transform, new Vector3(0f, 0.01f, 1f), 1, pitMat);
+            CreatePit("Pit_02", arenaRoot.transform, new Vector3(0f, 0.01f, 6f), 2, pitMat);
+            CreatePit("Pit_03", arenaRoot.transform, new Vector3(0f, 0.01f, 11f), 3, pitMat);
 
-            // 5. Create Player Striker Marble
-            GameObject marble = GameObject.Find("PlayerMarble_Blue");
-            if (marble != null)
-            {
-                Undo.DestroyObjectImmediate(marble);
-            }
-            marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            // 6. Create Player Striker Marble
+            GameObject marble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marble.name = "PlayerMarble_Blue";
             marble.transform.position = new Vector3(0f, 0.25f, -4f);
             marble.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
@@ -86,7 +92,7 @@ namespace PitStriker.EditorTools
             sc.radius = 0.5f;
             if (bouncePhys != null) sc.sharedMaterial = bouncePhys;
 
-            // Core Scripts
+            // Core Marble Controller
             MarbleController marbleController = marble.AddComponent<MarbleController>();
 
             // Trajectory Line
@@ -96,13 +102,12 @@ namespace PitStriker.EditorTools
             line.startColor = new Color(0.1f, 0.8f, 1f, 0.9f);
             line.endColor = new Color(0.1f, 0.9f, 1f, 0.3f);
             line.useWorldSpace = true;
-            line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            line.material.color = new Color(0f, 0.85f, 1f, 1f);
+            if (lineMat != null) line.sharedMaterial = lineMat;
             line.enabled = false;
 
             SwipeLaunchController launcher = marble.AddComponent<SwipeLaunchController>();
 
-            // 6. Main Camera Setup
+            // 7. Main Camera Setup
             Camera cam = Camera.main;
             if (cam != null)
             {
@@ -120,7 +125,7 @@ namespace PitStriker.EditorTools
             Undo.CollapseUndoOperations(group);
             Selection.activeGameObject = marble;
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena successfully generated with 3 Pits, Boundary Rails, and Blue Striker Marble!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena successfully generated with verified URP materials!</color>");
         }
 
         private static void CreateBoundaryWall(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -136,7 +141,7 @@ namespace PitStriker.EditorTools
             if (physMat != null) col.sharedMaterial = physMat;
         }
 
-        private static void CreatePit(string name, Transform parent, Vector3 position, int pitNumber)
+        private static void CreatePit(string name, Transform parent, Vector3 position, int pitNumber, Material mat)
         {
             GameObject pit = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pit.name = name;
@@ -144,10 +149,7 @@ namespace PitStriker.EditorTools
             pit.transform.position = position;
             pit.transform.localScale = new Vector3(1.2f, 0.02f, 1.2f);
 
-            // Dark rim material for the pit
-            Material pitMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            pitMat.color = new Color(0.12f, 0.09f, 0.06f, 1f);
-            pit.GetComponent<MeshRenderer>().sharedMaterial = pitMat;
+            if (mat != null) pit.GetComponent<MeshRenderer>().sharedMaterial = mat;
 
             // Remove default solid collider and add trigger zone
             Object.DestroyImmediate(pit.GetComponent<Collider>());

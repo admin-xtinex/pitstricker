@@ -80,46 +80,36 @@ namespace PitStriker.Input
             bool justPressed = false;
             bool justReleased = false;
 
-            // Query Input using New Input System with Touch & Mouse support
-            if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-            {
-                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
-                isPressed = true;
-                justPressed = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
-            }
-            else if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
-            {
-                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
-                justReleased = true;
-            }
-            else if (Mouse.current != null)
+            // Prioritize Mouse if left button is being used (essential for touch-screen laptops)
+            if (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.leftButton.wasReleasedThisFrame))
             {
                 screenPos = Mouse.current.position.ReadValue();
                 isPressed = Mouse.current.leftButton.isPressed;
                 justPressed = Mouse.current.leftButton.wasPressedThisFrame;
                 justReleased = Mouse.current.leftButton.wasReleasedThisFrame;
             }
+            else if (Touchscreen.current != null)
+            {
+                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
+                isPressed = Touchscreen.current.primaryTouch.press.isPressed;
+                justPressed = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
+                justReleased = Touchscreen.current.primaryTouch.press.wasReleasedThisFrame;
+            }
 
-            // 1. Pointer Down: Start Drag if touching near marble
+            // 1. Pointer Down: Start Drag anywhere on screen
             if (justPressed)
             {
                 if (TryGetGroundPoint(screenPos, out Vector3 groundPoint))
                 {
-                    float distToMarble = Vector3.Distance(new Vector3(groundPoint.x, 0, groundPoint.z),
-                                                          new Vector3(transform.position.x, 0, transform.position.z));
+                    _isDragging = true;
+                    _dragWorldStart = groundPoint;
+                    _currentDragWorldPoint = groundPoint;
 
-                    // Allow touch within 1.5 units of marble to start drag
-                    if (distToMarble <= 1.5f)
+                    if (_trajectoryLine != null)
                     {
-                        _isDragging = true;
-                        _dragWorldStart = groundPoint;
-                        _currentDragWorldPoint = groundPoint;
-
-                        if (_trajectoryLine != null)
-                        {
-                            _trajectoryLine.enabled = true;
-                        }
+                        _trajectoryLine.enabled = true;
                     }
+                    Debug.Log($"[AIM] Drag initiated at ground position: {groundPoint}");
                 }
             }
 
