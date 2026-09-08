@@ -30,14 +30,12 @@ def _candidate_script_dirs():
     """Return likely Tools/Blender locations for CLI and Blender Text Editor runs."""
     candidates = []
 
-    # Normal Python / command-line execution.
     raw_file = globals().get("__file__")
     if raw_file and raw_file not in {"<string>", "<blender_text>"}:
         resolved_file = _normalise_path(raw_file)
         if resolved_file:
             candidates.append(os.path.dirname(resolved_file))
 
-    # Blender Scripting workspace: Run Script from the active Text Editor.
     try:
         space = bpy.context.space_data
         text = getattr(space, "text", None)
@@ -49,7 +47,6 @@ def _candidate_script_dirs():
     except Exception:
         pass
 
-    # Fallback when the active editor is not the Text Editor anymore.
     try:
         for text_block in bpy.data.texts:
             text_filepath = getattr(text_block, "filepath", "")
@@ -63,7 +60,6 @@ def _candidate_script_dirs():
     except Exception:
         pass
 
-    # If the .blend is saved inside the repository, try common locations.
     blend_filepath = getattr(bpy.data, "filepath", "")
     if blend_filepath:
         blend_dir = os.path.dirname(_normalise_path(blend_filepath))
@@ -75,7 +71,6 @@ def _candidate_script_dirs():
             ]
         )
 
-    # Useful for launching Blender from the repository root or Tools/Blender.
     cwd = _normalise_path(os.getcwd())
     candidates.extend(
         [
@@ -85,7 +80,6 @@ def _candidate_script_dirs():
         ]
     )
 
-    # De-duplicate while preserving priority.
     unique = []
     seen = set()
     for candidate in candidates:
@@ -142,7 +136,7 @@ def parse_args():
     argv = argv[argv.index("--") + 1 :] if "--" in argv else []
 
     parser = argparse.ArgumentParser(description="Generate a Pit Striker Blender arena")
-    parser.add_argument("--map", dest="map_name", choices=sorted(MAP_PRESETS.keys()), default="beach")
+    parser.add_argument("--map", dest="map_name", choices=sorted(MAP_PRESETS.keys()), default="rough_soil")
     parser.add_argument("--pit-spacing", type=float, default=12.0)
     parser.add_argument("--pit-radius", type=float, default=0.18)
     parser.add_argument("--pit-depth", type=float, default=0.12)
