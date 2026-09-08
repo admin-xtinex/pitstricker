@@ -50,13 +50,13 @@ namespace PitStriker.Gameplay
                 _pitNumber = 1;
             }
 
-            // Submerged spherical trigger covers the full physical basin opening (0.75m radius)
+            // Submerged spherical trigger covers the full physical basin opening (1.10m radius)
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius = 0.75f;
-                sphereTrigger.center = new Vector3(0f, -0.15f, 0f);
+                sphereTrigger.radius = 1.10f;
+                sphereTrigger.center = new Vector3(0f, -0.10f, 0f);
             }
         }
 
@@ -73,9 +73,10 @@ namespace PitStriker.Gameplay
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
             float relativeY = marble.transform.position.y - transform.position.y;
 
-            // Pit basin opening is 0.62m radius; flat ground is y=0.25m.
-            // A marble within 0.70m radius and below y=0.32m (not airborne) is within the basin depression.
-            return horizontalDist <= 0.70f && relativeY < 0.32f;
+            // Pit basin opening is 0.62m radius; marble radius is 0.25m.
+            // A marble resting anywhere inside the cup or on the rim slope is within 1.05m radius
+            // and below fairway surface height (relativeY < 0.35m).
+            return horizontalDist <= 1.05f && relativeY < 0.35f;
         }
 
         /// <summary>

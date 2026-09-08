@@ -308,6 +308,14 @@ namespace PitStriker.Gameplay
                     MarbleController marble = player.marble;
                     if (marble == null || !marble.gameObject.activeInHierarchy) continue;
 
+                    float dist = Vector2.Distance(new Vector2(marble.transform.position.x, marble.transform.position.z), new Vector2(pit.transform.position.x, pit.transform.position.z));
+                    float relY = marble.transform.position.y - pit.transform.position.y;
+
+                    if (player == ActivePlayer)
+                    {
+                        Debug.Log($"[PIT AUDIT] Pit #{pit.PitNumber} (target={ActivePlayer.currentPit}) vs Active {player.name}: dist={dist:F2}m, relY={relY:F2}m, isInside={pit.IsMarbleInsidePit(marble)}");
+                    }
+
                     if (pit.IsMarbleInsidePit(marble))
                     {
                         marble.Halt();
@@ -318,6 +326,7 @@ namespace PitStriker.Gameplay
                             {
                                 _pitSunkThisTurn = true;
                                 pit.MarkSunk(marble);
+                                Debug.Log($"<color=#00FFAA><b>[TOSS BULLSEYE]</b> {player.name} sank Pit 3!</color>");
                             }
                             else
                             {
