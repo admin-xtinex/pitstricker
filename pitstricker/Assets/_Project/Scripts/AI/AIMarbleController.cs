@@ -123,7 +123,7 @@ namespace PitStriker.AI
             float powerFraction = Mathf.Clamp01(finalForce / 36.8f);
             float elapsed = 0f;
 
-            TurnManager.OnStatusMessage?.Invoke($"★ {aiPlayer.name.ToUpper()}: AIMING FOR {targetDesc.ToUpper()}... ★");
+            TurnManager.BroadcastStatus($"★ {aiPlayer.name.ToUpper()}: AIMING FOR {targetDesc.ToUpper()}... ★");
 
             while (elapsed < _thinkTimeSeconds)
             {
