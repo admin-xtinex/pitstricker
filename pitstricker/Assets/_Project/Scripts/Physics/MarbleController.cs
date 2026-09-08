@@ -188,28 +188,34 @@ namespace PitStriker.Physics
                                 Vector3 relVel = vStriker - vTarget;
                                 float vn = Vector3.Dot(relVel, normal);
 
-                                if (vn > 0.08f) // Valid closing velocity
+                                if (vn > 0.05f) // Valid closing velocity
                                 {
-                                    // High elastic restitution (0.95 for glass marbles / carrom striker)
-                                    float restitution = 0.95f;
+                                    // 1. Target Marble receives massive kinetic blast forward
+                                    float blastSpeed = Mathf.Max(vn * 2.6f, 5.5f);
+                                    Vector3 blastVelocity = normal * blastSpeed;
 
-                                    // Equal mass m1 = m2 = 1.0kg:
-                                    // Transfer normal velocity component:
-                                    // J = (1 + e) * 0.5 * vn * mass
-                                    float impulseMag = (1f + restitution) * 0.5f * vn * _mass;
+                                    // If target marble is sitting down inside a pit depression, pop it up and out over the rim!
+                                    if (otherMarble.transform.position.y < 0.20f)
+                                    {
+                                        blastVelocity += Vector3.up * 3.2f;
+                                    }
 
-                                    // Target receives normal impulse forward
-                                    otherRb.AddForce(normal * (impulseMag * 1.25f), ForceMode.Impulse);
-
-                                    // Striker loses its normal velocity component:
-                                    // On center hit, this cancels forward velocity so striker stops dead!
-                                    // On angle hit, this removes normal velocity, leaving tangential velocity so striker deflects to the side!
-                                    _rigidbody.AddForce(-normal * impulseMag, ForceMode.Impulse);
-
+                                    otherRb.linearVelocity = blastVelocity;
                                     otherMarble._wasMoving = true;
+                                    otherMarble._consecutiveRestFrames = 0;
+
+                                    // 2. Striker dumps almost all forward momentum (dead stop / gentle settle)
+                                    _rigidbody.linearVelocity = _rigidbody.linearVelocity * 0.15f;
+                                    _rigidbody.angularVelocity = _rigidbody.angularVelocity * 0.15f;
                                     _wasMoving = true;
 
-                                    Debug.Log($"<color=#00FFAA><b>[CARROM HIT]</b> vn={vn:F2}m/s. Target blasted with {impulseMag * 1.25f:F1}N impulse. Striker settled.</color>");
+                                    // Audio & VFX Juice for powerful tactical hit
+                                    if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)
+                                    {
+                                        PitStriker.VFX.VFXManager.Instance.PlayCollisionSparks(collision.contacts[0].point, blastSpeed);
+                                    }
+
+                                    Debug.Log($"<color=#00FFAA><b>[CARROM BLAST]</b> Striker halted. Target {otherMarble.name} blasted away with {blastSpeed:F1} m/s speed!</color>");
                                 }
                             }
                         }

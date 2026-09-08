@@ -67,12 +67,12 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // Master safety subfloor underneath the entire arena (48-meter fairway)
-            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(12f, 0.5f, 52f), sandMat, sandPhys);
+            // Master safety subfloor underneath the entire arena (48-meter fairway, 2x width 22m)
+            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(22f, 0.5f, 52f), sandMat, sandPhys);
 
-            // Left & Right Bank Slabs
-            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-2.7f, -0.25f, 15f), new Vector3(2.6f, 0.5f, 48f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(2.7f, -0.25f, 15f), new Vector3(2.6f, 0.5f, 48f), sandMat, sandPhys);
+            // Left & Right Bank Slabs (2x wide, covering x: -8.2m to +8.2m)
+            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
 
             // Center Track Slabs connecting seamlessly with round pit tiles (Z: -8.5m to Z: 38.0m)
             CreateGroundSlab("Ground_Center_Start", arenaRoot.transform, new Vector3(0f, -0.25f, -3.4f), new Vector3(2.8f, 0.5f, 10.2f), sandMat, sandPhys);
@@ -80,13 +80,13 @@ namespace PitStriker.EditorTools
             CreateGroundSlab("Ground_Center_Bridge_2_3", arenaRoot.transform, new Vector3(0f, -0.25f, 23.75f), new Vector3(2.8f, 0.5f, 11.9f), sandMat, sandPhys);
             CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 35.15f), new Vector3(2.8f, 0.5f, 5.7f), sandMat, sandPhys);
 
-            // 3. Boundary Rails (Left, Right, Back, Front)
-            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.35f, 14.5f), new Vector3(0.3f, 0.8f, 47.5f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.35f, 14.5f), new Vector3(0.3f, 0.8f, 47.5f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
+            // 3. Boundary Rails (Left, Right, Back, Front) - 2x wide layout (bounds: x = -8.2m to +8.2m)
+            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys);
 
-            // 4. Create 3 TRUE ROUND PITS with generous spacing (13.5m - 14.5m apart)
+            // 4. Create 3 TRUE ROUND PITS with 2x marble size (Diameter = 1.0m, R = 0.50m)
             CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1, sandMat, pitMat, woodMat, sandPhys);
             CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2, sandMat, pitMat, woodMat, sandPhys);
             CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3, sandMat, pitMat, woodMat, sandPhys);
@@ -233,10 +233,10 @@ namespace PitStriker.EditorTools
 
             float width = 2.8f;
             float length = 2.6f;
-            float rimRadius = 0.62f;     // Top rim radius of the bowl
-            float floorRadius = 0.26f;   // Basin floor radius
-            float depth = 0.22f;         // Authentic shallow pit depth (~marble depth)
-            int segments = 24;
+            float rimRadius = 0.50f;     // Exactly 2x marble radius (Diameter = 1.0m, marble diameter = 0.50m)
+            float floorRadius = 0.38f;   // Basin floor radius
+            float depth = 0.28f;         // Steep vertical earthen pit depth
+            int segments = 28;
 
             Mesh mesh = new Mesh();
             mesh.name = name + "_RoundMesh";
@@ -374,8 +374,8 @@ namespace PitStriker.EditorTools
             // Trigger Zone strictly inside the bottom cup
             SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 0.75f;
-            trigger.center = new Vector3(0f, -0.15f, 0f);
+            trigger.radius = 0.55f;
+            trigger.center = new Vector3(0f, -0.14f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
             zone.SetPitNumber(pitNumber);
@@ -383,36 +383,48 @@ namespace PitStriker.EditorTools
             zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
             zoneSo.ApplyModifiedProperties();
 
-            // Numbered Flag Marker next to the pit
-            CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
+            // Production Marker Pole next to the pit (replaces red flag banner)
+            CreateMarkerPole("MarkerPole_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
         }
 
-        private static void CreateFlagPole(string name, Transform parent, Vector3 localPos, int number, Material woodMat)
+        private static void CreateMarkerPole(string name, Transform parent, Vector3 localPos, int number, Material woodMat)
         {
-            GameObject flagObj = new GameObject(name);
-            flagObj.transform.SetParent(parent);
-            flagObj.transform.localPosition = localPos;
+            GameObject poleObj = new GameObject(name);
+            poleObj.transform.SetParent(parent);
+            poleObj.transform.localPosition = localPos;
 
-            // Pole
-            GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pole.name = "Pole";
-            pole.transform.SetParent(flagObj.transform);
-            pole.transform.localPosition = new Vector3(0f, 0.45f, 0f);
-            pole.transform.localScale = new Vector3(0.04f, 0.45f, 0.04f);
-            if (woodMat != null) pole.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-            Object.DestroyImmediate(pole.GetComponent<Collider>());
+            // 1. Turned wooden milestone post
+            GameObject post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            post.name = "Milestone_Post";
+            post.transform.SetParent(poleObj.transform);
+            post.transform.localPosition = new Vector3(0f, 0.35f, 0f);
+            post.transform.localScale = new Vector3(0.08f, 0.35f, 0.08f);
+            if (woodMat != null) post.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
+            Object.DestroyImmediate(post.GetComponent<Collider>());
 
-            // Red Flag Banner
-            GameObject banner = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            banner.name = "Banner";
-            banner.transform.SetParent(flagObj.transform);
-            banner.transform.localPosition = new Vector3(0.18f, 0.75f, 0f);
-            banner.transform.localScale = new Vector3(0.32f, 0.22f, 0.02f);
+            // 2. Brass/Bronze Milestone Head
+            GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "Milestone_Head";
+            head.transform.SetParent(poleObj.transform);
+            head.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+            head.transform.localScale = new Vector3(0.12f, 0.12f, 0.12f);
+            Material brassMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            brassMat.color = new Color(0.85f, 0.65f, 0.25f, 1f);
+            brassMat.SetFloat("_Smoothness", 0.7f);
+            head.GetComponent<MeshRenderer>().sharedMaterial = brassMat;
+            Object.DestroyImmediate(head.GetComponent<Collider>());
 
-            Material redMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            redMat.color = new Color(0.9f, 0.15f, 0.15f, 1f);
-            banner.GetComponent<MeshRenderer>().sharedMaterial = redMat;
-            Object.DestroyImmediate(banner.GetComponent<Collider>());
+            // 3. Milestone Number Badge Rings (1 ring for Pit 1, 2 for Pit 2, 3 for Pit 3)
+            for (int r = 0; r < number; r++)
+            {
+                GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                ring.name = "Ring_" + (r + 1);
+                ring.transform.SetParent(poleObj.transform);
+                ring.transform.localPosition = new Vector3(0f, 0.45f + (r * 0.08f), 0f);
+                ring.transform.localScale = new Vector3(0.10f, 0.02f, 0.10f);
+                ring.GetComponent<MeshRenderer>().sharedMaterial = brassMat;
+                Object.DestroyImmediate(ring.GetComponent<Collider>());
+            }
         }
 
         private static void CreateChalkRing(string name, Transform parent, Vector3 position, float radius)
