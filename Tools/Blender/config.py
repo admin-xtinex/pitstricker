@@ -14,7 +14,8 @@ class MapPreset:
 
 @dataclass
 class ArenaConfig:
-    map_name: str = "beach"
+    # Blender UI runs now default to the Kerala-village / rough-soil target.
+    map_name: str = "rough_soil"
     pit_radius: float = 0.18
     pit_depth: float = 0.12
     pit_spacing: float = 12.0
@@ -25,6 +26,7 @@ class ArenaConfig:
 
     @property
     def pit_positions(self):
+        # Gameplay invariant: all three pits are mathematically collinear.
         return [
             (0.0, 0.0, 0.0),
             (0.0, self.pit_spacing, 0.0),
@@ -43,7 +45,7 @@ MAP_PRESETS = {
         roughness=0.82,
         arena_width=13.0,
         arena_length=34.0,
-        prop_density=24,
+        prop_density=18,
         ground_bump=0.035,
     ),
     "grass": MapPreset(
@@ -52,17 +54,17 @@ MAP_PRESETS = {
         roughness=0.93,
         arena_width=13.0,
         arena_length=34.0,
-        prop_density=42,
+        prop_density=30,
         ground_bump=0.025,
     ),
     "rough_soil": MapPreset(
-        name="Rough Soil",
-        ground_color=(0.28, 0.12, 0.055, 1.0),
-        roughness=0.98,
-        arena_width=13.0,
-        arena_length=34.0,
-        prop_density=34,
-        ground_bump=0.08,
+        name="Kerala Village Rough Soil",
+        ground_color=(0.31, 0.135, 0.052, 1.0),
+        roughness=0.96,
+        arena_width=16.0,
+        arena_length=42.0,
+        prop_density=18,
+        ground_bump=0.075,
     ),
     "smooth_clay": MapPreset(
         name="Smooth Clay",
@@ -70,7 +72,7 @@ MAP_PRESETS = {
         roughness=0.58,
         arena_width=13.0,
         arena_length=34.0,
-        prop_density=12,
+        prop_density=10,
         ground_bump=0.008,
     ),
 }
