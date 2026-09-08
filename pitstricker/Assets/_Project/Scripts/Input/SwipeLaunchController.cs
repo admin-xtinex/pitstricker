@@ -16,10 +16,10 @@ namespace PitStriker.Input
         [SerializeField] private float _minDragDistance = 0.2f;
 
         [Tooltip("Maximum drag distance in world units for 100% power.")]
-        [SerializeField] private float _maxDragDistance = 2.5f;
+        [SerializeField] private float _maxDragDistance = 3.5f;
 
         [Tooltip("Maximum impulse force delivered to the marble at full power.")]
-        [SerializeField] private float _maxLaunchForce = 18.0f;
+        [SerializeField] private float _maxLaunchForce = 32.0f;
 
         [Tooltip("If true, pull backward to shoot forward (Slingshot style). If false, push forward (Cue stick style).")]
         [SerializeField] private bool _invertPullToShoot = true;
@@ -29,7 +29,7 @@ namespace PitStriker.Input
         [SerializeField] private LineRenderer _trajectoryLine;
 
         [Tooltip("Length of the visual trajectory guide at maximum power.")]
-        [SerializeField] private float _maxVisualTrajectoryLength = 5.0f;
+        [SerializeField] private float _maxVisualTrajectoryLength = 9.0f;
 
         // Cached References
         private MarbleController _marble;
