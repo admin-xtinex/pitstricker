@@ -3,9 +3,129 @@ import os
 import sys
 import bpy
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_REQUIRED_MODULE_FILES = (
+    "config.py",
+    "materials.py",
+    "terrain.py",
+    "pits.py",
+    "marbles.py",
+    "environment.py",
+    "lighting.py",
+    "cameras.py",
+)
+
+
+def _normalise_path(path):
+    if not path:
+        return None
+    try:
+        path = bpy.path.abspath(path)
+    except Exception:
+        pass
+    return os.path.normpath(os.path.abspath(path))
+
+
+def _candidate_script_dirs():
+    """Return likely Tools/Blender locations for CLI and Blender Text Editor runs."""
+    candidates = []
+
+    # Normal Python / command-line execution.
+    raw_file = globals().get("__file__")
+    if raw_file and raw_file not in {"<string>", "<blender_text>"}:
+        resolved_file = _normalise_path(raw_file)
+        if resolved_file:
+            candidates.append(os.path.dirname(resolved_file))
+
+    # Blender Scripting workspace: Run Script from the active Text Editor.
+    try:
+        space = bpy.context.space_data
+        text = getattr(space, "text", None)
+        text_filepath = getattr(text, "filepath", "") if text else ""
+        if text_filepath:
+            resolved_text = _normalise_path(text_filepath)
+            if resolved_text:
+                candidates.append(os.path.dirname(resolved_text))
+    except Exception:
+        pass
+
+    # Fallback when the active editor is not the Text Editor anymore.
+    try:
+        for text_block in bpy.data.texts:
+            text_filepath = getattr(text_block, "filepath", "")
+            if not text_filepath:
+                continue
+            if os.path.basename(text_filepath).lower() != "generate_arena.py":
+                continue
+            resolved_text = _normalise_path(text_filepath)
+            if resolved_text:
+                candidates.append(os.path.dirname(resolved_text))
+    except Exception:
+        pass
+
+    # If the .blend is saved inside the repository, try common locations.
+    blend_filepath = getattr(bpy.data, "filepath", "")
+    if blend_filepath:
+        blend_dir = os.path.dirname(_normalise_path(blend_filepath))
+        candidates.extend(
+            [
+                blend_dir,
+                os.path.join(blend_dir, "Tools", "Blender"),
+                os.path.join(os.path.dirname(blend_dir), "Tools", "Blender"),
+            ]
+        )
+
+    # Useful for launching Blender from the repository root or Tools/Blender.
+    cwd = _normalise_path(os.getcwd())
+    candidates.extend(
+        [
+            cwd,
+            os.path.join(cwd, "Tools", "Blender"),
+            os.path.join(os.path.dirname(cwd), "Tools", "Blender"),
+        ]
+    )
+
+    # De-duplicate while preserving priority.
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        candidate = _normalise_path(candidate)
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        unique.append(candidate)
+    return unique
+
+
+def _is_module_dir(path):
+    return bool(path) and all(
+        os.path.isfile(os.path.join(path, filename))
+        for filename in _REQUIRED_MODULE_FILES
+    )
+
+
+def _resolve_script_dir():
+    candidates = _candidate_script_dirs()
+    for candidate in candidates:
+        if _is_module_dir(candidate):
+            return candidate
+
+    checked = "\n  - ".join(candidates) if candidates else "(no usable paths detected)"
+    raise ModuleNotFoundError(
+        "Pit Striker Blender modules could not be located.\n\n"
+        "Open Tools/Blender/generate_arena.py directly from the cloned/downloaded "
+        "pitstricker repository and make sure the entire Tools/Blender folder is present.\n\n"
+        "Expected sibling files include config.py, terrain.py, pits.py, materials.py, "
+        "marbles.py, environment.py, lighting.py and cameras.py.\n\n"
+        f"Paths checked:\n  - {checked}"
+    )
+
+
+SCRIPT_DIR = _resolve_script_dir()
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+
+print(f"Pit Striker Blender modules: {SCRIPT_DIR}")
 
 from config import ArenaConfig, MAP_PRESETS
 from materials import make_ground_material, make_marker_material
