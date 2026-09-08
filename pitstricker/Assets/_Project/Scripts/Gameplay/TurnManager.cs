@@ -18,10 +18,11 @@ namespace PitStriker.Gameplay
     {
         public enum GameState
         {
-            ReadyToAim,
-            Rolling,
-            Evaluating,
-            MatchVictory
+            TossPhase,     // Opening Lag Phase: Players flick-throw towards Pit 3 to decide turn order
+            ReadyToAim,    // Precision aim for active player
+            Rolling,       // Marble in motion
+            Evaluating,    // Outcome evaluation
+            MatchVictory   // Match finished, podium display
         }
 
         [System.Serializable]
@@ -47,6 +48,14 @@ namespace PitStriker.Gameplay
             }
         }
 
+        [System.Serializable]
+        public class TossResult
+        {
+            public PlayerData player;
+            public float distanceToPit3;
+            public bool sunkInPit3;
+        }
+
         public static TurnManager Instance { get; private set; }
 
         [Header("Multiplayer Configuration")]
@@ -55,14 +64,14 @@ namespace PitStriker.Gameplay
         [SerializeField] private List<PlayerData> _players = new List<PlayerData>();
 
         [Header("Course Setup")]
-        [SerializeField] private Vector3 _startCenter = new Vector3(0f, 0.3f, -5.5f);
+        [SerializeField] private Vector3 _startCenter = new Vector3(0f, 0.3f, -6.0f);
         [SerializeField] private float _startSpacing = 0.45f;
 
         [Header("Par Configuration")]
         [SerializeField] private int[] _pitPars = new int[] { 2, 3, 3 }; // Pit 1: Par 2, Pit 2: Par 3, Pit 3: Par 3
 
         // State Tracking
-        public GameState CurrentState { get; private set; } = GameState.ReadyToAim;
+        public GameState CurrentState { get; private set; } = GameState.TossPhase;
         public int CurrentPlayerIndex { get; private set; } = 0;
         public PlayerData ActivePlayer => (_players != null && _players.Count > CurrentPlayerIndex) ? _players[CurrentPlayerIndex] : null;
         public int CoursePar => _pitPars[0] + _pitPars[1] + _pitPars[2];
@@ -72,7 +81,12 @@ namespace PitStriker.Gameplay
         public int PlayerCount => _players.Count;
         public IReadOnlyList<PlayerData> Players => _players;
 
+        // Toss & Bonus Play Tracking
+        private List<TossResult> _tossResults = new List<TossResult>();
+        private int _tossPlayerIndex = 0;
         private bool _pitSunkThisTurn = false;
+        private bool _hitOpponentMarbleThisTurn = false;
+        private bool _bonusStrikeEarned = false;
         private Coroutine _evaluateCoroutine;
 
         // Events
@@ -85,7 +99,7 @@ namespace PitStriker.Gameplay
 
         public static bool CanAim()
         {
-            return Instance == null || Instance.CurrentState == GameState.ReadyToAim;
+            return Instance == null || Instance.CurrentState == GameState.ReadyToAim || Instance.CurrentState == GameState.TossPhase;
         }
 
         private void Awake()
@@ -104,11 +118,13 @@ namespace PitStriker.Gameplay
         private void OnEnable()
         {
             PitZone.OnMarbleSunk += HandleMarbleSunk;
+            MarbleController.OnMarbleHitMarble += HandleMarbleHitMarble;
         }
 
         private void OnDisable()
         {
             PitZone.OnMarbleSunk -= HandleMarbleSunk;
+            MarbleController.OnMarbleHitMarble -= HandleMarbleHitMarble;
             UnbindAllMarbles();
         }
 
@@ -167,12 +183,40 @@ namespace PitStriker.Gameplay
             }
         }
 
+        private void HandleMarbleHitMarble(MarbleController striker, MarbleController hitTarget)
+        {
+            if (CurrentState == GameState.TossPhase) return;
+            if (ActivePlayer == null || striker != ActivePlayer.marble) return;
+
+            if (!_hitOpponentMarbleThisTurn)
+            {
+                _hitOpponentMarbleThisTurn = true;
+                _bonusStrikeEarned = true;
+                Debug.Log($"<color=#FFD700><b>[COMBO HIT]</b> {ActivePlayer.name} hit {hitTarget.name}! EXTRA PLAY AWARDED!</color>");
+                OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} HIT OPPONENT! EXTRA PLAY AWARDED! ★");
+            }
+        }
+
         private void HandleMarbleLaunched()
         {
-            if (CurrentState == GameState.MatchVictory || ActivePlayer == null) return;
+            if (CurrentState == GameState.MatchVictory) return;
+
+            if (CurrentState == GameState.TossPhase)
+            {
+                SetState(GameState.Rolling);
+                if (_tossPlayerIndex < _players.Count)
+                {
+                    OnStatusMessage?.Invoke($"★ {_players[_tossPlayerIndex].name.ToUpper()} TOSS IN FLIGHT! ★");
+                }
+                return;
+            }
+
+            if (ActivePlayer == null) return;
 
             ActivePlayer.totalStrokes++;
             _pitSunkThisTurn = false;
+            _hitOpponentMarbleThisTurn = false;
+            _bonusStrikeEarned = false;
 
             SetState(GameState.Rolling);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
@@ -189,11 +233,21 @@ namespace PitStriker.Gameplay
 
         private void HandleMarbleSunk(PitZone pit, MarbleController marble)
         {
+            if (CurrentState == GameState.TossPhase)
+            {
+                // In toss phase, sinking into Pit 3 is an instant bullseye!
+                marble.Halt();
+                if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
+                _evaluateCoroutine = StartCoroutine(EvaluateTurnOutcomeRoutine());
+                return;
+            }
+
             if (ActivePlayer == null || marble != ActivePlayer.marble) return;
 
             if (pit.PitNumber == ActivePlayer.currentPit)
             {
                 _pitSunkThisTurn = true;
+                _bonusStrikeEarned = true;
                 marble.Halt();
 
                 if (_evaluateCoroutine != null) StopCoroutine(_evaluateCoroutine);
@@ -210,9 +264,18 @@ namespace PitStriker.Gameplay
         {
             SetState(GameState.Evaluating);
 
-            // Let player savor the sink visual
+            // Let player savor the roll and stop
             yield return new WaitForSeconds(0.8f);
 
+            // 1. TOSS PHASE EVALUATION
+            if (_tossResults != null && _tossResults.Count < _players.Count)
+            {
+                yield return StartCoroutine(EvaluateTossOutcomeRoutine());
+                _evaluateCoroutine = null;
+                yield break;
+            }
+
+            // 2. MAIN MATCH EVALUATION
             if (ActivePlayer == null) yield break;
 
             if (_pitSunkThisTurn)
@@ -224,13 +287,14 @@ namespace PitStriker.Gameplay
                 {
                     ActivePlayer.currentPit++;
                     OnTargetPitChanged?.Invoke(ActivePlayer.currentPit);
-                    OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! BONUS STRIKE! ★");
+                    OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! EXTRA PLAY! ★");
 
-                    // Relocate to next tee
+                    // Relocate to next tee ahead of the conquered pit
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
 
                     yield return new WaitForSeconds(0.4f);
-                    // Sinking grants a BONUS STRIKE (keeps turn)
+                    _bonusStrikeEarned = false;
+                    _hitOpponentMarbleThisTurn = false;
                     SetState(GameState.ReadyToAim);
                 }
                 else
@@ -253,6 +317,15 @@ namespace PitStriker.Gameplay
                     }
                 }
             }
+            else if (_bonusStrikeEarned)
+            {
+                // Extra play awarded from hitting another player's marble!
+                _bonusStrikeEarned = false;
+                _hitOpponentMarbleThisTurn = false;
+                OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY! ★");
+                yield return new WaitForSeconds(0.5f);
+                SetState(GameState.ReadyToAim);
+            }
             else
             {
                 // Fairway shot: marble remains where it came to rest
@@ -268,6 +341,79 @@ namespace PitStriker.Gameplay
             }
 
             _evaluateCoroutine = null;
+        }
+
+        private IEnumerator EvaluateTossOutcomeRoutine()
+        {
+            // Find Pit 3 position
+            Vector3 pit3Pos = new Vector3(0f, 0f, 31.0f);
+            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
+            PitZone pit3Zone = null;
+            foreach (var p in allPits)
+            {
+                if (p.PitNumber == 3)
+                {
+                    pit3Pos = p.transform.position;
+                    pit3Zone = p;
+                    break;
+                }
+            }
+
+            PlayerData tossingPlayer = _players[_tossPlayerIndex];
+            float dist = Vector3.Distance(tossingPlayer.marble.transform.position, pit3Pos);
+            bool isSunk = pit3Zone != null && pit3Zone.IsSunk;
+            if (isSunk)
+            {
+                dist = 0.01f;
+                pit3Zone.ResetPit(); // Free pit for next throws
+            }
+
+            _tossResults.Add(new TossResult
+            {
+                player = tossingPlayer,
+                distanceToPit3 = dist,
+                sunkInPit3 = isSunk
+            });
+
+            OnStatusMessage?.Invoke($"{tossingPlayer.name.ToUpper()}: {dist:F2}m FROM PIT 3");
+            yield return new WaitForSeconds(1.2f);
+
+            _tossPlayerIndex++;
+
+            if (_tossPlayerIndex < _players.Count)
+            {
+                // Next player's turn to toss
+                ActivateTossPlayer(_tossPlayerIndex);
+                SetState(GameState.TossPhase);
+            }
+            else
+            {
+                // All players have thrown their toss!
+                // Sort by shortest distance to Pit 3
+                _tossResults.Sort((a, b) => a.distanceToPit3.CompareTo(b.distanceToPit3));
+
+                _players.Clear();
+                foreach (var tr in _tossResults)
+                {
+                    _players.Add(tr.player);
+                }
+
+                PlayerData tossWinner = _players[0];
+                OnStatusMessage?.Invoke($"★ {tossWinner.name.ToUpper()} WON THE TOSS ({_tossResults[0].distanceToPit3:F2}m)! PLAYS FIRST! ★");
+                Debug.Log($"<color=#FFD700><b>[TOSS WINNER]</b> {tossWinner.name} is closest to Pit 3 ({_tossResults[0].distanceToPit3:F2}m)! Wins 1st turn!</color>");
+
+                yield return new WaitForSeconds(2.0f);
+
+                // Switch SwipeLaunchController back to Precision Pull-back Aiming for the main game
+                if (SwipeLaunchController.Instance != null)
+                {
+                    SwipeLaunchController.Instance.SetAimMode(SwipeLaunchController.AimMode.PrecisionPullBack);
+                }
+
+                CurrentPlayerIndex = 0;
+                ActivateCurrentPlayer();
+                SetState(GameState.ReadyToAim);
+            }
         }
 
         private void AdvanceToNextActivePlayer()
@@ -302,9 +448,10 @@ namespace PitStriker.Gameplay
                 cam.SetTarget(ActivePlayer.marble.transform);
             }
 
-            // 2. Rebind Swipe Controller
+            // 2. Rebind Swipe Controller in Precision Mode
             if (SwipeLaunchController.Instance != null && ActivePlayer.marble != null)
             {
+                SwipeLaunchController.Instance.SetAimMode(SwipeLaunchController.AimMode.PrecisionPullBack);
                 SwipeLaunchController.Instance.SetActiveMarble(ActivePlayer.marble);
             }
 
@@ -312,6 +459,30 @@ namespace PitStriker.Gameplay
             OnTargetPitChanged?.Invoke(ActivePlayer.currentPit);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
             OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}'s TURN • TARGET: PIT {ActivePlayer.currentPit}");
+        }
+
+        private void ActivateTossPlayer(int index)
+        {
+            if (index >= _players.Count) return;
+
+            PlayerData p = _players[index];
+
+            // Point Camera
+            SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
+            if (cam != null && p.marble != null)
+            {
+                cam.SetTarget(p.marble.transform);
+            }
+
+            // Bind SwipeLaunchController in Forward Flick Throw Mode
+            if (SwipeLaunchController.Instance != null && p.marble != null)
+            {
+                SwipeLaunchController.Instance.SetAimMode(SwipeLaunchController.AimMode.ForwardFlickThrow);
+                SwipeLaunchController.Instance.SetActiveMarble(p.marble);
+            }
+
+            OnActivePlayerChanged?.Invoke(p);
+            OnStatusMessage?.Invoke($"TOSS: {p.name.ToUpper()} • SWIPE FORWARD TO PIT 3!");
         }
 
         private bool AreAllPlayersFinished()
@@ -350,11 +521,11 @@ namespace PitStriker.Gameplay
             Vector3 nextTeePos;
             if (nextPit == 2)
             {
-                nextTeePos = new Vector3(0f, 0.3f, 3.5f);
+                nextTeePos = new Vector3(0f, 0.3f, 4.5f);
             }
             else if (nextPit == 3)
             {
-                nextTeePos = new Vector3(0f, 0.3f, 14.5f);
+                nextTeePos = new Vector3(0f, 0.3f, 18.0f);
             }
             else
             {
@@ -373,6 +544,10 @@ namespace PitStriker.Gameplay
             }
 
             CurrentPlayerIndex = 0;
+            _tossPlayerIndex = 0;
+            _tossResults.Clear();
+            _bonusStrikeEarned = false;
+            _hitOpponentMarbleThisTurn = false;
 
             // Reset Pits
             PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
@@ -397,8 +572,9 @@ namespace PitStriker.Gameplay
                 }
             }
 
-            ActivateCurrentPlayer();
-            SetState(GameState.ReadyToAim);
+            // Start in Toss Phase: Forward Flick Throw to Pit 3
+            ActivateTossPlayer(0);
+            SetState(GameState.TossPhase);
         }
 
         private void SetState(GameState newState)
