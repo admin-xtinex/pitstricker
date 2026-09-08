@@ -283,7 +283,84 @@ namespace PitStriker.Gameplay
             {
                 Debug.LogWarning($"[TURN MANAGER] {ActivePlayer.name} sank Pit #{pit.PitNumber}, but active target is Pit #{ActivePlayer.currentPit}!");
                 OnStatusMessage?.Invoke($"WRONG PIT! TARGET IS PIT {ActivePlayer.currentPit}");
+                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                marble.ResetPosition(rimPos);
                 pit.ResetPit();
+            }
+        }
+
+        /// <summary>
+        /// Deterministically audits all pits and marbles once all physical motion has ceased.
+        /// Guarantees that no marble is ever stranded inside a pit basin without triggering goal or relocation,
+        /// even under multi-marble collisions or sleeping PhysX rigidbodies.
+        /// </summary>
+        private void AuditPitsPostSettle()
+        {
+            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
+            if (allPits == null || allPits.Length == 0 || _players == null) return;
+
+            bool isTossPhase = (_tossResults != null && _tossResults.Count < _players.Count);
+
+            foreach (var pit in allPits)
+            {
+                foreach (var player in _players)
+                {
+                    MarbleController marble = player.marble;
+                    if (marble == null || !marble.gameObject.activeInHierarchy) continue;
+
+                    if (pit.IsMarbleInsidePit(marble))
+                    {
+                        marble.Halt();
+
+                        if (isTossPhase)
+                        {
+                            if (pit.PitNumber == 3)
+                            {
+                                _pitSunkThisTurn = true;
+                                pit.MarkSunk(marble);
+                            }
+                            else
+                            {
+                                // In toss phase, if a short shot landed in Pit 1 or 2, relocate to rim so pit stays clear
+                                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                marble.ResetPosition(rimPos);
+                                pit.ResetPit();
+                            }
+                        }
+                        else
+                        {
+                            // MAIN MATCH
+                            if (player == ActivePlayer)
+                            {
+                                if (pit.PitNumber == ActivePlayer.currentPit)
+                                {
+                                    // ACTIVE PLAYER SANK TARGET PIT!
+                                    _pitSunkThisTurn = true;
+                                    _bonusStrikeEarned = true;
+                                    pit.MarkSunk(marble);
+                                    Debug.Log($"<color=#00FFAA><b>[PIT AUDIT GOAL]</b> Active player {player.name} is settled inside target Pit #{pit.PitNumber}!</color>");
+                                }
+                                else
+                                {
+                                    // Active player in wrong pit: safely relocate to rim
+                                    Debug.LogWarning($"[PIT AUDIT] {player.name} settled in Pit #{pit.PitNumber}, but target is Pit #{ActivePlayer.currentPit}! Relocating to rim.");
+                                    Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                    marble.ResetPosition(rimPos);
+                                    pit.ResetPit();
+                                }
+                            }
+                            else
+                            {
+                                // OPPONENT MARBLE IN PIT: Pocketed opponent!
+                                Debug.Log($"<color=#FF8800><b>[PIT AUDIT]</b> Opponent {player.name} is inside Pit #{pit.PitNumber}! Relocating to fairway rim.</color>");
+                                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                marble.ResetPosition(rimPos);
+                                pit.ResetPit();
+                                OnStatusMessage?.Invoke($"OPPONENT POCKETED! RELOCATED TO FAIRWAY");
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -363,6 +440,9 @@ namespace PitStriker.Gameplay
             // Let player savor the roll and stop
             yield return new WaitForSeconds(0.8f);
 
+            // Deterministically audit all pits and marbles to ensure no marble is trapped or uncounted
+            AuditPitsPostSettle();
+
             // 1. TOSS PHASE EVALUATION
             if (_tossResults != null && _tossResults.Count < _players.Count)
             {
@@ -389,23 +469,11 @@ namespace PitStriker.Gameplay
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
                     ResetAllPits();
 
-                    SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
-                    if (cam != null && ActivePlayer.marble != null)
-                    {
-                        cam.SetTarget(ActivePlayer.marble.transform, GetPitPosition(ActivePlayer.currentPit));
-                    }
-
-                    if (SwipeLaunchController.Instance != null && ActivePlayer.marble != null)
-                    {
-                        SwipeLaunchController.Instance.SetAimMode(SwipeLaunchController.AimMode.PrecisionPullBack);
-                        SwipeLaunchController.Instance.SetActiveMarble(ActivePlayer.marble);
-                    }
-
                     yield return new WaitForSeconds(0.4f);
                     _bonusStrikeEarned = false;
                     _hitOpponentMarbleThisTurn = false;
+                    ActivateCurrentPlayer();
                     SetState(GameState.ReadyToAim);
-                    OnActivePlayerChanged?.Invoke(ActivePlayer);
                     OnStatusMessage?.Invoke($"★ EXTRA PLAY! AIM FOR PIT {ActivePlayer.currentPit} ★");
                 }
                 else
@@ -480,6 +548,7 @@ namespace PitStriker.Gameplay
                 _hitOpponentMarbleThisTurn = false;
                 OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY! ★");
                 yield return new WaitForSeconds(0.5f);
+                ActivateCurrentPlayer();
                 SetState(GameState.ReadyToAim);
             }
             else
@@ -491,6 +560,7 @@ namespace PitStriker.Gameplay
                 }
                 else
                 {
+                    ActivateCurrentPlayer();
                     SetState(GameState.ReadyToAim);
                     OnStatusMessage?.Invoke($"AIM FOR PIT {ActivePlayer.currentPit} • STROKE {ActivePlayer.totalStrokes + 1}");
                 }

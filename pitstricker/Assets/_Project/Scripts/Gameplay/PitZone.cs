@@ -19,7 +19,7 @@ namespace PitStriker.Gameplay
 
         [Header("Capture Thresholds")]
         [Tooltip("Maximum velocity allowed for a marble to count as sunk. Prevents skimming or rolling through.")]
-        [SerializeField] private float _maxCaptureSpeed = 0.65f;
+        [SerializeField] private float _maxCaptureSpeed = 0.90f;
 
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
@@ -60,28 +60,60 @@ namespace PitStriker.Gameplay
             }
         }
 
+        /// <summary>
+        /// Deterministically evaluates whether a marble is physically contained within this pit basin.
+        /// Accounts for multi-marble collisions, slope resting, and shallow basin geometry.
+        /// </summary>
+        public bool IsMarbleInsidePit(MarbleController marble)
+        {
+            if (marble == null) return false;
+
+            Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
+            Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
+            float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
+            float relativeY = marble.transform.position.y - transform.position.y;
+
+            // Pit basin opening is 0.62m radius; flat ground is y=0.25m.
+            // A marble within 0.70m radius and below y=0.32m (not airborne) is within the basin depression.
+            return horizontalDist <= 0.70f && relativeY < 0.32f;
+        }
+
+        /// <summary>
+        /// Explicitly marks this pit as sunk by the given marble, firing audio, VFX, and game events.
+        /// </summary>
+        public void MarkSunk(MarbleController marble)
+        {
+            if (marble == null) return;
+
+            _capturedMarble = marble;
+            IsSunk = true;
+            marble.Halt();
+
+            // Audio & VFX Juice
+            if (PitStriker.Audio.AudioManager.Instance != null)
+            {
+                PitStriker.Audio.AudioManager.Instance.PlayPitSink();
+            }
+            if (PitStriker.VFX.VFXManager.Instance != null)
+            {
+                PitStriker.VFX.VFXManager.Instance.PlayPitCelebration(transform.position);
+            }
+
+            Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> {marble.name} settled and SUNK into Pit #{_pitNumber}!</color>");
+            OnMarbleSunk?.Invoke(this, marble);
+        }
+
         private void OnTriggerStay(Collider other)
         {
             MarbleController marble = other.GetComponent<MarbleController>();
             if (marble == null) return;
 
-            // 1. Elevation check: Marble center must be down inside the pit depression below the flat fairway
-            // On flat ground, marble center is at y ~ 0.25m. In the pit cup, center is <= 0.22m.
-            float relativeY = marble.transform.position.y - transform.position.y;
-            bool isDownInPit = relativeY < 0.22f;
-
-            // 2. Horizontal containment: must be within the pit opening radius (0.75m)
-            Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
-            Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
-            float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
-            bool isInsidePitHole = horizontalDist < 0.75f;
-
-            // 3. Settled speed check: Marble must have settled or slowed down inside the pit.
-            // Fast skimming marbles (> 0.85 m/s) will naturally roll through or lip out.
-            bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
-
-            if (isDownInPit && isInsidePitHole && isSettled)
+            if (IsMarbleInsidePit(marble))
             {
+                // Settled speed check: Marble must have settled or slowed down inside the pit.
+                bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
+                if (!isSettled) return;
+
                 // If this marble was already captured and registered, keep it settled
                 if (marble == _capturedMarble)
                 {
@@ -90,22 +122,7 @@ namespace PitStriker.Gameplay
                 }
 
                 // New marble settled in pit! Register capture
-                _capturedMarble = marble;
-                IsSunk = true;
-                marble.Halt();
-
-                // Audio & VFX Juice
-                if (PitStriker.Audio.AudioManager.Instance != null)
-                {
-                    PitStriker.Audio.AudioManager.Instance.PlayPitSink();
-                }
-                if (PitStriker.VFX.VFXManager.Instance != null)
-                {
-                    PitStriker.VFX.VFXManager.Instance.PlayPitCelebration(transform.position);
-                }
-
-                Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> {marble.name} settled and SUNK into Pit #{_pitNumber}!</color>");
-                OnMarbleSunk?.Invoke(this, marble);
+                MarkSunk(marble);
             }
         }
 

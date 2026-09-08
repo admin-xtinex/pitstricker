@@ -374,8 +374,8 @@ namespace PitStriker.EditorTools
             // Trigger Zone strictly inside the bottom cup
             SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 0.32f;
-            trigger.center = new Vector3(0f, -0.11f, 0f);
+            trigger.radius = 0.75f;
+            trigger.center = new Vector3(0f, -0.15f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
             zone.SetPitNumber(pitNumber);
