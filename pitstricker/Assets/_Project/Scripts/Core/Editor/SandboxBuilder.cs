@@ -168,7 +168,7 @@ namespace PitStriker.EditorTools
                 tm = tmObj.AddComponent<TurnManager>();
             }
             SerializedObject tmSo = new SerializedObject(tm);
-            tmSo.FindProperty("_playerCount").intValue = 4;
+            tmSo.FindProperty("_playerCount").intValue = 2;
             tmSo.ApplyModifiedProperties();
 
             // 9. Audio & Visual Juice Managers (Phase 7)

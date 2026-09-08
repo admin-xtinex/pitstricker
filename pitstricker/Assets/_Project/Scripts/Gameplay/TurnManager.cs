@@ -62,7 +62,7 @@ namespace PitStriker.Gameplay
 
         [Header("Multiplayer Configuration")]
         [Range(1, 4)]
-        [SerializeField] private int _playerCount = 4;
+        [SerializeField] private int _playerCount = 2;
         [SerializeField] private List<PlayerData> _players = new List<PlayerData>();
 
         [Header("Course Setup")]
@@ -165,11 +165,23 @@ namespace PitStriker.Gameplay
 
                 if (marble != null)
                 {
+                    marble.gameObject.SetActive(true);
                     marble.IsRetired = false;
                     Rigidbody rb = marble.GetComponent<Rigidbody>();
                     if (rb != null) rb.isKinematic = false;
                     marble.OnMarbleLaunched += HandleMarbleLaunched;
                     marble.OnMarbleStopped += HandleMarbleStopped;
+                }
+            }
+
+            // Deactivate and hide unused extra marbles so they don't sit on the fairway or collide
+            for (int i = countToUse; i < foundMarbles.Length; i++)
+            {
+                if (foundMarbles[i] != null)
+                {
+                    foundMarbles[i].Halt();
+                    foundMarbles[i].SetVisible(false);
+                    foundMarbles[i].gameObject.SetActive(false);
                 }
             }
 
