@@ -65,6 +65,23 @@ namespace PitStriker.Input
             }
         }
 
+        public void SetActiveMarble(MarbleController newMarble)
+        {
+            _marble = newMarble;
+            CancelDrag();
+
+            if (_trajectoryLine != null && _marble != null)
+            {
+                MeshRenderer mr = _marble.GetComponent<MeshRenderer>();
+                if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_BaseColor"))
+                {
+                    Color c = mr.sharedMaterial.GetColor("_BaseColor");
+                    _trajectoryLine.startColor = new Color(c.r, c.g, c.b, 0.95f);
+                    _trajectoryLine.endColor = new Color(c.r, c.g, c.b, 0.25f);
+                }
+            }
+        }
+
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
@@ -166,7 +183,8 @@ namespace PitStriker.Input
                     if (_trajectoryLine != null)
                     {
                         _trajectoryLine.enabled = true;
-                        Vector3 startPos = transform.position + (Vector3.up * 0.05f);
+                        Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
+                        Vector3 startPos = marblePos + (Vector3.up * 0.05f);
                         Vector3 endPos = startPos + (_shootDirection * (_currentPower * _maxVisualTrajectoryLength));
 
                         _trajectoryLine.SetPosition(0, startPos);

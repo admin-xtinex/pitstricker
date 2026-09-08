@@ -79,6 +79,17 @@ namespace PitStriker.Physics
             _wasMoving = true;
 
             OnMarbleLaunched?.Invoke();
+
+            // Audio & VFX Juice
+            if (PitStriker.Audio.AudioManager.Instance != null)
+            {
+                PitStriker.Audio.AudioManager.Instance.PlayLaunch(Mathf.Clamp01(forceMagnitude / 32f));
+            }
+            if (PitStriker.VFX.VFXManager.Instance != null)
+            {
+                PitStriker.VFX.VFXManager.Instance.PlayLaunchDust(transform.position, normalizedDir, Mathf.Clamp01(forceMagnitude / 32f));
+            }
+
             Debug.Log($"[MARBLE] Launched along {normalizedDir} with force {forceMagnitude:F1} N.");
         }
 
@@ -115,6 +126,21 @@ namespace PitStriker.Physics
         private void OnCollisionEnter(Collision collision)
         {
             OnMarbleCollision?.Invoke(collision);
+
+            float speed = collision.relativeVelocity.magnitude;
+            if (speed > 0.4f)
+            {
+                bool isMarble = collision.collider.GetComponent<MarbleController>() != null;
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayCollision(speed, isMarble);
+                }
+
+                if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)
+                {
+                    PitStriker.VFX.VFXManager.Instance.PlayCollisionSparks(collision.contacts[0].point, speed);
+                }
+            }
         }
 
         /// <summary>
