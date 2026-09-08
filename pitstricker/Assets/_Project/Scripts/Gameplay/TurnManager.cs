@@ -108,6 +108,7 @@ namespace PitStriker.Gameplay
         public static event Action<PlayerData> OnActivePlayerChanged;
         public static event Action<int, int> OnStrokeCountChanged; // (activePlayerStrokes, totalCoursePar)
         public static event Action<int> OnTargetPitChanged;         // (targetPit: 1, 2, 3)
+        public static event Action<PlayerData, List<PlayerData>> OnMatchVictory; // (winner, rankedLeaderboard)
         public static event Action<string> OnStatusMessage;
 
         public static void BroadcastStatus(string message)
