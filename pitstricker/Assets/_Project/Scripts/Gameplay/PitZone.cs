@@ -30,10 +30,11 @@ namespace PitStriker.Gameplay
 
         private void Awake()
         {
-            Collider col = GetComponent<Collider>();
-            if (col != null)
+            // Only set SphereCollider as trigger, never touch MeshCollider
+            SphereCollider sphereTrigger = GetComponent<SphereCollider>();
+            if (sphereTrigger != null)
             {
-                col.isTrigger = true;
+                sphereTrigger.isTrigger = true;
             }
         }
 

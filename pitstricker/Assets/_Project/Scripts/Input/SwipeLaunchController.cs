@@ -60,13 +60,12 @@ namespace PitStriker.Input
 
         private void Update()
         {
-            // Do not allow aiming while the marble is currently rolling
-            if (_marble.IsMoving)
+            // Keyboard shortcut test launch for instant testing (Spacebar)
+            if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
-                if (_isDragging)
-                {
-                    CancelDrag();
-                }
+                _marble.Halt();
+                _marble.ApplyImpulse(Vector3.forward, 22.0f);
+                Debug.Log("<color=#00FFAA><b>[TEST LAUNCH]</b> Spacebar pressed! Marble launched forward with 22N force.</color>");
                 return;
             }
 
@@ -80,8 +79,8 @@ namespace PitStriker.Input
             bool justPressed = false;
             bool justReleased = false;
 
-            // Prioritize Mouse if left button is being used (essential for touch-screen laptops)
-            if (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.leftButton.wasReleasedThisFrame))
+            // Prioritize Mouse (works reliably on PC, trackpad, and touchscreen laptops)
+            if (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.leftButton.wasPressedThisFrame || Mouse.current.leftButton.wasReleasedThisFrame))
             {
                 screenPos = Mouse.current.position.ReadValue();
                 isPressed = Mouse.current.leftButton.isPressed;
@@ -99,6 +98,12 @@ namespace PitStriker.Input
             // 1. Pointer Down: Start Drag anywhere on screen
             if (justPressed)
             {
+                // If marble has residual drift, halt it so the player can aim cleanly
+                if (_marble.CurrentSpeed < 2.0f)
+                {
+                    _marble.Halt();
+                }
+
                 if (TryGetGroundPoint(screenPos, out Vector3 groundPoint))
                 {
                     _isDragging = true;
@@ -109,7 +114,7 @@ namespace PitStriker.Input
                     {
                         _trajectoryLine.enabled = true;
                     }
-                    Debug.Log($"[AIM] Drag initiated at ground position: {groundPoint}");
+                    Debug.Log($"<color=#00FFFF><b>[AIM]</b> Drag started at: {groundPoint}</color>");
                 }
             }
 
