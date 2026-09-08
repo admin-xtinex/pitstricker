@@ -189,6 +189,12 @@ namespace PitStriker.UI
             {
                 _strokeCounterText.text = $"{activePlayer.name.ToUpper()}: {activePlayer.totalStrokes} STROKES";
             }
+
+            // Disable Strike button during autonomous AI turns
+            if (_strikeButton != null)
+            {
+                _strikeButton.interactable = !activePlayer.isAI;
+            }
         }
 
         private void HandleSliderValueChanged(float val)
@@ -206,6 +212,11 @@ namespace PitStriker.UI
 
         private void HandleStrikeClicked()
         {
+            if (TurnManager.Instance != null && TurnManager.Instance.ActivePlayer != null && TurnManager.Instance.ActivePlayer.isAI)
+            {
+                return; // Guard against clicking strike during AI turn
+            }
+
             if (SwipeLaunchController.Instance != null)
             {
                 float p = _powerSlider != null && _powerSlider.value > 0.05f ? _powerSlider.value : 0.65f;

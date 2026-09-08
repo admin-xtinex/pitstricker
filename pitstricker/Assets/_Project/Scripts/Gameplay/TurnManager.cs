@@ -25,6 +25,12 @@ namespace PitStriker.Gameplay
             MatchVictory   // Match finished, podium display
         }
 
+        public enum MatchGameMode
+        {
+            PassAndPlay, // All local human players
+            PlayerVsAI   // Player 1 is Human, Player 2..N are AI Bots
+        }
+
         [System.Serializable]
         public class PlayerData
         {
@@ -36,6 +42,7 @@ namespace PitStriker.Gameplay
             public int currentPit = 1;
             public bool isFinished = false;
             public bool hasTakenFirstShot = false;
+            public bool isAI = false;
 
             public PlayerData(int id, string name, Color color, MarbleController marble)
             {
@@ -47,6 +54,7 @@ namespace PitStriker.Gameplay
                 this.currentPit = 1;
                 this.isFinished = false;
                 this.hasTakenFirstShot = false;
+                this.isAI = false;
             }
         }
 
@@ -61,6 +69,9 @@ namespace PitStriker.Gameplay
         public static TurnManager Instance { get; private set; }
 
         [Header("Multiplayer Configuration")]
+        [SerializeField] private MatchGameMode _gameMode = MatchGameMode.PlayerVsAI;
+        public MatchGameMode CurrentGameMode => _gameMode;
+
         [Range(1, 4)]
         [SerializeField] private int _playerCount = 2;
         [SerializeField] private List<PlayerData> _players = new List<PlayerData>();
@@ -102,6 +113,10 @@ namespace PitStriker.Gameplay
 
         public static bool CanAim()
         {
+            if (Instance != null && Instance.ActivePlayer != null && Instance.ActivePlayer.isAI)
+            {
+                return false; // Disable human touch input during AI turn
+            }
             return Instance == null || Instance.CurrentState == GameState.ReadyToAim || Instance.CurrentState == GameState.TossPhase;
         }
 
@@ -110,6 +125,12 @@ namespace PitStriker.Gameplay
             if (Instance == null)
             {
                 Instance = this;
+
+                // Ensure AIMarbleController is attached to drive autonomous bot turns
+                if (GetComponent<PitStriker.AI.AIMarbleController>() == null)
+                {
+                    gameObject.AddComponent<PitStriker.AI.AIMarbleController>();
+                }
             }
             else
             {
@@ -160,7 +181,10 @@ namespace PitStriker.Gameplay
             for (int i = 0; i < countToUse; i++)
             {
                 MarbleController marble = i < foundMarbles.Length ? foundMarbles[i] : null;
-                PlayerData player = new PlayerData(i + 1, $"Player {i + 1}", themeColors[i % themeColors.Length], marble);
+                bool isBot = (_gameMode == MatchGameMode.PlayerVsAI && i > 0);
+                string pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
+                PlayerData player = new PlayerData(i + 1, pName, themeColors[i % themeColors.Length], marble);
+                player.isAI = isBot;
                 _players.Add(player);
 
                 if (marble != null)
@@ -815,7 +839,19 @@ namespace PitStriker.Gameplay
             OnActivePlayerChanged?.Invoke(ActivePlayer);
             OnTargetPitChanged?.Invoke(ActivePlayer.currentPit);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
-            OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}'s TURN • TARGET: PIT {ActivePlayer.currentPit}");
+
+            if (ActivePlayer.isAI)
+            {
+                OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()}'s TURN • TARGET: PIT {ActivePlayer.currentPit} ★");
+                if (PitStriker.AI.AIMarbleController.Instance != null)
+                {
+                    PitStriker.AI.AIMarbleController.Instance.TakeAITurn(ActivePlayer);
+                }
+            }
+            else
+            {
+                OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}'s TURN • TARGET: PIT {ActivePlayer.currentPit}");
+            }
         }
 
         private void ActivateTossPlayer(int index)
@@ -854,7 +890,19 @@ namespace PitStriker.Gameplay
             }
 
             OnActivePlayerChanged?.Invoke(p);
-            OnStatusMessage?.Invoke($"TOSS: {p.name.ToUpper()} • SWIPE FORWARD TO PIT 3!");
+
+            if (p.isAI)
+            {
+                OnStatusMessage?.Invoke($"TOSS: {p.name.ToUpper()} • SWIPING TO PIT 3...");
+                if (PitStriker.AI.AIMarbleController.Instance != null)
+                {
+                    PitStriker.AI.AIMarbleController.Instance.TakeAITurn(p);
+                }
+            }
+            else
+            {
+                OnStatusMessage?.Invoke($"TOSS: {p.name.ToUpper()} • SWIPE FORWARD TO PIT 3!");
+            }
         }
 
         private bool AreAllPlayersFinished()

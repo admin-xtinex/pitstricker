@@ -312,6 +312,36 @@ namespace PitStriker.Input
             CancelDrag();
         }
 
+        /// <summary>
+        /// Renders the visual trajectory aim guide and power bar during autonomous AI turns or guided tutorials.
+        /// </summary>
+        public void ShowAimPreview(Vector3 direction, float power01)
+        {
+            _shootDirection = direction;
+            _currentPower = Mathf.Clamp01(power01);
+
+            if (_trajectoryLine != null)
+            {
+                _trajectoryLine.enabled = true;
+                Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
+                Vector3 startPos = marblePos + (Vector3.up * 0.05f);
+                Vector3 endPos = startPos + (_shootDirection * (Mathf.Max(0.3f, _currentPower) * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
+
+                _trajectoryLine.SetPosition(0, startPos);
+                _trajectoryLine.SetPosition(1, endPos);
+            }
+
+            OnPowerChanged?.Invoke(_currentPower);
+        }
+
+        /// <summary>
+        /// Hides the visual aim line and zeroes the power meter.
+        /// </summary>
+        public void HideAimPreview()
+        {
+            CancelDrag();
+        }
+
         private void CancelDrag()
         {
             _isDragging = false;
