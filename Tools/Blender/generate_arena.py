@@ -14,6 +14,7 @@ _REQUIRED_MODULE_FILES = (
     "environment.py",
     "lighting.py",
     "cameras.py",
+    "unity_export.py",
 )
 
 _LOCAL_MODULE_NAMES = (
@@ -25,6 +26,7 @@ _LOCAL_MODULE_NAMES = (
     "environment",
     "lighting",
     "cameras",
+    "unity_export",
 )
 
 
@@ -122,7 +124,7 @@ def _resolve_script_dir():
         "Open Tools/Blender/generate_arena.py directly from the cloned/downloaded "
         "pitstricker repository and make sure the entire Tools/Blender folder is present.\n\n"
         "Expected sibling files include config.py, terrain.py, pits.py, materials.py, "
-        "marbles.py, environment.py, lighting.py and cameras.py.\n\n"
+        "marbles.py, environment.py, lighting.py, cameras.py and unity_export.py.\n\n"
         f"Paths checked:\n  - {checked}"
     )
 
@@ -150,6 +152,7 @@ from marbles import create_demo_players
 from environment import add_map_environment
 from lighting import setup_world_and_lighting
 from cameras import create_cameras
+from unity_export import create_unity_anchors, default_unity_fbx_path, export_unity_fbx
 
 
 def parse_args():
@@ -165,6 +168,12 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--output", type=str, default="")
     parser.add_argument("--export-glb", type=str, default="")
+    parser.add_argument("--export-fbx", type=str, default="")
+    parser.add_argument(
+        "--no-auto-unity-export",
+        action="store_true",
+        help="Generate the Blender scene without automatically exporting an FBX into the Unity project.",
+    )
     return parser.parse_args(argv)
 
 
@@ -192,6 +201,7 @@ def build_arena(config):
     add_center_guide(config)
     setup_world_and_lighting(config)
     create_cameras(config)
+    create_unity_anchors(config)
 
     scene = bpy.context.scene
     scene["pit_striker_map"] = config.map_name
@@ -239,6 +249,16 @@ def main():
             export_apply=True,
         )
         print(f"Exported GLB: {os.path.abspath(args.export_glb)}")
+
+    # Unity-first workflow: Blender UI users only need to run generate_arena.py.
+    if not args.no_auto_unity_export:
+        unity_fbx = args.export_fbx or default_unity_fbx_path(SCRIPT_DIR, config.map_name)
+        try:
+            export_unity_fbx(unity_fbx, include_debug=False)
+            bpy.context.scene["unity_fbx_path"] = os.path.abspath(unity_fbx)
+        except Exception as exc:
+            print(f"WARNING: Unity FBX export skipped: {exc}")
+            print("The Blender scene is still valid; you can export FBX manually from File > Export > FBX.")
 
 
 if __name__ == "__main__":
