@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import os
 import sys
 import bpy
@@ -13,6 +14,17 @@ _REQUIRED_MODULE_FILES = (
     "environment.py",
     "lighting.py",
     "cameras.py",
+)
+
+_LOCAL_MODULE_NAMES = (
+    "config",
+    "materials",
+    "terrain",
+    "pits",
+    "marbles",
+    "environment",
+    "lighting",
+    "cameras",
 )
 
 
@@ -115,10 +127,19 @@ def _resolve_script_dir():
     )
 
 
+def _reload_local_modules():
+    """Force Blender Text Editor reruns to pick up files changed by git pull."""
+    importlib.invalidate_caches()
+    for module_name in _LOCAL_MODULE_NAMES:
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
 SCRIPT_DIR = _resolve_script_dir()
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
+_reload_local_modules()
 print(f"Pit Striker Blender modules: {SCRIPT_DIR}")
 
 from config import ArenaConfig, MAP_PRESETS
