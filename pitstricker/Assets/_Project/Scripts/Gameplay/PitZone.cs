@@ -25,11 +25,30 @@ namespace PitStriker.Gameplay
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
 
+        public void SetPitNumber(int number)
+        {
+            _pitNumber = number;
+        }
+
         // Events
         public static event Action<PitZone, MarbleController> OnMarbleSunk;
 
         private void Awake()
         {
+            // Auto-detect pit number from GameObject name if uninitialized or mismatch
+            if (gameObject.name.Contains("2") || gameObject.name.Contains("02"))
+            {
+                _pitNumber = 2;
+            }
+            else if (gameObject.name.Contains("3") || gameObject.name.Contains("03"))
+            {
+                _pitNumber = 3;
+            }
+            else if (gameObject.name.Contains("1") || gameObject.name.Contains("01"))
+            {
+                _pitNumber = 1;
+            }
+
             // Only set SphereCollider as trigger, never touch MeshCollider
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)

@@ -333,6 +333,10 @@ namespace PitStriker.EditorTools
             trigger.center = new Vector3(0f, -depth * 0.5f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
+            zone.SetPitNumber(pitNumber);
+            SerializedObject zoneSo = new SerializedObject(zone);
+            zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
+            zoneSo.ApplyModifiedProperties();
 
             // Numbered Flag Marker next to the pit
             CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(radius + 0.35f, 0f, 0f), pitNumber, woodMat);

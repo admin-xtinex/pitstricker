@@ -207,6 +207,10 @@ namespace PitStriker.UI
             {
                 _victoryModal.SetActive(true);
             }
+            else
+            {
+                CreateRuntimeVictoryModal(totalStrokes, coursePar, rating);
+            }
 
             if (_victoryStrokesText != null)
             {
@@ -222,6 +226,83 @@ namespace PitStriker.UI
             {
                 _victoryRatingText.text = $"RATING: {rating}";
             }
+        }
+
+        private void CreateRuntimeVictoryModal(int totalStrokes, int coursePar, string rating)
+        {
+            GameObject modalObj = new GameObject("Victory_Modal_Runtime");
+            modalObj.transform.SetParent(transform, false);
+            RectTransform modalRect = modalObj.AddComponent<RectTransform>();
+            modalRect.anchorMin = new Vector2(0.5f, 0.5f);
+            modalRect.anchorMax = new Vector2(0.5f, 0.5f);
+            modalRect.pivot = new Vector2(0.5f, 0.5f);
+            modalRect.anchoredPosition = Vector2.zero;
+            modalRect.sizeDelta = new Vector2(500f, 320f);
+
+            Image modalBg = modalObj.AddComponent<Image>();
+            modalBg.color = new Color(0.04f, 0.06f, 0.1f, 0.96f);
+
+            // Title
+            GameObject titleObj = new GameObject("Title");
+            titleObj.transform.SetParent(modalObj.transform, false);
+            RectTransform titleRect = titleObj.AddComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 0.7f);
+            titleRect.anchorMax = new Vector2(1f, 0.95f);
+            titleRect.sizeDelta = Vector2.zero;
+            Text title = titleObj.AddComponent<Text>();
+            title.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            title.fontSize = 28;
+            title.fontStyle = FontStyle.Bold;
+            title.alignment = TextAnchor.MiddleCenter;
+            title.color = new Color(1f, 0.85f, 0.2f, 1f);
+            title.text = "★ VICTORY! ★";
+
+            // Stats
+            GameObject statsObj = new GameObject("Stats");
+            statsObj.transform.SetParent(modalObj.transform, false);
+            RectTransform statsRect = statsObj.AddComponent<RectTransform>();
+            statsRect.anchorMin = new Vector2(0f, 0.25f);
+            statsRect.anchorMax = new Vector2(1f, 0.7f);
+            statsRect.sizeDelta = Vector2.zero;
+            Text stats = statsObj.AddComponent<Text>();
+            stats.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            stats.fontSize = 20;
+            stats.fontStyle = FontStyle.Bold;
+            stats.alignment = TextAnchor.MiddleCenter;
+            stats.color = Color.white;
+            stats.text = $"TOTAL STROKES: {totalStrokes}\nCOURSE PAR: {coursePar}\nRATING: {rating}";
+
+            // Play Again Button
+            GameObject btnObj = new GameObject("PlayAgainBtn");
+            btnObj.transform.SetParent(modalObj.transform, false);
+            RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+            btnRect.anchorMin = new Vector2(0.25f, 0.06f);
+            btnRect.anchorMax = new Vector2(0.75f, 0.22f);
+            btnRect.sizeDelta = Vector2.zero;
+            Image btnImg = btnObj.AddComponent<Image>();
+            btnImg.color = new Color(0f, 0.8f, 0.4f, 1f);
+            Button btn = btnObj.AddComponent<Button>();
+            btn.onClick.AddListener(() =>
+            {
+                Destroy(modalObj);
+                if (TurnManager.Instance != null) TurnManager.Instance.RestartMatch();
+            });
+
+            GameObject btnTextObj = new GameObject("Text");
+            btnTextObj.transform.SetParent(btnObj.transform, false);
+            RectTransform btnTextRect = btnTextObj.AddComponent<RectTransform>();
+            btnTextRect.anchorMin = Vector2.zero;
+            btnTextRect.anchorMax = Vector2.one;
+            btnTextRect.sizeDelta = Vector2.zero;
+            Text btnText = btnTextObj.AddComponent<Text>();
+            btnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            btnText.fontSize = 18;
+            btnText.fontStyle = FontStyle.Bold;
+            btnText.alignment = TextAnchor.MiddleCenter;
+            btnText.color = Color.white;
+            btnText.text = "PLAY AGAIN";
+
+            _victoryModal = modalObj;
         }
 
         private void UpdateObjectiveUI()
