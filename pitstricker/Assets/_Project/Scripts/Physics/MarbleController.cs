@@ -161,33 +161,54 @@ namespace PitStriker.Physics
             {
                 OnMarbleHitMarble?.Invoke(this, otherMarble);
 
-                // Carrom / 8-Ball Pool Elastic Momentum Transfer:
-                // Strike target marble with amplified impulse along the contact normal
-                if (collision.contactCount > 0)
+                // Authentic Carrom & 8-Ball Pool Equal-Mass Elastic Collision:
+                // Only process from the striker side (marble with higher speed) to prevent reciprocal double-impulse inversion!
+                if (collision.contactCount > 0 && _rigidbody != null)
                 {
-                    Vector3 normal = collision.contacts[0].normal;
-                    Vector3 pushDir = -normal;
-                    pushDir.y = 0f;
-                    if (pushDir.sqrMagnitude > 0.001f)
+                    Rigidbody otherRb = otherMarble.GetComponent<Rigidbody>();
+                    if (otherRb != null)
                     {
-                        pushDir.Normalize();
-                        float relSpeed = collision.relativeVelocity.magnitude;
-                        if (relSpeed > 0.12f)
+                        Vector3 vStriker = _rigidbody.linearVelocity;
+                        Vector3 vTarget = otherRb.linearVelocity;
+
+                        // Only the faster incoming marble acts as striker
+                        if (vStriker.sqrMagnitude > vTarget.sqrMagnitude)
                         {
-                            // Kinetic transfer impulse directly along contact normal
-                            float transferImpulse = relSpeed * _mass * 1.55f;
+                            // Contact normal pointing from striker to target
+                            Vector3 normal = (otherMarble.transform.position - transform.position);
+                            normal.y = 0f;
 
-                            Rigidbody otherRb = otherMarble.GetComponent<Rigidbody>();
-                            if (otherRb != null)
+                            if (normal.sqrMagnitude > 0.001f)
                             {
-                                otherRb.AddForce(pushDir * transferImpulse, ForceMode.Impulse);
-                                otherMarble._wasMoving = true;
-                            }
+                                normal.Normalize();
 
-                            // Deflect and slow down striker like a carrom striker hitting a coin
-                            if (_rigidbody != null)
-                            {
-                                _rigidbody.AddForce(-pushDir * (transferImpulse * 0.45f), ForceMode.Impulse);
+                                // Striker incoming speed along contact normal
+                                Vector3 relVel = vStriker - vTarget;
+                                float vn = Vector3.Dot(relVel, normal);
+
+                                if (vn > 0.08f) // Valid closing velocity
+                                {
+                                    // High elastic restitution (0.95 for glass marbles / carrom striker)
+                                    float restitution = 0.95f;
+
+                                    // Equal mass m1 = m2 = 1.0kg:
+                                    // Transfer normal velocity component:
+                                    // J = (1 + e) * 0.5 * vn * mass
+                                    float impulseMag = (1f + restitution) * 0.5f * vn * _mass;
+
+                                    // Target receives normal impulse forward
+                                    otherRb.AddForce(normal * (impulseMag * 1.25f), ForceMode.Impulse);
+
+                                    // Striker loses its normal velocity component:
+                                    // On center hit, this cancels forward velocity so striker stops dead!
+                                    // On angle hit, this removes normal velocity, leaving tangential velocity so striker deflects to the side!
+                                    _rigidbody.AddForce(-normal * impulseMag, ForceMode.Impulse);
+
+                                    otherMarble._wasMoving = true;
+                                    _wasMoving = true;
+
+                                    Debug.Log($"<color=#00FFAA><b>[CARROM HIT]</b> vn={vn:F2}m/s. Target blasted with {impulseMag * 1.25f:F1}N impulse. Striker settled.</color>");
+                                }
                             }
                         }
                     }
@@ -195,11 +216,11 @@ namespace PitStriker.Physics
             }
 
             float speed = collision.relativeVelocity.magnitude;
-            if (speed > 0.25f)
+            if (speed > 0.2f)
             {
                 if (PitStriker.Audio.AudioManager.Instance != null)
                 {
-                    PitStriker.Audio.AudioManager.Instance.PlayCollision(isMarble ? speed * 1.4f : speed, isMarble);
+                    PitStriker.Audio.AudioManager.Instance.PlayCollision(isMarble ? speed * 1.6f : speed, isMarble);
                 }
 
                 if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)

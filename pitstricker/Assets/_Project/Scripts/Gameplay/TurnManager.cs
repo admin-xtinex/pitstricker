@@ -67,7 +67,6 @@ namespace PitStriker.Gameplay
 
         [Header("Course Setup")]
         [SerializeField] private Vector3 _startCenter = new Vector3(0f, 0.3f, -6.0f);
-        [SerializeField] private float _startSpacing = 0.45f;
 
         [Header("Par Configuration")]
         [SerializeField] private int[] _pitPars = new int[] { 2, 3, 3 }; // Pit 1: Par 2, Pit 2: Par 3, Pit 3: Par 3
@@ -371,6 +370,12 @@ namespace PitStriker.Gameplay
                     // Relocate to next tee ahead of the conquered pit
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
 
+                    SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
+                    if (cam != null)
+                    {
+                        cam.SetObjectiveTarget(GetPitPosition(ActivePlayer.currentPit));
+                    }
+
                     yield return new WaitForSeconds(0.4f);
                     _bonusStrikeEarned = false;
                     _hitOpponentMarbleThisTurn = false;
@@ -601,11 +606,11 @@ namespace PitStriker.Gameplay
                 ActivePlayer.marble.SetVisible(true);
             }
 
-            // 1. Point Camera to active player's marble
+            // 1. Point Camera to active player's marble oriented towards active target pit
             SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
             if (cam != null && ActivePlayer.marble != null)
             {
-                cam.SetTarget(ActivePlayer.marble.transform);
+                cam.SetTarget(ActivePlayer.marble.transform, GetPitPosition(ActivePlayer.currentPit));
             }
 
             // 2. Rebind Swipe Controller in Precision Mode
@@ -634,11 +639,11 @@ namespace PitStriker.Gameplay
                 p.marble.SetVisible(true);
             }
 
-            // Point Camera
+            // Point Camera oriented directly towards Pit 3
             SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
             if (cam != null && p.marble != null)
             {
-                cam.SetTarget(p.marble.transform);
+                cam.SetTarget(p.marble.transform, GetPitPosition(3));
             }
 
             // Bind SwipeLaunchController in Forward Flick Throw Mode
@@ -712,6 +717,29 @@ namespace PitStriker.Gameplay
             }
 
             marble.ResetPosition(nextTeePos);
+        }
+
+        /// <summary>
+        /// Retrieves the world position of the target pit. Falls back to default course layout coordinates if needed.
+        /// </summary>
+        public Vector3 GetPitPosition(int pitNumber)
+        {
+            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
+            foreach (var p in allPits)
+            {
+                if (p.PitNumber == pitNumber)
+                {
+                    return p.transform.position;
+                }
+            }
+
+            switch (pitNumber)
+            {
+                case 1: return new Vector3(0f, 0f, 3.0f);
+                case 2: return new Vector3(0f, 0f, 16.5f);
+                case 3: return new Vector3(0f, 0f, 31.0f);
+                default: return new Vector3(0f, 0f, 31.0f);
+            }
         }
 
         public void RestartMatch()
