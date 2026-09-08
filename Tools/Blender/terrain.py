@@ -1,6 +1,5 @@
 import random
 import bpy
-from mathutils import Vector
 
 
 def clear_scene():
@@ -10,13 +9,9 @@ def clear_scene():
     for datablocks in (
         bpy.data.meshes,
         bpy.data.curves,
-        bpy.data.materials,
         bpy.data.cameras,
         bpy.data.lights,
     ):
-        # Keep materials: generated material references may be reused during one run.
-        if datablocks is bpy.data.materials:
-            continue
         for block in list(datablocks):
             if block.users == 0:
                 datablocks.remove(block)
@@ -38,9 +33,9 @@ def create_ground(config, preset, material):
 
 
 def scatter_edge_props(config, preset, material=None):
-    """Create lightweight blockout props away from the gameplay center line."""
+    """Small neutral terrain details only; hero environment lives in environment.py."""
     random.seed(config.seed)
-    collection = bpy.data.collections.new("Environment_Props")
+    collection = bpy.data.collections.new("Terrain_Details")
     bpy.context.scene.collection.children.link(collection)
 
     half_width = preset.arena_width * 0.5
@@ -51,19 +46,19 @@ def scatter_edge_props(config, preset, material=None):
         side = -1 if index % 2 == 0 else 1
         x = side * random.uniform(half_width * 0.72, half_width * 0.95)
         y = random.uniform(min_y, max_y)
-        scale = random.uniform(0.10, 0.30)
+        scale = random.uniform(0.035, 0.095)
 
         bpy.ops.mesh.primitive_ico_sphere_add(
             subdivisions=1,
             radius=1.0,
-            location=(x, y, scale * 0.55),
+            location=(x, y, scale * 0.35),
         )
         prop = bpy.context.object
-        prop.name = f"Edge_Prop_{index:02d}"
+        prop.name = f"Terrain_Pebble_{index:02d}"
         prop.scale = (
-            scale * random.uniform(1.0, 2.0),
-            scale * random.uniform(0.8, 1.8),
-            scale * random.uniform(0.5, 1.1),
+            scale * random.uniform(1.1, 2.1),
+            scale * random.uniform(0.8, 1.5),
+            scale * random.uniform(0.45, 0.8),
         )
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
         if material:
