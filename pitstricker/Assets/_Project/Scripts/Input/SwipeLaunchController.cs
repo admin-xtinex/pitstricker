@@ -32,6 +32,16 @@ namespace PitStriker.Input
         [Tooltip("Length of the visual trajectory guide at maximum power.")]
         [SerializeField] private float _maxVisualTrajectoryLength = 9.0f;
 
+        public enum AimMode
+        {
+            PrecisionPullBack,  // Slingshot pull-back aiming for tactical gameplay
+            ForwardFlickThrow   // Fast upward flick throwing gesture for the Opening Toss Phase
+        }
+
+        [Header("Aiming Mode")]
+        [SerializeField] private AimMode _aimMode = AimMode.PrecisionPullBack;
+        public AimMode CurrentAimMode => _aimMode;
+
         // Cached References
         public static SwipeLaunchController Instance { get; private set; }
         private MarbleController _marble;
@@ -40,9 +50,10 @@ namespace PitStriker.Input
         // Events
         public static event System.Action<float> OnPowerChanged;
 
-        // Drag State
+        // Drag & Flick State
         private bool _isDragging = false;
         private Vector2 _dragScreenStart;
+        private float _dragStartTime;
         private float _currentPower = 0f;
         private Vector3 _shootDirection = Vector3.forward;
 
@@ -63,6 +74,12 @@ namespace PitStriker.Input
                 _trajectoryLine.positionCount = 2;
                 _trajectoryLine.enabled = false;
             }
+        }
+
+        public void SetAimMode(AimMode mode)
+        {
+            _aimMode = mode;
+            CancelDrag();
         }
 
         public void SetActiveMarble(MarbleController newMarble)
@@ -142,7 +159,6 @@ namespace PitStriker.Input
             // Pointer Down: Start Drag anywhere on screen
             if (justPressed)
             {
-                // If marble has residual drift, halt it so the player can aim cleanly
                 if (_marble.CurrentSpeed < 2.5f)
                 {
                     _marble.Halt();
@@ -150,50 +166,88 @@ namespace PitStriker.Input
 
                 _isDragging = true;
                 _dragScreenStart = screenPos;
+                _dragStartTime = Time.time;
                 _currentPower = 0f;
             }
 
-            // Pointer Dragging: Calculate power and aim trajectory
+            // Pointer Dragging / Flicking
             if (_isDragging && isPressed)
             {
                 Vector2 screenDelta = screenPos - _dragScreenStart;
-                float dragPixels = screenDelta.magnitude;
 
-                float minPixels = Mathf.Max(10f, _minDragDistance * 60f); // Deadzone threshold to prevent accidental launches
-                float maxPixels = Mathf.Clamp(_maxDragDistance * 80f, 160f, Screen.height * 0.45f);
-
-                if (dragPixels < minPixels)
+                if (_aimMode == AimMode.ForwardFlickThrow)
                 {
-                    _currentPower = 0f;
-                    if (_trajectoryLine != null) _trajectoryLine.enabled = false;
-                    OnPowerChanged?.Invoke(0f);
+                    // Forward Flick Mode (Toss Phase): Upward swipe on screen means forward throw
+                    float dt = Mathf.Max(0.001f, Time.time - _dragStartTime);
+                    float flickSpeed = screenDelta.magnitude / dt;
+
+                    if (screenDelta.y > 15f)
+                    {
+                        _currentPower = Mathf.Clamp01(flickSpeed / (Screen.height * 1.5f));
+                        OnPowerChanged?.Invoke(_currentPower);
+
+                        Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
+                        Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
+                        Vector2 aimDir = screenDelta.normalized;
+                        _shootDirection = (camRight * aimDir.x + camFwd * aimDir.y).normalized;
+
+                        if (_trajectoryLine != null)
+                        {
+                            _trajectoryLine.enabled = true;
+                            Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
+                            Vector3 startPos = marblePos + (Vector3.up * 0.05f);
+                            Vector3 endPos = startPos + (_shootDirection * (Mathf.Max(0.3f, _currentPower) * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
+
+                            _trajectoryLine.SetPosition(0, startPos);
+                            _trajectoryLine.SetPosition(1, endPos);
+                        }
+                    }
+                    else
+                    {
+                        _currentPower = 0f;
+                        if (_trajectoryLine != null) _trajectoryLine.enabled = false;
+                        OnPowerChanged?.Invoke(0f);
+                    }
                 }
                 else
                 {
-                    _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
-                    OnPowerChanged?.Invoke(_currentPower);
+                    // Precision Slingshot Mode (Main Match): Pull backward to shoot forward
+                    float dragPixels = screenDelta.magnitude;
+                    float minPixels = Mathf.Max(10f, _minDragDistance * 60f);
+                    float maxPixels = Mathf.Clamp(_maxDragDistance * 80f, 160f, Screen.height * 0.45f);
 
-                    // Direction to shoot
-                    Vector2 aimScreenDir = _invertPullToShoot ? -screenDelta.normalized : screenDelta.normalized;
-
-                    Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
-                    Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
-                    _shootDirection = (camRight * aimScreenDir.x + camFwd * aimScreenDir.y).normalized;
-
-                    if (_trajectoryLine != null)
+                    if (dragPixels < minPixels)
                     {
-                        _trajectoryLine.enabled = true;
-                        Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
-                        Vector3 startPos = marblePos + (Vector3.up * 0.05f);
-                        Vector3 endPos = startPos + (_shootDirection * (_currentPower * _maxVisualTrajectoryLength));
+                        _currentPower = 0f;
+                        if (_trajectoryLine != null) _trajectoryLine.enabled = false;
+                        OnPowerChanged?.Invoke(0f);
+                    }
+                    else
+                    {
+                        _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
+                        OnPowerChanged?.Invoke(_currentPower);
 
-                        _trajectoryLine.SetPosition(0, startPos);
-                        _trajectoryLine.SetPosition(1, endPos);
+                        Vector2 aimScreenDir = _invertPullToShoot ? -screenDelta.normalized : screenDelta.normalized;
+
+                        Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
+                        Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
+                        _shootDirection = (camRight * aimScreenDir.x + camFwd * aimScreenDir.y).normalized;
+
+                        if (_trajectoryLine != null)
+                        {
+                            _trajectoryLine.enabled = true;
+                            Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
+                            Vector3 startPos = marblePos + (Vector3.up * 0.05f);
+                            Vector3 endPos = startPos + (_shootDirection * (_currentPower * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
+
+                            _trajectoryLine.SetPosition(0, startPos);
+                            _trajectoryLine.SetPosition(1, endPos);
+                        }
                     }
                 }
             }
 
-            // Pointer Released: Execute launch
+            // Pointer Released: Execute Launch or Flick
             if (_isDragging && justReleased)
             {
                 ExecuteLaunch();
@@ -202,11 +256,29 @@ namespace PitStriker.Input
 
         private void ExecuteLaunch()
         {
-            if (_currentPower > 0.03f)
+            if (_aimMode == AimMode.ForwardFlickThrow)
             {
-                float finalForce = _currentPower * _maxLaunchForce;
-                _marble.ApplyImpulse(_shootDirection, finalForce);
-                Debug.Log($"<color=#00FFAA><b>[SWIPE LAUNCH]</b> Launched with {_currentPower * 100:F0}% power ({finalForce:F1} N)!</color>");
+                // Forward Flick Throw Execution
+                if (_currentPower > 0.05f)
+                {
+                    Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
+                    Vector3 throwDir = (dir + Vector3.up * 0.08f).normalized; // Natural upward lob
+                    float force = _currentPower * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier;
+
+                    _marble.Halt();
+                    _marble.ApplyImpulse(throwDir, force);
+                    Debug.Log($"<color=#00FFAA><b>[FLICK THROW]</b> Forward swipe tossed marble with {_currentPower * 100:F0}% power ({force:F1} N)!</color>");
+                }
+            }
+            else
+            {
+                // Precision Slingshot Execution
+                if (_currentPower > 0.03f)
+                {
+                    float finalForce = _currentPower * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier;
+                    _marble.ApplyImpulse(_shootDirection, finalForce);
+                    Debug.Log($"<color=#00FFAA><b>[PRECISION STRIKE]</b> Launched with {_currentPower * 100:F0}% power ({finalForce:F1} N)!</color>");
+                }
             }
 
             CancelDrag();
@@ -221,10 +293,11 @@ namespace PitStriker.Input
 
             float power = powerFraction >= 0f ? powerFraction : (_currentPower > 0.05f ? _currentPower : 0.65f);
             Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
+            Vector3 finalDir = _aimMode == AimMode.ForwardFlickThrow ? (dir + Vector3.up * 0.08f).normalized : dir;
 
             _marble.Halt();
-            _marble.ApplyImpulse(dir, power * _maxLaunchForce);
-            Debug.Log($"<color=#00FFAA><b>[STRIKE BUTTON]</b> Launched with {power * 100:F0}% power ({power * _maxLaunchForce:F1} N) towards {dir}!</color>");
+            _marble.ApplyImpulse(finalDir, power * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier);
+            Debug.Log($"<color=#00FFAA><b>[STRIKE BUTTON]</b> Executed launch with {power * 100:F0}% power towards {finalDir}!</color>");
             CancelDrag();
         }
 

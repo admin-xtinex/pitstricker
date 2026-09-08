@@ -54,6 +54,7 @@ namespace PitStriker.Gameplay
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
+                sphereTrigger.radius *= GameDifficulty.PitCatchRadiusMultiplier;
             }
         }
 
@@ -77,7 +78,8 @@ namespace PitStriker.Gameplay
                 Vector3 pullDir = centerTarget - marble.transform.position;
                 pullDir.y = -0.5f; // Pull downwards into the basin
 
-                rb.AddForce(pullDir * _pitVortexForce, ForceMode.Acceleration);
+                float vortex = _pitVortexForce * (GameDifficulty.PitVortexStrength / 6.0f);
+                rb.AddForce(pullDir * vortex, ForceMode.Acceleration);
 
                 // Dampen horizontal velocity so the marble settles naturally inside the cup
                 Vector3 horizontalVel = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);

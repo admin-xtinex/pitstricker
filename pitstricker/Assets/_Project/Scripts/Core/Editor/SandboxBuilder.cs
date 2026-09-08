@@ -67,33 +67,32 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // Master safety subfloor underneath the entire arena (40-meter fairway)
-            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 12f), new Vector3(12f, 0.5f, 44f), sandMat, sandPhys);
+            // Master safety subfloor underneath the entire arena (48-meter fairway)
+            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(12f, 0.5f, 52f), sandMat, sandPhys);
 
             // Left & Right Bank Slabs
-            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-2.7f, -0.25f, 12f), new Vector3(2.6f, 0.5f, 40f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(2.7f, -0.25f, 12f), new Vector3(2.6f, 0.5f, 40f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-2.7f, -0.25f, 15f), new Vector3(2.6f, 0.5f, 48f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(2.7f, -0.25f, 15f), new Vector3(2.6f, 0.5f, 48f), sandMat, sandPhys);
 
-            // Center Track Slabs connecting seamlessly with round pit tiles
-            // Track runs from Z: -8.0 to Z: 32.0 (40m total distance)
-            CreateGroundSlab("Ground_Center_Start", arenaRoot.transform, new Vector3(0f, -0.25f, -3.75f), new Vector3(2.8f, 0.5f, 8.5f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_Bridge_1_2", arenaRoot.transform, new Vector3(0f, -0.25f, 7.5f), new Vector3(2.8f, 0.5f, 8.0f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_Bridge_2_3", arenaRoot.transform, new Vector3(0f, -0.25f, 19.0f), new Vector3(2.8f, 0.5f, 9.0f), sandMat, sandPhys);
-            CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 29.25f), new Vector3(2.8f, 0.5f, 5.5f), sandMat, sandPhys);
+            // Center Track Slabs connecting seamlessly with round pit tiles (Z: -8.5m to Z: 38.0m)
+            CreateGroundSlab("Ground_Center_Start", arenaRoot.transform, new Vector3(0f, -0.25f, -3.4f), new Vector3(2.8f, 0.5f, 10.2f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_Bridge_1_2", arenaRoot.transform, new Vector3(0f, -0.25f, 9.75f), new Vector3(2.8f, 0.5f, 10.9f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_Bridge_2_3", arenaRoot.transform, new Vector3(0f, -0.25f, 23.75f), new Vector3(2.8f, 0.5f, 11.9f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Center_End", arenaRoot.transform, new Vector3(0f, -0.25f, 35.15f), new Vector3(2.8f, 0.5f, 5.7f), sandMat, sandPhys);
 
             // 3. Boundary Rails (Left, Right, Back, Front)
-            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.35f, 12f), new Vector3(0.3f, 0.8f, 40f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.35f, 12f), new Vector3(0.3f, 0.8f, 40f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -8.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
-            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 32.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-4.1f, 0.35f, 14.5f), new Vector3(0.3f, 0.8f, 47.5f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Right", arenaRoot.transform, new Vector3(4.1f, 0.35f, 14.5f), new Vector3(0.3f, 0.8f, 47.5f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
+            CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(8.5f, 0.8f, 0.3f), woodMat, bouncePhys);
 
-            // 4. Create 3 TRUE ROUND PITS with generous spacing (11-12m apart)
-            CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 2.0f), 1, sandMat, pitMat, woodMat, sandPhys);
-            CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 13.0f), 2, sandMat, pitMat, woodMat, sandPhys);
-            CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 25.0f), 3, sandMat, pitMat, woodMat, sandPhys);
+            // 4. Create 3 TRUE ROUND PITS with generous spacing (13.5m - 14.5m apart)
+            CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1, sandMat, pitMat, woodMat, sandPhys);
+            CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2, sandMat, pitMat, woodMat, sandPhys);
+            CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3, sandMat, pitMat, woodMat, sandPhys);
 
-            // 5. Create Ground Chalk Launch Ring (Concept Image 1 & 2 reference)
-            CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -5.5f), 1.0f);
+            // 5. Create Ground Chalk Launch Ring (Baseline Z = -6.0m)
+            CreateChalkRing("Chalk_Launch_Ring", arenaRoot.transform, new Vector3(0f, 0.015f, -6.0f), 1.0f);
 
             // 6. Create 4 Player Striker Marbles (P1..P4) for Local Pass-and-Play Multiplayer
             string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
@@ -104,7 +103,7 @@ namespace PitStriker.EditorTools
             {
                 GameObject marbleObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 marbleObj.name = marbleNames[i];
-                marbleObj.transform.position = new Vector3(xPositions[i], 0.3f, -5.5f);
+                marbleObj.transform.position = new Vector3(xPositions[i], 0.3f, -6.0f);
                 marbleObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
 
                 if (marbleMats[i] != null) marbleObj.GetComponent<MeshRenderer>().sharedMaterial = marbleMats[i];

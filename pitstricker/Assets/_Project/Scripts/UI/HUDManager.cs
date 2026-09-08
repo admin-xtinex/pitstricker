@@ -104,6 +104,7 @@ namespace PitStriker.UI
             TurnManager.OnTargetPitChanged += HandleTargetPitChanged;
             TurnManager.OnMatchVictory += HandleMatchVictory;
             TurnManager.OnStatusMessage += HandleStatusMessage;
+            TurnManager.OnStateChanged += HandleStateChanged;
         }
 
         private void OnDisable()
@@ -114,6 +115,7 @@ namespace PitStriker.UI
             TurnManager.OnTargetPitChanged -= HandleTargetPitChanged;
             TurnManager.OnMatchVictory -= HandleMatchVictory;
             TurnManager.OnStatusMessage -= HandleStatusMessage;
+            TurnManager.OnStateChanged -= HandleStateChanged;
         }
 
         private void Start()
@@ -122,6 +124,34 @@ namespace PitStriker.UI
             HandlePowerChanged(0f);
             HandleStrokeCountChanged(0, 8);
             if (_victoryModal != null) _victoryModal.SetActive(false);
+        }
+
+        private void HandleStateChanged(TurnManager.GameState newState)
+        {
+            if (newState == TurnManager.GameState.TossPhase)
+            {
+                if (_strikeButton != null)
+                {
+                    Text btnText = _strikeButton.GetComponentInChildren<Text>();
+                    if (btnText != null) btnText.text = "TOSS";
+                }
+                if (_statusBanner != null)
+                {
+                    _statusBanner.text = "TOSS PHASE: SWIPE FORWARD TO THROW TO PIT 3!";
+                }
+                if (_parText != null)
+                {
+                    _parText.text = "CLOSEST TO PIT 3 PLAYS FIRST";
+                }
+            }
+            else if (newState == TurnManager.GameState.ReadyToAim)
+            {
+                if (_strikeButton != null)
+                {
+                    Text btnText = _strikeButton.GetComponentInChildren<Text>();
+                    if (btnText != null) btnText.text = "STRIKE";
+                }
+            }
         }
 
         private void HandleActivePlayerChanged(TurnManager.PlayerData activePlayer)

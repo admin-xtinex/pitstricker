@@ -35,6 +35,7 @@ namespace PitStriker.Physics
         public event Action OnMarbleLaunched;
         public event Action OnMarbleStopped;
         public event Action<Collision> OnMarbleCollision;
+        public static event Action<MarbleController, MarbleController> OnMarbleHitMarble; // (striker, hitTarget)
 
         public bool IsMoving => _rigidbody != null && _rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold);
         public Vector3 Velocity => _rigidbody != null ? _rigidbody.linearVelocity : Vector3.zero;
@@ -127,10 +128,16 @@ namespace PitStriker.Physics
         {
             OnMarbleCollision?.Invoke(collision);
 
+            MarbleController otherMarble = collision.collider.GetComponent<MarbleController>();
+            bool isMarble = otherMarble != null;
+            if (isMarble)
+            {
+                OnMarbleHitMarble?.Invoke(this, otherMarble);
+            }
+
             float speed = collision.relativeVelocity.magnitude;
             if (speed > 0.4f)
             {
-                bool isMarble = collision.collider.GetComponent<MarbleController>() != null;
                 if (PitStriker.Audio.AudioManager.Instance != null)
                 {
                     PitStriker.Audio.AudioManager.Instance.PlayCollision(speed, isMarble);
