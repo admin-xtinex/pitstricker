@@ -84,16 +84,31 @@ namespace PitStriker.AI
             }
             else
             {
-                // Main Match: Evaluate line of sight to target pit vs. tactical strike on opponent
+                // Main Match: Evaluate line of sight to target pit vs. tactical/defensive strike on opponent
                 Vector3 pitPos = TurnManager.Instance.GetPitPosition(aiPlayer.currentPit);
-                TurnManager.PlayerData bestTargetOpponent = EvaluateTacticalStrike(aiPlayer, pitPos);
+                TurnManager.PlayerData bestTargetOpponent = EvaluateTacticalStrike(aiPlayer, pitPos, out bool isCriticalDenial);
 
-                if (bestTargetOpponent != null && bestTargetOpponent.marble != null && UnityEngine.Random.value < _tacticalAggression)
+                if (bestTargetOpponent != null && bestTargetOpponent.marble != null)
                 {
                     targetPos = bestTargetOpponent.marble.transform.position;
                     isStrikeAttack = true;
-                    targetDesc = $"Strike Attack on {bestTargetOpponent.name}";
-                    Debug.Log($"<color=#FFD700><b>[AI TACTICAL STRIKE]</b> {aiPlayer.name} strategically chose to strike {bestTargetOpponent.name}!</color>");
+
+                    if (isCriticalDenial)
+                    {
+                        targetDesc = $"DEFENSIVE DENIAL STRIKE on {bestTargetOpponent.name}!";
+                        Debug.Log($"<color=#FF0044><b>[AI DEFENSIVE DENIAL STRIKE]</b> {aiPlayer.name} detected {bestTargetOpponent.name} threatening to win/advance! Executing decisive strike to blast them away!</color>");
+                    }
+                    else
+                    {
+                        targetDesc = $"Tactical Strike on {bestTargetOpponent.name}";
+                        Debug.Log($"<color=#FFD700><b>[AI TACTICAL STRIKE]</b> {aiPlayer.name} strategically chose to strike {bestTargetOpponent.name}!</color>");
+                    }
+
+                    // Dynamically orient camera towards the targeted opponent!
+                    if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null)
+                    {
+                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.SetTarget(aiPlayer.marble.transform, targetPos);
+                    }
                 }
                 else
                 {
@@ -101,6 +116,11 @@ namespace PitStriker.AI
                     isStrikeAttack = false;
                     targetDesc = $"Target Pit #{aiPlayer.currentPit}";
                     Debug.Log($"<color=#00FFAA><b>[AI PIT SHOT]</b> {aiPlayer.name} advancing towards Pit #{aiPlayer.currentPit}.</color>");
+
+                    if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null)
+                    {
+                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.SetTarget(aiPlayer.marble.transform, targetPos);
+                    }
                 }
             }
 
@@ -111,8 +131,9 @@ namespace PitStriker.AI
             // Physics-calibrated force
             float calibratedForce = CalculateRequiredForce(distance, isTossPhase, isStrikeAttack);
 
-            // Natural humanized imperfection: small gaussian-like angular and force noise
-            float angleOffset = UnityEngine.Random.Range(-_aimAngleVariance, _aimAngleVariance);
+            // Natural humanized imperfection: reduce noise for critical match-saving denial strikes
+            float angleVariance = isStrikeAttack ? (_aimAngleVariance * 0.5f) : _aimAngleVariance;
+            float angleOffset = UnityEngine.Random.Range(-angleVariance, angleVariance);
             Vector3 finalAimDir = Quaternion.Euler(0f, angleOffset, 0f) * baseDir;
 
             float forceErrorFrac = UnityEngine.Random.Range(-_forceVariance, _forceVariance);
@@ -161,16 +182,19 @@ namespace PitStriker.AI
         }
 
         /// <summary>
-        /// Evaluates all active opponents to find the highest-value tactical strike opportunity.
-        /// An opponent is high-value if they are threatening a pit win or blocking the fairway lane.
+        /// Evaluates all active opponents to find critical victory-denial threats or high-value tactical opportunities.
+        /// Prioritizes stopping opponents who are on match point (Pit 3), leading in pit count, or within sinking range.
         /// </summary>
-        private TurnManager.PlayerData EvaluateTacticalStrike(TurnManager.PlayerData aiPlayer, Vector3 pitPos)
+        private TurnManager.PlayerData EvaluateTacticalStrike(TurnManager.PlayerData aiPlayer, Vector3 aiPitPos, out bool isCriticalDenial)
         {
+            isCriticalDenial = false;
             if (TurnManager.Instance == null || TurnManager.Instance.Players == null) return null;
 
             Vector3 aiPos = aiPlayer.marble.transform.position;
-            TurnManager.PlayerData bestTarget = null;
-            float highestScore = 0f;
+            float aiDistToPit = Vector3.Distance(aiPos, aiPitPos);
+
+            TurnManager.PlayerData bestTacticalTarget = null;
+            float highestTacticalScore = 0f;
 
             foreach (var opponent in TurnManager.Instance.Players)
             {
@@ -182,33 +206,74 @@ namespace PitStriker.AI
                 Vector3 oppPos = opponent.marble.transform.position;
                 float distToOpponent = Vector3.Distance(aiPos, oppPos);
 
-                // Ignore opponents out of practical striking range
-                if (distToOpponent < 1.0f || distToOpponent > 18.0f) continue;
+                // Range check: allow shots up to 34m across the arena fairway
+                if (distToOpponent < 0.6f || distToOpponent > 34.0f) continue;
 
-                // Value 1: Opponent is close to their own target pit (threat to win or advance!)
                 Vector3 oppTargetPit = TurnManager.Instance.GetPitPosition(opponent.currentPit);
                 float oppDistToPit = Vector3.Distance(oppPos, oppTargetPit);
-                float threatValue = Mathf.Clamp(6.0f - oppDistToPit, 0f, 6.0f) * 2.0f;
 
-                // Value 2: Opponent is positioned directly along AI's path to its target pit (blocking shot)
-                Vector3 toPit = (pitPos - aiPos).normalized;
-                Vector3 toOpp = (oppPos - aiPos).normalized;
-                float angleDegrees = Vector3.Angle(toPit, toOpp);
-                float blockValue = (angleDegrees < 25f && distToOpponent < Vector3.Distance(aiPos, pitPos)) ? 6.0f : 0f;
-
-                // Value 3: Closer opponents are easier to strike cleanly
-                float proximityScore = Mathf.Clamp(18.0f - distToOpponent, 0f, 18.0f) * 0.4f;
-
-                float totalScore = threatValue + blockValue + proximityScore;
-
-                if (totalScore > highestScore && totalScore >= 7.0f)
+                // =========================================================================
+                // CRITICAL CONDITION 1: OPPONENT IS ON MATCH POINT (PIT 3) & IN SCORING RANGE
+                // =========================================================================
+                // If opponent is at Pit 3 and within 14 meters of sinking, they can win next turn!
+                // AI MUST prioritize striking them away, regardless of AI's own progression.
+                if (opponent.currentPit == 3 && oppDistToPit <= 14.0f)
                 {
-                    highestScore = totalScore;
-                    bestTarget = opponent;
+                    isCriticalDenial = true;
+                    return opponent; // Immediate mandatory denial strike!
+                }
+
+                // =========================================================================
+                // CRITICAL CONDITION 2: OPPONENT IS LEADING AND ABOUT TO CONQUER THEIR PIT
+                // =========================================================================
+                // Opponent has cleared more pits (e.g. on Pit 2 while AI is on Pit 1) and is near their pit
+                if (opponent.currentPit > aiPlayer.currentPit && oppDistToPit <= 7.0f)
+                {
+                    isCriticalDenial = true;
+                    return opponent; // Immediate mandatory denial strike!
+                }
+
+                // =========================================================================
+                // CRITICAL CONDITION 3: OPPONENT IS IN EASY TAP-IN RANGE (< 4.5m)
+                // =========================================================================
+                // E.g. Opponent is 2m from pit, AI is 8m from pit. Sinking takes priority for opponent.
+                if (oppDistToPit <= 4.5f && aiDistToPit > 3.0f)
+                {
+                    isCriticalDenial = true;
+                    return opponent;
+                }
+
+                // =========================================================================
+                // GENERAL TACTICAL EVALUATION (Secondary)
+                // =========================================================================
+                // Threat score based on opponent proximity to their pit
+                float threatScore = Mathf.Clamp(10.0f - oppDistToPit, 0f, 10.0f) * 1.5f;
+
+                // Path blocking score
+                Vector3 toPit = (aiPitPos - aiPos).normalized;
+                Vector3 toOpp = (oppPos - aiPos).normalized;
+                float angle = Vector3.Angle(toPit, toOpp);
+                float blockScore = (angle < 28f && distToOpponent < aiDistToPit) ? 8.0f : 0f;
+
+                // Strike viability based on distance (closer opponents are easier to strike cleanly)
+                float proximityScore = Mathf.Clamp(24.0f - distToOpponent, 0f, 24.0f) * 0.4f;
+
+                float totalScore = threatScore + blockScore + proximityScore;
+
+                if (totalScore > highestTacticalScore)
+                {
+                    highestTacticalScore = totalScore;
+                    bestTacticalTarget = opponent;
                 }
             }
 
-            return bestTarget;
+            // If a tactical target scored sufficiently high and AI aggression roll succeeds:
+            if (bestTacticalTarget != null && highestTacticalScore >= 5.0f && UnityEngine.Random.value < _tacticalAggression)
+            {
+                return bestTacticalTarget;
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -229,8 +294,8 @@ namespace PitStriker.AI
             }
             else if (isAttack)
             {
-                // Strike attack applies +18% force to punch through target marble and maximize knockback
-                baseForce *= 1.18f;
+                // Strike attack applies +25% force to punch through target marble and maximize knockback displacement
+                baseForce = Mathf.Clamp(baseForce * 1.25f, 12.0f, 38.0f);
             }
 
             return Mathf.Clamp(baseForce, 3.0f, 38.0f);

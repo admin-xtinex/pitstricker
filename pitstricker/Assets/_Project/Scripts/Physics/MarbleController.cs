@@ -226,6 +226,7 @@ namespace PitStriker.Physics
                                     if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null)
                                     {
                                         PitStriker.CameraSystem.SmoothFollowCamera.Instance.TriggerImpactShake(Mathf.Clamp(blastSpeed * 0.04f, 0.15f, 0.45f), 0.22f);
+                                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.TrackImpactedTarget(otherMarble.transform, 1.6f);
                                     }
 #if UNITY_ANDROID || UNITY_IOS
                                     Handheld.Vibrate();

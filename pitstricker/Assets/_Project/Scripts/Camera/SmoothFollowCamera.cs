@@ -68,8 +68,38 @@ namespace PitStriker.CameraSystem
             _shakeTimer = duration;
         }
 
+        private Coroutine _impactTrackCoroutine;
+
+        /// <summary>
+        /// Temporarily shifts camera tracking to the blasted opponent marble during a strike impact
+        /// so the player can witness the thrilling trajectory and knockback settle.
+        /// </summary>
+        public void TrackImpactedTarget(Transform struckTarget, float duration = 1.6f)
+        {
+            if (struckTarget == null) return;
+            if (_impactTrackCoroutine != null) StopCoroutine(_impactTrackCoroutine);
+            _impactTrackCoroutine = StartCoroutine(TrackImpactRoutine(struckTarget, duration));
+        }
+
+        private System.Collections.IEnumerator TrackImpactRoutine(Transform struckTarget, float duration)
+        {
+            Transform originalTarget = _target;
+            _target = struckTarget;
+            yield return new WaitForSeconds(duration);
+            if (_target == struckTarget && originalTarget != null)
+            {
+                _target = originalTarget;
+            }
+            _impactTrackCoroutine = null;
+        }
+
         public void SetTarget(Transform newTarget, Vector3? objectivePoint = null)
         {
+            if (_impactTrackCoroutine != null)
+            {
+                StopCoroutine(_impactTrackCoroutine);
+                _impactTrackCoroutine = null;
+            }
             _target = newTarget;
 
             if (objectivePoint.HasValue && _target != null)
@@ -90,7 +120,7 @@ namespace PitStriker.CameraSystem
                 _baseAimDirection = Vector3.forward;
             }
 
-            _manualOrbitAngle = 0f; // Automatically align straight to the objective pit!
+            _manualOrbitAngle = 0f; // Automatically align straight to the objective!
         }
 
         public void SetObjectiveTarget(Vector3 objectivePoint)
