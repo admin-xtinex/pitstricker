@@ -66,16 +66,16 @@ namespace PitStriker.Gameplay
         /// </summary>
         public bool IsMarbleInsidePit(MarbleController marble)
         {
-            if (marble == null) return false;
+            if (marble == null || marble.IsRetired) return false;
 
             Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
             Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
             float relativeY = marble.transform.position.y - transform.position.y;
 
-            // Generous 1.45m radius: with pits 13.5m apart, any marble stopping within 1.45m is definitively at this pit.
-            // relativeY < 0.40m ensures the marble is on the ground or in the depression (not jumping high in the air).
-            return horizontalDist <= 1.45f && relativeY < 0.40f;
+            // Pit cup is 1.0m diameter (0.50m radius) with earthen bevel up to 1.05m.
+            // Sunken basin depth is relativeY < 0.20m.
+            return (horizontalDist <= 1.05f && relativeY < 0.35f) || (horizontalDist <= 1.35f && relativeY < 0.15f);
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace PitStriker.Gameplay
         /// </summary>
         public void MarkSunk(MarbleController marble)
         {
-            if (marble == null) return;
+            if (marble == null || marble.IsRetired) return;
 
             _capturedMarble = marble;
             IsSunk = true;
@@ -106,7 +106,7 @@ namespace PitStriker.Gameplay
         private void OnTriggerStay(Collider other)
         {
             MarbleController marble = other.GetComponent<MarbleController>();
-            if (marble == null) return;
+            if (marble == null || marble.IsRetired) return;
 
             if (IsMarbleInsidePit(marble))
             {

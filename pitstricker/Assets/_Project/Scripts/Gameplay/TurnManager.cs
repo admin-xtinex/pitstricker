@@ -284,7 +284,7 @@ namespace PitStriker.Gameplay
             else if (marble != ActivePlayer.marble)
             {
                 Debug.Log($"<color=#FF8800><b>[POCKETED OPPONENT]</b> Opponent {marble.name} was pocketed in Pit #{pit.PitNumber}! Relocating to fairway rim.</color>");
-                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                Vector3 rimPos = pit.transform.position + new Vector3(2.5f, 0.25f, 0f);
                 marble.ResetPosition(rimPos);
                 pit.ResetPit();
                 OnStatusMessage?.Invoke($"OPPONENT POCKETED! RELOCATED TO FAIRWAY");
@@ -294,7 +294,7 @@ namespace PitStriker.Gameplay
             {
                 Debug.LogWarning($"[TURN MANAGER] {ActivePlayer.name} sank Pit #{pit.PitNumber}, but active target is Pit #{ActivePlayer.currentPit}!");
                 OnStatusMessage?.Invoke($"WRONG PIT! TARGET IS PIT {ActivePlayer.currentPit}");
-                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                Vector3 rimPos = pit.transform.position + new Vector3(2.5f, 0.25f, 0f);
                 marble.ResetPosition(rimPos);
                 pit.ResetPit();
             }
@@ -342,7 +342,7 @@ namespace PitStriker.Gameplay
                             else
                             {
                                 // In toss phase, if a short shot landed in Pit 1 or 2, relocate to rim so pit stays clear
-                                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                Vector3 rimPos = pit.transform.position + new Vector3(2.5f, 0.25f, 0f);
                                 marble.ResetPosition(rimPos);
                                 pit.ResetPit();
                             }
@@ -364,7 +364,7 @@ namespace PitStriker.Gameplay
                                 {
                                     // Active player in wrong pit: safely relocate to rim
                                     Debug.LogWarning($"[PIT AUDIT] {player.name} settled in Pit #{pit.PitNumber}, but target is Pit #{ActivePlayer.currentPit}! Relocating to rim.");
-                                    Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                    Vector3 rimPos = pit.transform.position + new Vector3(2.5f, 0.25f, 0f);
                                     marble.ResetPosition(rimPos);
                                     pit.ResetPit();
                                 }
@@ -373,7 +373,7 @@ namespace PitStriker.Gameplay
                             {
                                 // OPPONENT MARBLE IN PIT: Pocketed opponent!
                                 Debug.Log($"<color=#FF8800><b>[PIT AUDIT]</b> Opponent {player.name} is inside Pit #{pit.PitNumber}! Relocating to fairway rim.</color>");
-                                Vector3 rimPos = pit.transform.position + new Vector3(0.9f, 0.25f, 0f);
+                                Vector3 rimPos = pit.transform.position + new Vector3(2.5f, 0.25f, 0f);
                                 marble.ResetPosition(rimPos);
                                 pit.ResetPit();
                                 OnStatusMessage?.Invoke($"OPPONENT POCKETED! RELOCATED TO FAIRWAY");
@@ -643,7 +643,7 @@ namespace PitStriker.Gameplay
                 // Place bullseye marble cleanly next to the rim so Pit 3 stays open for remaining tossers
                 if (tossingPlayer.marble != null)
                 {
-                    tossingPlayer.marble.ResetPosition(pit3Pos + new Vector3(0.5f, 0.25f, 0f));
+                    tossingPlayer.marble.ResetPosition(pit3Pos + new Vector3(2.5f, 0.25f, 0f));
                 }
                 if (pit3Zone != null) pit3Zone.ResetPit();
             }
