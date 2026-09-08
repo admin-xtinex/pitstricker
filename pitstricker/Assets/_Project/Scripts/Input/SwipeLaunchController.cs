@@ -32,6 +32,7 @@ namespace PitStriker.Input
         [SerializeField] private float _maxVisualTrajectoryLength = 9.0f;
 
         // Cached References
+        public static SwipeLaunchController Instance { get; private set; }
         private MarbleController _marble;
         private Camera _mainCamera;
 
@@ -40,11 +41,13 @@ namespace PitStriker.Input
 
         // Drag State
         private bool _isDragging = false;
-        private Vector3 _dragWorldStart;
-        private Vector3 _currentDragWorldPoint;
+        private Vector2 _dragScreenStart;
+        private float _currentPower = 0f;
+        private Vector3 _shootDirection = Vector3.forward;
 
         private void Awake()
         {
+            Instance = this;
             _marble = GetComponent<MarbleController>();
             _mainCamera = Camera.main;
 
@@ -59,6 +62,11 @@ namespace PitStriker.Input
                 _trajectoryLine.positionCount = 2;
                 _trajectoryLine.enabled = false;
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         private void Update()
@@ -82,145 +90,124 @@ namespace PitStriker.Input
             bool justPressed = false;
             bool justReleased = false;
 
-            // Prioritize Mouse (works reliably on PC, trackpad, and touchscreen laptops)
-            if (Mouse.current != null && (Mouse.current.leftButton.isPressed || Mouse.current.leftButton.wasPressedThisFrame || Mouse.current.leftButton.wasReleasedThisFrame))
-            {
-                screenPos = Mouse.current.position.ReadValue();
-                isPressed = Mouse.current.leftButton.isPressed;
-                justPressed = Mouse.current.leftButton.wasPressedThisFrame;
-                justReleased = Mouse.current.leftButton.wasReleasedThisFrame;
-            }
-            else if (Touchscreen.current != null)
+            // 1. Prioritize Touchscreen if active
+            if (Touchscreen.current != null && (Touchscreen.current.primaryTouch.press.isPressed || Touchscreen.current.primaryTouch.press.wasPressedThisFrame || Touchscreen.current.primaryTouch.press.wasReleasedThisFrame))
             {
                 screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
                 isPressed = Touchscreen.current.primaryTouch.press.isPressed;
                 justPressed = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
                 justReleased = Touchscreen.current.primaryTouch.press.wasReleasedThisFrame;
             }
+            // 2. Mouse / Trackpad
+            else if (Mouse.current != null)
+            {
+                screenPos = Mouse.current.position.ReadValue();
+                isPressed = Mouse.current.leftButton.isPressed;
+                justPressed = Mouse.current.leftButton.wasPressedThisFrame;
+                justReleased = Mouse.current.leftButton.wasReleasedThisFrame;
+            }
 
-            // 1. Pointer Down: Start Drag anywhere on screen
+            if (_mainCamera == null)
+            {
+                _mainCamera = Camera.main;
+                if (_mainCamera == null) return;
+            }
+
+            // Pointer Down: Start Drag anywhere on screen
             if (justPressed)
             {
                 // If marble has residual drift, halt it so the player can aim cleanly
-                if (_marble.CurrentSpeed < 2.0f)
+                if (_marble.CurrentSpeed < 2.5f)
                 {
                     _marble.Halt();
                 }
 
-                if (TryGetGroundPoint(screenPos, out Vector3 groundPoint))
+                _isDragging = true;
+                _dragScreenStart = screenPos;
+                _currentPower = 0f;
+            }
+
+            // Pointer Dragging: Calculate power and aim trajectory
+            if (_isDragging && isPressed)
+            {
+                Vector2 screenDelta = screenPos - _dragScreenStart;
+                float dragPixels = screenDelta.magnitude;
+
+                float minPixels = 12.0f; // Deadzone threshold to prevent accidental launches
+                float maxPixels = Mathf.Clamp(Screen.height * 0.28f, 160f, 400f);
+
+                if (dragPixels < minPixels)
                 {
-                    _isDragging = true;
-                    _dragWorldStart = groundPoint;
-                    _currentDragWorldPoint = groundPoint;
+                    _currentPower = 0f;
+                    if (_trajectoryLine != null) _trajectoryLine.enabled = false;
+                    OnPowerChanged?.Invoke(0f);
+                }
+                else
+                {
+                    _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
+                    OnPowerChanged?.Invoke(_currentPower);
+
+                    // Direction to shoot
+                    Vector2 aimScreenDir = _invertPullToShoot ? -screenDelta.normalized : screenDelta.normalized;
+
+                    Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
+                    Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
+                    _shootDirection = (camRight * aimScreenDir.x + camFwd * aimScreenDir.y).normalized;
 
                     if (_trajectoryLine != null)
                     {
                         _trajectoryLine.enabled = true;
+                        Vector3 startPos = transform.position + (Vector3.up * 0.05f);
+                        Vector3 endPos = startPos + (_shootDirection * (_currentPower * _maxVisualTrajectoryLength));
+
+                        _trajectoryLine.SetPosition(0, startPos);
+                        _trajectoryLine.SetPosition(1, endPos);
                     }
-                    Debug.Log($"<color=#00FFFF><b>[AIM]</b> Drag started at: {groundPoint}</color>");
                 }
             }
 
-            // 2. Pointer Dragging: Update aim trajectory
-            if (_isDragging && isPressed)
-            {
-                if (TryGetGroundPoint(screenPos, out Vector3 groundPoint))
-                {
-                    _currentDragWorldPoint = groundPoint;
-                    UpdateTrajectoryVisuals();
-                }
-            }
-
-            // 3. Pointer Released: Execute launch
+            // Pointer Released: Execute launch
             if (_isDragging && justReleased)
             {
                 ExecuteLaunch();
             }
         }
 
-        private void UpdateTrajectoryVisuals()
-        {
-            if (_trajectoryLine == null) return;
-
-            Vector3 pullVector = _dragWorldStart - _currentDragWorldPoint;
-            pullVector.y = 0f;
-
-            float pullDist = pullVector.magnitude;
-            if (pullDist < _minDragDistance)
-            {
-                _trajectoryLine.enabled = false;
-                OnPowerChanged?.Invoke(0f);
-                return;
-            }
-
-            _trajectoryLine.enabled = true;
-
-            // Direction to shoot
-            Vector3 shootDir = _invertPullToShoot ? pullVector.normalized : -pullVector.normalized;
-            float powerFraction = Mathf.Clamp01(pullDist / _maxDragDistance);
-            float visualLength = powerFraction * _maxVisualTrajectoryLength;
-
-            OnPowerChanged?.Invoke(powerFraction);
-
-            Vector3 startPos = transform.position;
-            startPos.y += 0.05f; // Elevate slightly above ground to prevent z-fighting
-
-            Vector3 endPos = startPos + (shootDir * visualLength);
-
-            _trajectoryLine.SetPosition(0, startPos);
-            _trajectoryLine.SetPosition(1, endPos);
-        }
-
         private void ExecuteLaunch()
         {
-            Vector3 pullVector = _dragWorldStart - _currentDragWorldPoint;
-            pullVector.y = 0f;
-
-            float pullDist = pullVector.magnitude;
-
-            // If pulled less than deadzone threshold, treat as safe cancellation
-            if (pullDist >= _minDragDistance)
+            if (_currentPower > 0.03f)
             {
-                Vector3 shootDir = _invertPullToShoot ? pullVector.normalized : -pullVector.normalized;
-                float powerFraction = Mathf.Clamp01(pullDist / _maxDragDistance);
-                float finalForce = powerFraction * _maxLaunchForce;
-
-                _marble.ApplyImpulse(shootDir, finalForce);
+                float finalForce = _currentPower * _maxLaunchForce;
+                _marble.ApplyImpulse(_shootDirection, finalForce);
+                Debug.Log($"<color=#00FFAA><b>[SWIPE LAUNCH]</b> Launched with {_currentPower * 100:F0}% power ({finalForce:F1} N)!</color>");
             }
 
+            CancelDrag();
+        }
+
+        /// <summary>
+        /// Allows UI buttons (like the STRIKE button) to trigger a launch towards the aimed or forward direction.
+        /// </summary>
+        public void LaunchStrike(float powerFraction = -1f)
+        {
+            float power = powerFraction >= 0f ? powerFraction : (_currentPower > 0.05f ? _currentPower : 0.65f);
+            Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
+
+            _marble.Halt();
+            _marble.ApplyImpulse(dir, power * _maxLaunchForce);
+            Debug.Log($"<color=#00FFAA><b>[STRIKE BUTTON]</b> Launched with {power * 100:F0}% power ({power * _maxLaunchForce:F1} N) towards {dir}!</color>");
             CancelDrag();
         }
 
         private void CancelDrag()
         {
             _isDragging = false;
+            _currentPower = 0f;
             OnPowerChanged?.Invoke(0f);
             if (_trajectoryLine != null)
             {
                 _trajectoryLine.enabled = false;
             }
-        }
-
-        private bool TryGetGroundPoint(Vector2 screenPosition, out Vector3 worldGroundPoint)
-        {
-            worldGroundPoint = Vector3.zero;
-            if (_mainCamera == null)
-            {
-                _mainCamera = Camera.main;
-                if (_mainCamera == null) return false;
-            }
-
-            Ray ray = _mainCamera.ScreenPointToRay(screenPosition);
-            // Create a mathematical plane at the marble's ground elevation
-            UnityEngine.Plane groundPlane = new UnityEngine.Plane(Vector3.up, new Vector3(0, transform.position.y, 0));
-
-            if (groundPlane.Raycast(ray, out float enterDistance))
-            {
-                worldGroundPoint = ray.GetPoint(enterDistance);
-                return true;
-            }
-
-            return false;
         }
     }
 }

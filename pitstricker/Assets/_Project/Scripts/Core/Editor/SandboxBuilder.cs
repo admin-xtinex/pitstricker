@@ -138,9 +138,10 @@ namespace PitStriker.EditorTools
             CreateHUDCanvas();
 
             Undo.CollapseUndoOperations(group);
-            Selection.activeGameObject = marble;
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+            UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
 
-            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with 100% ROUND PITS, Numbered Flags, Chalk Ring, and Concept HUD!</color>");
+            Debug.Log("<color=#00FF88><b>[PIT STRIKER]</b> Arena rebuilt with 100% ROUND PITS, Numbered Flags, Chalk Ring, and Concept HUD (Power Meter & Strike)!</color>");
         }
 
         private static void CreateGroundSlab(string name, Transform parent, Vector3 position, Vector3 scale, Material mat, PhysicsMaterial physMat)
@@ -380,7 +381,7 @@ namespace PitStriker.EditorTools
         }
 
         /// <summary>
-        /// Generates the complete Concept Art HUD UI Canvas (Power Meter + Sequential Tracker).
+        /// Generates the complete Concept Art HUD UI Canvas (Power Meter + Sequential Tracker + Strike Button).
         /// </summary>
         private static void CreateHUDCanvas()
         {
@@ -395,12 +396,25 @@ namespace PitStriker.EditorTools
 
             HUDManager hud = canvasObj.AddComponent<HUDManager>();
 
-            // Ensure EventSystem exists
-            if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            // Ensure EventSystem exists and uses InputSystemUIInputModule (Unity 6 Input System)
+            UnityEngine.EventSystems.EventSystem es = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+            if (es == null)
             {
-                GameObject es = new GameObject("EventSystem");
-                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                GameObject esObj = new GameObject("EventSystem");
+                es = esObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            }
+
+            // Remove legacy StandaloneInputModule if present
+            UnityEngine.EventSystems.StandaloneInputModule standalone = es.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            if (standalone != null)
+            {
+                Object.DestroyImmediate(standalone);
+            }
+
+            // Ensure InputSystemUIInputModule is present
+            if (es.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>() == null)
+            {
+                es.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
 
             // 2. Power Meter Panel (Bottom-Left)
@@ -410,18 +424,19 @@ namespace PitStriker.EditorTools
             powerRect.anchorMin = new Vector2(0f, 0f);
             powerRect.anchorMax = new Vector2(0f, 0f);
             powerRect.pivot = new Vector2(0f, 0f);
-            powerRect.anchoredPosition = new Vector2(50f, 50f);
-            powerRect.sizeDelta = new Vector2(340f, 60f);
+            powerRect.anchoredPosition = new Vector2(50f, 45f);
+            powerRect.sizeDelta = new Vector2(360f, 65f);
 
             Image panelBg = powerPanel.AddComponent<Image>();
             panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+            panelBg.raycastTarget = false;
 
             // Power Slider
             GameObject sliderObj = new GameObject("Power_Slider");
             sliderObj.transform.SetParent(powerPanel.transform, false);
             RectTransform sliderRect = sliderObj.AddComponent<RectTransform>();
-            sliderRect.anchorMin = new Vector2(0.32f, 0.25f);
-            sliderRect.anchorMax = new Vector2(0.95f, 0.75f);
+            sliderRect.anchorMin = new Vector2(0.35f, 0.2f);
+            sliderRect.anchorMax = new Vector2(0.95f, 0.8f);
             sliderRect.sizeDelta = Vector2.zero;
 
             Slider slider = sliderObj.AddComponent<Slider>();
@@ -446,25 +461,63 @@ namespace PitStriker.EditorTools
 
             Image fillImage = fillImgObj.AddComponent<Image>();
             fillImage.color = new Color(0f, 0.85f, 1f, 1f);
+            fillImage.raycastTarget = false;
             slider.fillRect = fillRect;
 
             // Power Label
             GameObject labelObj = new GameObject("Label");
             labelObj.transform.SetParent(powerPanel.transform, false);
             RectTransform labelRect = labelObj.AddComponent<RectTransform>();
-            labelRect.anchorMin = new Vector2(0.05f, 0f);
-            labelRect.anchorMax = new Vector2(0.3f, 1f);
+            labelRect.anchorMin = new Vector2(0.03f, 0f);
+            labelRect.anchorMax = new Vector2(0.34f, 1f);
             labelRect.sizeDelta = Vector2.zero;
 
             Text powerLabel = labelObj.AddComponent<Text>();
             powerLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            powerLabel.fontSize = 18;
+            powerLabel.fontSize = 17;
             powerLabel.fontStyle = FontStyle.Bold;
             powerLabel.alignment = TextAnchor.MiddleCenter;
             powerLabel.color = Color.white;
-            powerLabel.text = "POWER";
+            powerLabel.raycastTarget = false;
+            powerLabel.text = "POWER: 0%";
 
-            // 3. Sequential Stage Tracker (Top-Center: 1 -> 2 -> 3)
+            // 3. STRIKE Button (Bottom-Right, Concept Art layout)
+            GameObject strikeObj = new GameObject("Strike_Button");
+            strikeObj.transform.SetParent(canvasObj.transform, false);
+            RectTransform strikeRect = strikeObj.AddComponent<RectTransform>();
+            strikeRect.anchorMin = new Vector2(1f, 0f);
+            strikeRect.anchorMax = new Vector2(1f, 0f);
+            strikeRect.pivot = new Vector2(1f, 0f);
+            strikeRect.anchoredPosition = new Vector2(-50f, 40f);
+            strikeRect.sizeDelta = new Vector2(110f, 110f);
+
+            Image strikeImg = strikeObj.AddComponent<Image>();
+            strikeImg.color = new Color(1f, 0.45f, 0.05f, 0.95f);
+
+            Button strikeBtn = strikeObj.AddComponent<Button>();
+            ColorBlock cb = strikeBtn.colors;
+            cb.normalColor = new Color(1f, 0.45f, 0.05f, 0.95f);
+            cb.highlightedColor = new Color(1f, 0.65f, 0.2f, 1f);
+            cb.pressedColor = new Color(0.85f, 0.35f, 0f, 1f);
+            strikeBtn.colors = cb;
+
+            GameObject strikeLabelObj = new GameObject("Text");
+            strikeLabelObj.transform.SetParent(strikeObj.transform, false);
+            RectTransform strikeLabelRect = strikeLabelObj.AddComponent<RectTransform>();
+            strikeLabelRect.anchorMin = Vector2.zero;
+            strikeLabelRect.anchorMax = Vector2.one;
+            strikeLabelRect.sizeDelta = Vector2.zero;
+
+            Text strikeText = strikeLabelObj.AddComponent<Text>();
+            strikeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            strikeText.fontSize = 20;
+            strikeText.fontStyle = FontStyle.Bold;
+            strikeText.alignment = TextAnchor.MiddleCenter;
+            strikeText.color = Color.white;
+            strikeText.raycastTarget = false;
+            strikeText.text = "STRIKE";
+
+            // 4. Sequential Stage Tracker (Top-Center: 1 -> 2 -> 3)
             GameObject stagePanel = new GameObject("Stage_Tracker_Panel");
             stagePanel.transform.SetParent(canvasObj.transform, false);
             RectTransform stageRect = stagePanel.AddComponent<RectTransform>();
@@ -476,6 +529,7 @@ namespace PitStriker.EditorTools
 
             Image stageBg = stagePanel.AddComponent<Image>();
             stageBg.color = new Color(0.05f, 0.08f, 0.12f, 0.85f);
+            stageBg.raycastTarget = false;
 
             // Banner Text
             GameObject bannerObj = new GameObject("Banner_Text");
@@ -491,6 +545,7 @@ namespace PitStriker.EditorTools
             bannerText.fontStyle = FontStyle.Bold;
             bannerText.alignment = TextAnchor.MiddleCenter;
             bannerText.color = new Color(0f, 0.85f, 1f, 1f);
+            bannerText.raycastTarget = false;
             bannerText.text = "YOUR TURN  •  TARGET: PIT 1";
 
             // Beads Container
@@ -505,6 +560,7 @@ namespace PitStriker.EditorTools
             so.FindProperty("_powerSlider").objectReferenceValue = slider;
             so.FindProperty("_powerFillImage").objectReferenceValue = fillImage;
             so.FindProperty("_powerLabel").objectReferenceValue = powerLabel;
+            so.FindProperty("_strikeButton").objectReferenceValue = strikeBtn;
             so.FindProperty("_bead1Image").objectReferenceValue = bead1;
             so.FindProperty("_bead2Image").objectReferenceValue = bead2;
             so.FindProperty("_bead3Image").objectReferenceValue = bead3;

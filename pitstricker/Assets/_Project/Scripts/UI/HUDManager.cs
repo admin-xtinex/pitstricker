@@ -17,6 +17,9 @@ namespace PitStriker.UI
         [SerializeField] private Image _powerFillImage;
         [SerializeField] private Text _powerLabel;
 
+        [Header("Strike Action Button")]
+        [SerializeField] private Button _strikeButton;
+
         [Header("Objective Stage Beads (1 -> 2 -> 3)")]
         [SerializeField] private Image _bead1Image;
         [SerializeField] private Image _bead2Image;
@@ -25,6 +28,34 @@ namespace PitStriker.UI
 
         // Current Stage Progression (1 -> 2 -> 3)
         private int _currentObjectivePit = 1;
+
+        private void Awake()
+        {
+            // Runtime Safety Check: Replace legacy StandaloneInputModule if present to prevent Unity 6 New Input System exceptions
+            var es = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+            if (es != null)
+            {
+                var standalone = es.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                if (standalone != null)
+                {
+                    Destroy(standalone);
+                    if (es.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>() == null)
+                    {
+                        es.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+                    }
+                }
+            }
+
+            if (_strikeButton != null)
+            {
+                _strikeButton.onClick.AddListener(HandleStrikeClicked);
+            }
+
+            if (_powerSlider != null)
+            {
+                _powerSlider.onValueChanged.AddListener(HandleSliderValueChanged);
+            }
+        }
 
         private void OnEnable()
         {
@@ -44,11 +75,33 @@ namespace PitStriker.UI
             HandlePowerChanged(0f);
         }
 
+        private void HandleSliderValueChanged(float val)
+        {
+            if (_powerFillImage != null)
+            {
+                _powerFillImage.color = Color.Lerp(new Color(0f, 0.85f, 1f, 1f), new Color(1f, 0.4f, 0f, 1f), val);
+            }
+
+            if (_powerLabel != null)
+            {
+                _powerLabel.text = val > 0.01f ? $"Power: {Mathf.RoundToInt(val * 100f)}%" : "Power: 0%";
+            }
+        }
+
+        private void HandleStrikeClicked()
+        {
+            if (SwipeLaunchController.Instance != null)
+            {
+                float p = _powerSlider != null && _powerSlider.value > 0.05f ? _powerSlider.value : 0.65f;
+                SwipeLaunchController.Instance.LaunchStrike(p);
+            }
+        }
+
         private void HandlePowerChanged(float power01)
         {
             if (_powerSlider != null)
             {
-                _powerSlider.value = power01;
+                _powerSlider.SetValueWithoutNotify(power01);
             }
 
             if (_powerFillImage != null)
