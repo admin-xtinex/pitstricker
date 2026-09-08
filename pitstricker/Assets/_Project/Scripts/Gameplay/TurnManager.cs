@@ -266,6 +266,7 @@ namespace PitStriker.Gameplay
             {
                 Debug.LogWarning($"[TURN MANAGER] {ActivePlayer.name} sank Pit #{pit.PitNumber}, but active target is Pit #{ActivePlayer.currentPit}!");
                 OnStatusMessage?.Invoke($"WRONG PIT! TARGET IS PIT {ActivePlayer.currentPit}");
+                pit.ResetPit();
             }
         }
 
@@ -369,6 +370,7 @@ namespace PitStriker.Gameplay
 
                     // Relocate to next tee ahead of the conquered pit
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
+                    ResetAllPits();
 
                     SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
                     if (cam != null)
@@ -406,8 +408,12 @@ namespace PitStriker.Gameplay
                     if (ActivePlayer.marble != null)
                     {
                         ActivePlayer.marble.Halt();
+                        ActivePlayer.marble.ResetPosition(new Vector3(0f, -50f, 0f));
                         ActivePlayer.marble.SetVisible(false);
                     }
+
+                    // Immediately reset Pit 3 and all pits so subsequent players battling for 2nd / 3rd place can sink into Pit 3!
+                    ResetAllPits();
 
                     // Count remaining active competitors
                     int remainingActive = 0;
@@ -572,6 +578,9 @@ namespace PitStriker.Gameplay
                 DeclareMatchVictory();
                 return;
             }
+
+            // Ensure all pits are reset and ready for the next active player
+            ResetAllPits();
 
             // Find next player who hasn't finished
             int attempts = 0;
@@ -739,6 +748,18 @@ namespace PitStriker.Gameplay
                 case 2: return new Vector3(0f, 0f, 16.5f);
                 case 3: return new Vector3(0f, 0f, 31.0f);
                 default: return new Vector3(0f, 0f, 31.0f);
+            }
+        }
+
+        /// <summary>
+        /// Resets the capture state of all pits across the course, opening them for the next player.
+        /// </summary>
+        public void ResetAllPits()
+        {
+            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
+            foreach (var p in allPits)
+            {
+                p.ResetPit();
             }
         }
 

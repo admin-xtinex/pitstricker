@@ -233,8 +233,9 @@ namespace PitStriker.EditorTools
 
             float width = 2.8f;
             float length = 2.6f;
-            float radius = 0.75f;
-            float depth = 0.38f;
+            float rimRadius = 0.62f;     // Top rim radius of the bowl
+            float floorRadius = 0.26f;   // Basin floor radius
+            float depth = 0.22f;         // Authentic shallow pit depth (~marble depth)
             int segments = 24;
 
             Mesh mesh = new Mesh();
@@ -247,7 +248,7 @@ namespace PitStriker.EditorTools
             List<int> sandTriangles = new List<int>();
             List<int> pitTriangles = new List<int>();
 
-            // 1. Top Sand Surface (Outer rectangle to inner circle)
+            // 1. Top Sand Surface (Outer rectangle to inner rim circle)
             for (int i = 0; i < segments; i++)
             {
                 float angle = i * Mathf.PI * 2f / segments;
@@ -259,7 +260,7 @@ namespace PitStriker.EditorTools
                 float t = Mathf.Min(tx, tz);
 
                 Vector3 outerPt = new Vector3(t * cos, 0f, t * sin);
-                Vector3 innerRimPt = new Vector3(radius * cos, 0f, radius * sin);
+                Vector3 innerRimPt = new Vector3(rimRadius * cos, 0f, rimRadius * sin);
 
                 vertices.Add(outerPt);
                 normals.Add(Vector3.up);
@@ -287,24 +288,27 @@ namespace PitStriker.EditorTools
                 sandTriangles.Add(outerNext);
             }
 
-            // 2. Vertical Cylindrical Inner Wall of the Pit Cup
+            // 2. Smooth Sloped Bowl Wall of the Pit Cup (connecting rim to basin floor)
             int wallStartIndex = vertices.Count;
+            float deltaR = rimRadius - floorRadius;
+            Vector2 slopeNormal2D = new Vector2(-depth, deltaR).normalized;
+
             for (int i = 0; i < segments; i++)
             {
                 float angle = i * Mathf.PI * 2f / segments;
                 float cos = Mathf.Cos(angle);
                 float sin = Mathf.Sin(angle);
 
-                Vector3 topPt = new Vector3(radius * cos, 0f, radius * sin);
-                Vector3 bottomPt = new Vector3(radius * cos, -depth, radius * sin);
-                Vector3 inNormal = new Vector3(-cos, 0f, -sin);
+                Vector3 topPt = new Vector3(rimRadius * cos, 0f, rimRadius * sin);
+                Vector3 bottomPt = new Vector3(floorRadius * cos, -depth, floorRadius * sin);
+                Vector3 slopedNormal = new Vector3(slopeNormal2D.x * cos, slopeNormal2D.y, slopeNormal2D.x * sin);
 
                 vertices.Add(topPt);
-                normals.Add(inNormal);
+                normals.Add(slopedNormal);
                 uvs.Add(new Vector2((float)i / segments, 0f));
 
                 vertices.Add(bottomPt);
-                normals.Add(inNormal);
+                normals.Add(slopedNormal);
                 uvs.Add(new Vector2((float)i / segments, 1f));
             }
 
@@ -338,7 +342,7 @@ namespace PitStriker.EditorTools
                 float cos = Mathf.Cos(angle);
                 float sin = Mathf.Sin(angle);
 
-                vertices.Add(new Vector3(radius * cos, -depth, radius * sin));
+                vertices.Add(new Vector3(floorRadius * cos, -depth, floorRadius * sin));
                 normals.Add(Vector3.up);
                 uvs.Add(new Vector2(cos * 0.5f + 0.5f, sin * 0.5f + 0.5f));
             }
@@ -367,11 +371,11 @@ namespace PitStriker.EditorTools
             mc.sharedMesh = mesh;
             if (physMat != null) mc.sharedMaterial = physMat;
 
-            // Trigger Zone inside the cup
+            // Trigger Zone strictly inside the bottom cup
             SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = radius * 1.1f;
-            trigger.center = new Vector3(0f, -depth * 0.5f, 0f);
+            trigger.radius = 0.32f;
+            trigger.center = new Vector3(0f, -0.11f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
             zone.SetPitNumber(pitNumber);
@@ -380,7 +384,7 @@ namespace PitStriker.EditorTools
             zoneSo.ApplyModifiedProperties();
 
             // Numbered Flag Marker next to the pit
-            CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(radius + 0.35f, 0f, 0f), pitNumber, woodMat);
+            CreateFlagPole("Flag_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
         }
 
         private static void CreateFlagPole(string name, Transform parent, Vector3 localPos, int number, Material woodMat)

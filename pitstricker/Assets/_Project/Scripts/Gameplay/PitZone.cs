@@ -6,7 +6,9 @@ namespace PitStriker.Gameplay
 {
     /// <summary>
     /// Represents a numbered pit in the arena (e.g. Pit 1, Pit 2, Pit 3).
-    /// Detects when a marble enters and assists in settling it into the cup.
+    /// Detects when a marble legitimately enters and settles inside the cup.
+    /// Real marble pits are shallow and natural: fast marbles roll right over or lip out;
+    /// only properly paced, gentle marbles that settle inside the basin are captured.
     /// </summary>
     [RequireComponent(typeof(Collider))]
     public class PitZone : MonoBehaviour
@@ -16,14 +18,13 @@ namespace PitStriker.Gameplay
         [SerializeField] private int _pitNumber = 1;
 
         [Header("Capture Thresholds")]
-        [Tooltip("Maximum velocity allowed for a marble to count as sunk (prevents skimming).")]
-        [SerializeField] private float _maxCaptureSpeed = 2.0f;
-
-        [Tooltip("Strength of the gravitational pull drawing the marble into the center of the pit.")]
-        [SerializeField] private float _pitVortexForce = 8.0f;
+        [Tooltip("Maximum velocity allowed for a marble to count as sunk. Prevents skimming or rolling through.")]
+        [SerializeField] private float _maxCaptureSpeed = 0.35f;
 
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
+
+        private MarbleController _capturedMarble = null;
 
         public void SetPitNumber(int number)
         {
@@ -49,12 +50,14 @@ namespace PitStriker.Gameplay
                 _pitNumber = 1;
             }
 
-            // Only set SphereCollider as trigger, never touch MeshCollider
+            // Realistic trigger zone: strictly sized to the lower basin floor so it NEVER
+            // extends onto the fairway outside the pit rim!
             SphereCollider sphereTrigger = GetComponent<SphereCollider>();
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius *= GameDifficulty.PitCatchRadiusMultiplier;
+                sphereTrigger.radius = 0.32f;
+                sphereTrigger.center = new Vector3(0f, -0.11f, 0f);
             }
         }
 
@@ -63,34 +66,33 @@ namespace PitStriker.Gameplay
             MarbleController marble = other.GetComponent<MarbleController>();
             if (marble == null) return;
 
-            // Once captured and sunk, keep marble stationary in the basin
-            if (IsSunk)
+            // If this marble was already captured and sunk in this pit, keep it settled
+            if (IsSunk && marble == _capturedMarble)
             {
                 marble.Halt();
                 return;
             }
 
-            Rigidbody rb = marble.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                // Apply a gentle funnel pull toward the bottom-center of the pit
-                Vector3 centerTarget = transform.position;
-                Vector3 pullDir = centerTarget - marble.transform.position;
-                pullDir.y = -0.5f; // Pull downwards into the basin
+            // 1. Elevation check: Marble center must be down in the basin below the flat fairway
+            // On flat ground, marble center is at y ~ 0.25m. In the shallow pit cup, center is < 0.08m.
+            float relativeY = marble.transform.position.y - transform.position.y;
+            bool isDownInBasin = relativeY < 0.08f;
 
-                float vortex = _pitVortexForce * (GameDifficulty.PitVortexStrength / 6.0f);
-                rb.AddForce(pullDir * vortex, ForceMode.Acceleration);
+            // 2. Centered check: Marble must be inside the basin cup radius, not on the outer rim
+            Vector2 marbleXZ = new Vector2(marble.transform.position.x, marble.transform.position.z);
+            Vector2 pitXZ = new Vector2(transform.position.x, transform.position.z);
+            float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
+            bool isCenteredInCup = horizontalDist < 0.38f;
 
-                // Dampen horizontal velocity so the marble settles naturally inside the cup
-                Vector3 horizontalVel = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-                rb.linearVelocity -= horizontalVel * (0.08f);
-            }
+            // 3. Settled speed check: Marble must have settled to low speed.
+            // If it is rolling at normal or fast speed, it will naturally roll through the bowl,
+            // climb the opposite slope, and lip out onto the fairway!
+            bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
 
-            // Check if marble has settled in the pit below ground elevation
-            float captureSpeedThreshold = _maxCaptureSpeed * GameDifficulty.PitCatchRadiusMultiplier;
-            if (!IsSunk && marble.transform.position.y < 0.20f && marble.CurrentSpeed <= captureSpeedThreshold)
+            if (!IsSunk && isDownInBasin && isCenteredInCup && isSettled)
             {
                 IsSunk = true;
+                _capturedMarble = marble;
                 marble.Halt();
 
                 // Audio & VFX Juice
@@ -103,7 +105,7 @@ namespace PitStriker.Gameplay
                     PitStriker.VFX.VFXManager.Instance.PlayPitCelebration(transform.position);
                 }
 
-                Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> Marble SUNK into Pit #{_pitNumber}!</color>");
+                Debug.Log($"<color=#00FFAA><b>[GOAL!]</b> {marble.name} settled and SUNK into Pit #{_pitNumber}!</color>");
                 OnMarbleSunk?.Invoke(this, marble);
             }
         }
@@ -111,18 +113,20 @@ namespace PitStriker.Gameplay
         private void OnTriggerExit(Collider other)
         {
             MarbleController marble = other.GetComponent<MarbleController>();
-            if (marble != null)
+            if (marble != null && marble == _capturedMarble)
             {
                 IsSunk = false;
+                _capturedMarble = null;
             }
         }
 
         /// <summary>
-        /// Resets the pit capture flag for match restarts.
+        /// Resets the pit capture flag and captured marble reference, opening the pit for new shots.
         /// </summary>
         public void ResetPit()
         {
             IsSunk = false;
+            _capturedMarble = null;
         }
     }
 }

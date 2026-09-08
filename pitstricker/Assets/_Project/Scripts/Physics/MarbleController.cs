@@ -110,13 +110,15 @@ namespace PitStriker.Physics
                 return;
             }
 
-            // Snappy tail-end braking to eliminate endless micro-crawls on the course
+            // Snappy tail-end braking on the flat fairway to eliminate endless micro-crawls.
+            // When dipping inside the pit depression (y < 0.18f), natural 3D physics runs uninhibited so marbles can climb and lip out!
             Vector3 horizVel = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z);
             float horizSpeed = horizVel.magnitude;
-            if (horizSpeed < 0.75f && horizSpeed > 0f)
+            if (horizSpeed < 0.75f && horizSpeed > 0f && transform.position.y >= 0.18f)
             {
-                float brake = Time.fixedDeltaTime * 2.2f;
-                _rigidbody.linearVelocity = Vector3.MoveTowards(_rigidbody.linearVelocity, Vector3.zero, brake);
+                float brake = Time.fixedDeltaTime * 2.0f;
+                Vector3 targetHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, brake);
+                _rigidbody.linearVelocity = new Vector3(targetHoriz.x, _rigidbody.linearVelocity.y, targetHoriz.z);
                 _rigidbody.angularVelocity = Vector3.MoveTowards(_rigidbody.angularVelocity, Vector3.zero, brake * 1.5f);
             }
 
