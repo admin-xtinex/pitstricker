@@ -35,6 +35,7 @@ namespace PitStriker.Gameplay
             public int totalStrokes = 0;
             public int currentPit = 1;
             public bool isFinished = false;
+            public bool hasTakenFirstShot = false;
 
             public PlayerData(int id, string name, Color color, MarbleController marble)
             {
@@ -45,6 +46,7 @@ namespace PitStriker.Gameplay
                 this.totalStrokes = 0;
                 this.currentPit = 1;
                 this.isFinished = false;
+                this.hasTakenFirstShot = false;
             }
         }
 
@@ -138,8 +140,8 @@ namespace PitStriker.Gameplay
         {
             UnbindAllMarbles();
 
-            // Find all marbles in the scene
-            MarbleController[] foundMarbles = FindObjectsByType<MarbleController>(FindObjectsInactive.Exclude);
+            // Find all marbles in the scene (including staged/inactive ones)
+            MarbleController[] foundMarbles = FindObjectsByType<MarbleController>(FindObjectsInactive.Include);
             Array.Sort(foundMarbles, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             _players.Clear();
@@ -214,6 +216,7 @@ namespace PitStriker.Gameplay
             if (ActivePlayer == null) return;
 
             ActivePlayer.totalStrokes++;
+            ActivePlayer.hasTakenFirstShot = true;
             _pitSunkThisTurn = false;
             _hitOpponentMarbleThisTurn = false;
             _bonusStrikeEarned = false;
@@ -404,6 +407,30 @@ namespace PitStriker.Gameplay
 
                 yield return new WaitForSeconds(2.0f);
 
+                // Reset all pits
+                foreach (var p in allPits)
+                {
+                    p.ResetPit();
+                }
+
+                // Traditional rule: All marbles are picked up and brought back to the starting line!
+                // Initially hide all marbles so only the active player appears at the start line.
+                for (int i = 0; i < _players.Count; i++)
+                {
+                    PlayerData p = _players[i];
+                    p.hasTakenFirstShot = false;
+                    p.totalStrokes = 0;
+                    p.currentPit = 1;
+                    p.isFinished = false;
+
+                    if (p.marble != null)
+                    {
+                        p.marble.Halt();
+                        p.marble.ResetPosition(_startCenter);
+                        p.marble.SetVisible(false);
+                    }
+                }
+
                 // Switch SwipeLaunchController back to Precision Pull-back Aiming for the main game
                 if (SwipeLaunchController.Instance != null)
                 {
@@ -441,6 +468,13 @@ namespace PitStriker.Gameplay
         {
             if (ActivePlayer == null) return;
 
+            // If active player has not yet taken their first move, stage them at the start line and make visible
+            if (!ActivePlayer.hasTakenFirstShot && ActivePlayer.marble != null)
+            {
+                ActivePlayer.marble.ResetPosition(_startCenter);
+                ActivePlayer.marble.SetVisible(true);
+            }
+
             // 1. Point Camera to active player's marble
             SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
             if (cam != null && ActivePlayer.marble != null)
@@ -466,6 +500,13 @@ namespace PitStriker.Gameplay
             if (index >= _players.Count) return;
 
             PlayerData p = _players[index];
+
+            // Staging: Position this tossing player at the start line and make visible
+            if (p.marble != null)
+            {
+                p.marble.ResetPosition(_startCenter);
+                p.marble.SetVisible(true);
+            }
 
             // Point Camera
             SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
@@ -556,25 +597,26 @@ namespace PitStriker.Gameplay
                 p.ResetPit();
             }
 
-            // Position marbles side by side on the opening chalk baseline
-            float startX = -((_players.Count - 1) * _startSpacing * 0.5f);
+            // Hide all marbles initially; each player will appear at the start line one-by-one on their turn
             for (int i = 0; i < _players.Count; i++)
             {
                 PlayerData p = _players[i];
                 p.totalStrokes = 0;
                 p.currentPit = 1;
                 p.isFinished = false;
+                p.hasTakenFirstShot = false;
 
                 if (p.marble != null)
                 {
-                    Vector3 startPos = _startCenter + new Vector3(startX + (i * _startSpacing), 0f, 0f);
-                    p.marble.ResetPosition(startPos);
+                    p.marble.Halt();
+                    p.marble.ResetPosition(_startCenter);
+                    p.marble.SetVisible(false);
                 }
             }
 
-            // Start in Toss Phase: Forward Flick Throw to Pit 3
-            ActivateTossPlayer(0);
+            // Start in Toss Phase: Only Player 1 is visible at the starting point!
             SetState(GameState.TossPhase);
+            ActivateTossPlayer(0);
         }
 
         private void SetState(GameState newState)

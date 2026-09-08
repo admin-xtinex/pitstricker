@@ -103,7 +103,7 @@ namespace PitStriker.EditorTools
             {
                 GameObject marbleObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 marbleObj.name = marbleNames[i];
-                marbleObj.transform.position = new Vector3(xPositions[i], 0.3f, -6.0f);
+                marbleObj.transform.position = new Vector3(0f, 0.3f, -6.0f);
                 marbleObj.transform.localScale = new Vector3(0.5f, 0.5f, 0.5f);
 
                 if (marbleMats[i] != null) marbleObj.GetComponent<MeshRenderer>().sharedMaterial = marbleMats[i];
@@ -137,6 +137,11 @@ namespace PitStriker.EditorTools
                     line.enabled = false;
 
                     marbleObj.AddComponent<SwipeLaunchController>();
+                }
+                else
+                {
+                    // Marbles P2..P4 are staged hidden until their respective turns
+                    mc.SetVisible(false);
                 }
             }
 

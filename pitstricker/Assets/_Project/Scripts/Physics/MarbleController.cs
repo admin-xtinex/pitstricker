@@ -177,5 +177,38 @@ namespace PitStriker.Physics
             transform.position = newPosition;
             _wasMoving = false;
         }
+
+        /// <summary>
+        /// Enables or disables marble visual rendering and physical interaction on the track.
+        /// When hidden, collisions, gravity, and velocity are suspended.
+        /// </summary>
+        public void SetVisible(bool visible)
+        {
+            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+            foreach (var r in renderers)
+            {
+                if (r is LineRenderer) continue; // Keep aiming guide intact
+                r.enabled = visible;
+            }
+
+            if (_collider == null) _collider = GetComponent<SphereCollider>();
+            if (_collider != null) _collider.enabled = visible;
+
+            if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody>();
+            if (_rigidbody != null)
+            {
+                if (!visible)
+                {
+                    Halt();
+                    _rigidbody.isKinematic = true;
+                    _rigidbody.detectCollisions = false;
+                }
+                else
+                {
+                    _rigidbody.isKinematic = false;
+                    _rigidbody.detectCollisions = true;
+                }
+            }
+        }
     }
 }

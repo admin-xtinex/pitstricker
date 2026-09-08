@@ -9,7 +9,6 @@ namespace PitStriker.Input
     /// Handles mobile touch and mouse drag-and-release swipe mechanics for launching marbles.
     /// Draws an aiming trajectory indicator on the ground plane.
     /// </summary>
-    [RequireComponent(typeof(MarbleController))]
     public class SwipeLaunchController : MonoBehaviour
     {
         [Header("Launch Physics Tuning")]
@@ -106,6 +105,8 @@ namespace PitStriker.Input
 
         private void Update()
         {
+            if (_marble == null) return;
+
             // Keyboard shortcut test launch for instant testing (Spacebar)
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
             {
