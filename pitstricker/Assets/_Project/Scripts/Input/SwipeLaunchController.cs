@@ -159,8 +159,8 @@ namespace PitStriker.Input
                 Vector2 screenDelta = screenPos - _dragScreenStart;
                 float dragPixels = screenDelta.magnitude;
 
-                float minPixels = 12.0f; // Deadzone threshold to prevent accidental launches
-                float maxPixels = Mathf.Clamp(Screen.height * 0.28f, 160f, 400f);
+                float minPixels = Mathf.Max(10f, _minDragDistance * 60f); // Deadzone threshold to prevent accidental launches
+                float maxPixels = Mathf.Clamp(_maxDragDistance * 80f, 160f, Screen.height * 0.45f);
 
                 if (dragPixels < minPixels)
                 {

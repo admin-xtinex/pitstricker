@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using PitStriker.Input;
@@ -12,6 +13,7 @@ namespace PitStriker.UI
     /// </summary>
     public class HUDManager : MonoBehaviour
     {
+#pragma warning disable CS0649
         [Header("Power Gauge Elements")]
         [SerializeField] private Slider _powerSlider;
         [SerializeField] private Image _powerFillImage;
@@ -48,7 +50,7 @@ namespace PitStriker.UI
         private void Awake()
         {
             // Runtime Safety Check: Replace legacy StandaloneInputModule if present to prevent Unity 6 New Input System exceptions
-            var es = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+            var es = Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
             if (es != null)
             {
                 var standalone = es.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
@@ -65,7 +67,7 @@ namespace PitStriker.UI
             // Ensure TurnManager is active in the scene even if arena was not regenerated
             if (TurnManager.Instance == null)
             {
-                TurnManager existingTm = Object.FindFirstObjectByType<TurnManager>();
+                TurnManager existingTm = Object.FindAnyObjectByType<TurnManager>();
                 if (existingTm == null)
                 {
                     GameObject tmObj = new GameObject("TurnManager");

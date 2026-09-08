@@ -55,7 +55,7 @@ namespace PitStriker.EditorTools
             if (oldArena != null) Undo.DestroyObjectImmediate(oldArena);
 
             // Clean up any existing marble controllers in the scene
-            foreach (var m in Object.FindObjectsByType<MarbleController>(FindObjectsSortMode.None))
+            foreach (var m in Object.FindObjectsByType<MarbleController>(FindObjectsInactive.Exclude))
             {
                 Undo.DestroyObjectImmediate(m.gameObject);
             }
@@ -157,7 +157,7 @@ namespace PitStriker.EditorTools
             }
 
             // 8. Turn & Match Orchestrator (Phase 5 Multiplayer)
-            TurnManager tm = Object.FindFirstObjectByType<TurnManager>();
+            TurnManager tm = Object.FindAnyObjectByType<TurnManager>();
             if (tm == null)
             {
                 GameObject tmObj = new GameObject("TurnManager");
@@ -168,14 +168,14 @@ namespace PitStriker.EditorTools
             tmSo.ApplyModifiedProperties();
 
             // 9. Audio & Visual Juice Managers (Phase 7)
-            AudioManager audioMgr = Object.FindFirstObjectByType<AudioManager>();
+            AudioManager audioMgr = Object.FindAnyObjectByType<AudioManager>();
             if (audioMgr == null)
             {
                 GameObject audioObj = new GameObject("AudioManager");
                 audioObj.AddComponent<AudioManager>();
             }
 
-            VFXManager vfxMgr = Object.FindFirstObjectByType<VFXManager>();
+            VFXManager vfxMgr = Object.FindAnyObjectByType<VFXManager>();
             if (vfxMgr == null)
             {
                 GameObject vfxObj = new GameObject("VFXManager");
@@ -449,7 +449,7 @@ namespace PitStriker.EditorTools
             HUDManager hud = canvasObj.AddComponent<HUDManager>();
 
             // Ensure EventSystem exists and uses InputSystemUIInputModule (Unity 6 Input System)
-            UnityEngine.EventSystems.EventSystem es = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+            UnityEngine.EventSystems.EventSystem es = Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
             if (es == null)
             {
                 GameObject esObj = new GameObject("EventSystem");

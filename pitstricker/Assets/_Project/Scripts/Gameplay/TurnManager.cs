@@ -123,7 +123,7 @@ namespace PitStriker.Gameplay
             UnbindAllMarbles();
 
             // Find all marbles in the scene
-            MarbleController[] foundMarbles = FindObjectsByType<MarbleController>(FindObjectsSortMode.None);
+            MarbleController[] foundMarbles = FindObjectsByType<MarbleController>(FindObjectsInactive.Exclude);
             Array.Sort(foundMarbles, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             _players.Clear();
@@ -296,7 +296,7 @@ namespace PitStriker.Gameplay
             if (ActivePlayer == null) return;
 
             // 1. Point Camera to active player's marble
-            SmoothFollowCamera cam = FindFirstObjectByType<SmoothFollowCamera>();
+            SmoothFollowCamera cam = FindAnyObjectByType<SmoothFollowCamera>();
             if (cam != null && ActivePlayer.marble != null)
             {
                 cam.SetTarget(ActivePlayer.marble.transform);
@@ -375,7 +375,7 @@ namespace PitStriker.Gameplay
             CurrentPlayerIndex = 0;
 
             // Reset Pits
-            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsSortMode.None);
+            PitZone[] allPits = FindObjectsByType<PitZone>(FindObjectsInactive.Exclude);
             foreach (PitZone p in allPits)
             {
                 p.ResetPit();
