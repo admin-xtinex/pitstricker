@@ -112,7 +112,7 @@ namespace PitStriker.EditorTools
                 "VIS_Base", "VIS_S1", "VIS_S2", "VIS_Stone_A", "VIS_Stone_B"
             };
 
-            var allTransforms = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsSortMode.None);
+            var allTransforms = UnityEngine.Object.FindObjectsByType<Transform>();
             int collidersAdded = 0;
 
             foreach (var t in allTransforms)
