@@ -43,12 +43,29 @@ namespace PitStriker.UI
         [SerializeField] private Text _victoryParText;
         [SerializeField] private Text _victoryRatingText;
         [SerializeField] private Button _playAgainButton;
+        [SerializeField] private Button _homeMenuButton;
+
+        [Header("In-Game Top-Bar Navigation Controls")]
+        [SerializeField] private Button _topHomeButton;
+        [SerializeField] private Button _topRestartButton;
+        [SerializeField] private Button _topPauseButton;
 
         // Current Stage Progression (1 -> 2 -> 3)
         private int _currentObjectivePit = 1;
 
         private void Awake()
         {
+            // Ensure HUD Canvas sorting order is above GameScreens (sortingOrder 50)
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null)
+            {
+                canvas.sortingOrder = 60;
+            }
+            if (GetComponent<GraphicRaycaster>() == null)
+            {
+                gameObject.AddComponent<GraphicRaycaster>();
+            }
+
             // Runtime Safety Check: Replace legacy StandaloneInputModule if present to prevent Unity 6 New Input System exceptions
             var es = Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
             if (es != null)
@@ -90,9 +107,77 @@ namespace PitStriker.UI
                 _playAgainButton.onClick.AddListener(HandlePlayAgainClicked);
             }
 
+            if (_homeMenuButton != null)
+            {
+                _homeMenuButton.onClick.AddListener(HandleHomeMenuClicked);
+            }
+
+            EnsureTopBarNavigationButtons();
+
             if (_victoryModal != null)
             {
                 _victoryModal.SetActive(false);
+            }
+        }
+
+        private void EnsureTopBarNavigationButtons()
+        {
+            // Navigation belongs to MenuManager's always-visible overlay.
+            var legacy = transform.Find("TopBar_Navigation");
+            if (legacy) legacy.gameObject.SetActive(false);
+            var oldPause = transform.Find("Btn_HUD_Pause");
+            if (oldPause) oldPause.gameObject.SetActive(false);
+        }
+
+        private static GameObject CreateNavButton(string name, Transform parent, string label, Color bgColor)
+        {
+            GameObject btnObj = new GameObject(name);
+            btnObj.transform.SetParent(parent, false);
+            btnObj.AddComponent<RectTransform>();
+
+            Image img = btnObj.AddComponent<Image>();
+            img.color = bgColor;
+
+            Button btn = btnObj.AddComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = bgColor;
+            cb.highlightedColor = Color.Lerp(bgColor, Color.white, 0.25f);
+            cb.pressedColor = Color.Lerp(bgColor, Color.black, 0.25f);
+            btn.colors = cb;
+
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(btnObj.transform, false);
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero;
+            textRect.anchoredPosition = Vector2.zero;
+
+            Text t = textObj.AddComponent<Text>();
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.text = label;
+            t.fontSize = 15;
+            t.fontStyle = FontStyle.Bold;
+            t.color = Color.white;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.raycastTarget = false;
+
+            return btnObj;
+        }
+
+        private void HandleTopPauseClicked()
+        {
+            if (MenuManager.Instance != null)
+            {
+                MenuManager.Instance.ShowScreen(MenuManager.ScreenType.Pause);
+                if (TurnManager.Instance != null)
+                {
+                    TurnManager.Instance.SetPaused(true);
+                }
+            }
+            else if (TurnManager.Instance != null)
+            {
+                TurnManager.Instance.SetPaused(true);
             }
         }
 
@@ -157,6 +242,11 @@ namespace PitStriker.UI
         private void HandleActivePlayerChanged(TurnManager.PlayerData activePlayer)
         {
             if (activePlayer == null) return;
+
+            if (_playerBadgeImages != null && TurnManager.Instance != null)
+                for (int i = 0; i < _playerBadgeImages.Length; i++)
+                    if (_playerBadgeImages[i] != null)
+                        _playerBadgeImages[i].transform.parent.gameObject.SetActive(i < TurnManager.Instance.PlayerCount);
 
             // Highlight active player badge; dim others
             if (_playerBadgeGlows != null)
@@ -237,6 +327,23 @@ namespace PitStriker.UI
             }
         }
 
+        private void HandleHomeMenuClicked()
+        {
+            if (_victoryModal != null)
+            {
+                _victoryModal.SetActive(false);
+            }
+
+            if (MenuManager.Instance != null)
+            {
+                MenuManager.Instance.HandleHomeClicked();
+            }
+            else if (TurnManager.Instance != null)
+            {
+                TurnManager.Instance.ReturnToMainMenu();
+            }
+        }
+
         private void HandlePowerChanged(float power01)
         {
             if (_powerSlider != null)
@@ -290,13 +397,90 @@ namespace PitStriker.UI
 
         private void HandleMatchVictory(TurnManager.PlayerData winner, List<TurnManager.PlayerData> leaderboard)
         {
+            Time.timeScale = 1f;
+
             if (_victoryModal != null)
             {
                 _victoryModal.SetActive(true);
+                _victoryModal.transform.SetAsLastSibling();
+
+                // Ensure top-level sorting order so modal is never blocked
+                Canvas modalCanvas = _victoryModal.GetComponent<Canvas>();
+                if (modalCanvas == null) modalCanvas = _victoryModal.AddComponent<Canvas>();
+                modalCanvas.overrideSorting = true;
+                modalCanvas.sortingOrder = 100;
+                if (_victoryModal.GetComponent<GraphicRaycaster>() == null)
+                {
+                    _victoryModal.AddComponent<GraphicRaycaster>();
+                }
+
+                // Ensure Play Again button is configured and positioned on left side
+                if (_playAgainButton != null)
+                {
+                    RectTransform paRect = _playAgainButton.GetComponent<RectTransform>();
+                    if (paRect != null)
+                    {
+                        paRect.anchorMin = new Vector2(0.06f, 0.04f);
+                        paRect.anchorMax = new Vector2(0.48f, 0.16f);
+                        paRect.sizeDelta = Vector2.zero;
+                        paRect.anchoredPosition = Vector2.zero;
+                    }
+
+                    _playAgainButton.onClick.RemoveAllListeners();
+                    _playAgainButton.onClick.AddListener(HandlePlayAgainClicked);
+                }
+
+                // Ensure Main Menu button exists on the right side
+                Transform existingHomeBtn = _victoryModal.transform.Find("Btn_VictoryHome");
+                if (existingHomeBtn == null)
+                {
+                    GameObject homeBtnObj = new GameObject("Btn_VictoryHome");
+                    homeBtnObj.transform.SetParent(_victoryModal.transform, false);
+                    RectTransform homeRect = homeBtnObj.AddComponent<RectTransform>();
+                    homeRect.anchorMin = new Vector2(0.52f, 0.04f);
+                    homeRect.anchorMax = new Vector2(0.94f, 0.16f);
+                    homeRect.sizeDelta = Vector2.zero;
+                    homeRect.anchoredPosition = Vector2.zero;
+
+                    Image homeImg = homeBtnObj.AddComponent<Image>();
+                    homeImg.color = new Color(0.15f, 0.45f, 0.85f, 1f);
+
+                    Button homeBtn = homeBtnObj.AddComponent<Button>();
+                    homeBtn.onClick.AddListener(HandleHomeMenuClicked);
+                    _homeMenuButton = homeBtn;
+
+                    GameObject textObj = new GameObject("Text");
+                    textObj.transform.SetParent(homeBtnObj.transform, false);
+                    RectTransform textRect = textObj.AddComponent<RectTransform>();
+                    textRect.anchorMin = Vector2.zero;
+                    textRect.anchorMax = Vector2.one;
+                    textRect.sizeDelta = Vector2.zero;
+                    textRect.anchoredPosition = Vector2.zero;
+
+                    Text homeText = textObj.AddComponent<Text>();
+                    homeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                    homeText.fontSize = 18;
+                    homeText.fontStyle = FontStyle.Bold;
+                    homeText.alignment = TextAnchor.MiddleCenter;
+                    homeText.color = Color.white;
+                    homeText.text = "MAIN MENU";
+                    homeText.raycastTarget = false;
+                }
+                else
+                {
+                    Button hb = existingHomeBtn.GetComponent<Button>();
+                    if (hb != null)
+                    {
+                        hb.onClick.RemoveAllListeners();
+                        hb.onClick.AddListener(HandleHomeMenuClicked);
+                        _homeMenuButton = hb;
+                    }
+                }
             }
             else
             {
                 CreateRuntimeVictoryModal(winner, leaderboard);
+                if (_victoryModal != null) _victoryModal.transform.SetAsLastSibling();
             }
 
             if (_victoryStrokesText != null && winner != null)
@@ -330,7 +514,12 @@ namespace PitStriker.UI
             modalRect.anchorMax = new Vector2(0.5f, 0.5f);
             modalRect.pivot = new Vector2(0.5f, 0.5f);
             modalRect.anchoredPosition = Vector2.zero;
-            modalRect.sizeDelta = new Vector2(520f, 360f);
+            modalRect.sizeDelta = new Vector2(540f, 380f);
+
+            Canvas modalCanvas = modalObj.AddComponent<Canvas>();
+            modalCanvas.overrideSorting = true;
+            modalCanvas.sortingOrder = 100;
+            modalObj.AddComponent<GraphicRaycaster>();
 
             Image modalBg = modalObj.AddComponent<Image>();
             modalBg.color = new Color(0.04f, 0.06f, 0.1f, 0.96f);
@@ -375,12 +564,12 @@ namespace PitStriker.UI
             }
             stats.text = sb.ToString();
 
-            // Play Again Button
+            // Play Again Button (Left)
             GameObject btnObj = new GameObject("PlayAgainBtn");
             btnObj.transform.SetParent(modalObj.transform, false);
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
-            btnRect.anchorMin = new Vector2(0.25f, 0.05f);
-            btnRect.anchorMax = new Vector2(0.75f, 0.2f);
+            btnRect.anchorMin = new Vector2(0.08f, 0.05f);
+            btnRect.anchorMax = new Vector2(0.48f, 0.20f);
             btnRect.sizeDelta = Vector2.zero;
             Image btnImg = btnObj.AddComponent<Image>();
             btnImg.color = new Color(0f, 0.8f, 0.4f, 1f);
@@ -399,11 +588,42 @@ namespace PitStriker.UI
             btnTextRect.sizeDelta = Vector2.zero;
             Text btnText = btnTextObj.AddComponent<Text>();
             btnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            btnText.fontSize = 18;
+            btnText.fontSize = 17;
             btnText.fontStyle = FontStyle.Bold;
             btnText.alignment = TextAnchor.MiddleCenter;
             btnText.color = Color.white;
             btnText.text = "PLAY AGAIN";
+
+            // Main Menu Button (Right)
+            GameObject homeBtnObj = new GameObject("HomeBtn");
+            homeBtnObj.transform.SetParent(modalObj.transform, false);
+            RectTransform homeBtnRect = homeBtnObj.AddComponent<RectTransform>();
+            homeBtnRect.anchorMin = new Vector2(0.52f, 0.05f);
+            homeBtnRect.anchorMax = new Vector2(0.92f, 0.20f);
+            homeBtnRect.sizeDelta = Vector2.zero;
+            Image homeBtnImg = homeBtnObj.AddComponent<Image>();
+            homeBtnImg.color = new Color(0.15f, 0.45f, 0.85f, 1f);
+            Button homeBtn = homeBtnObj.AddComponent<Button>();
+            homeBtn.onClick.AddListener(() =>
+            {
+                Destroy(modalObj);
+                if (MenuManager.Instance != null) MenuManager.Instance.HandleHomeClicked();
+                else if (TurnManager.Instance != null) TurnManager.Instance.ReturnToMainMenu();
+            });
+
+            GameObject homeTextObj = new GameObject("Text");
+            homeTextObj.transform.SetParent(homeBtnObj.transform, false);
+            RectTransform homeTextRect = homeTextObj.AddComponent<RectTransform>();
+            homeTextRect.anchorMin = Vector2.zero;
+            homeTextRect.anchorMax = Vector2.one;
+            homeTextRect.sizeDelta = Vector2.zero;
+            Text homeText = homeTextObj.AddComponent<Text>();
+            homeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            homeText.fontSize = 17;
+            homeText.fontStyle = FontStyle.Bold;
+            homeText.alignment = TextAnchor.MiddleCenter;
+            homeText.color = Color.white;
+            homeText.text = "MAIN MENU";
 
             _victoryModal = modalObj;
         }

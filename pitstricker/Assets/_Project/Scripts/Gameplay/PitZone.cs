@@ -21,6 +21,7 @@ namespace PitStriker.Gameplay
         [Tooltip("Maximum velocity allowed for a marble to count as sunk. Prevents skimming or rolling through.")]
         [SerializeField] private float _maxCaptureSpeed = 0.90f;
 
+        [SerializeField, Min(0.1f)] private float _sizeScale = 1f;
         public int PitNumber => _pitNumber;
         public bool IsSunk { get; private set; }
 
@@ -55,14 +56,14 @@ namespace PitStriker.Gameplay
             if (sphereTrigger != null)
             {
                 sphereTrigger.isTrigger = true;
-                sphereTrigger.radius = 1.50f;
+                sphereTrigger.radius = 1.50f * _sizeScale;
                 sphereTrigger.center = Vector3.zero;
             }
         }
 
         /// <summary>
-        /// Deterministically evaluates whether a marble is physically contained within or at this pit basin.
-        /// Generous 1.45m radius ensures any marble that reaches or lips the pit is 100% reliably scored.
+        /// Deterministically evaluates whether a marble is physically nestled inside this shallow earthen pit basin.
+        /// Calibrated for realistic shallow pit depth (-0.08m) and 0.52m saucer rim radius.
         /// </summary>
         public bool IsMarbleInsidePit(MarbleController marble)
         {
@@ -73,9 +74,11 @@ namespace PitStriker.Gameplay
             float horizontalDist = Vector2.Distance(marbleXZ, pitXZ);
             float relativeY = marble.transform.position.y - transform.position.y;
 
-            // Pit cup is 1.0m diameter (0.50m radius) with earthen bevel up to 1.05m.
-            // Sunken basin depth is relativeY < 0.20m.
-            return (horizontalDist <= 1.05f && relativeY < 0.35f) || (horizontalDist <= 1.35f && relativeY < 0.15f);
+            // In shallow saucer pits (depth -0.08m, rim radius 0.52m), a resting marble center sits at relativeY ~= 0.17m.
+            // When resting on the surrounding flat road, relativeY is 0.25m.
+            float marbleRadius = marble.WorldRadius;
+            return horizontalDist <= .52f * _sizeScale - marbleRadius * .25f
+                && relativeY < marbleRadius * .85f;
         }
 
         /// <summary>

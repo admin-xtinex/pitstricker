@@ -1,0 +1,23 @@
+Pit Striker — Run the Blender script (Blender 3.2+)
+
+1. Open Blender.
+2. File → Open (or continue in) PS_GameplayKit.blend
+   Path: Art/3DSource/GameplayKit/PS_GameplayKit.blend
+3. Top tabs: click "Scripting".
+4. Text → Open → select:
+   Art/3DSource/GameplayKit/build_gameplay_kit.py
+5. Click the Play button (Run Script) at the top of the text editor.
+6. Switch back to "Layout".
+7. Click the 3rd viewport shading circle (Material Preview).
+8. Scroll / middle-mouse drag to see marbles, pits, flags, beach strip.
+9. File → Save.
+
+Safe to run again — it deletes previous Pit Striker objects first.
+
+What you get:
+- 4 glass-style marbles (Blue/Red/Green/Amber)
+- 3 pits + red numbered flags (Unity spacing)
+- Chalk ring, sand fairway, ocean, palm/hut/boat placeholders
+
+Concept art look (swirls, detailed palms, hut) = polish pass later.
+Gameplay shapes + layout = this script.

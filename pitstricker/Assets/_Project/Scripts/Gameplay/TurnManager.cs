@@ -18,6 +18,8 @@ namespace PitStriker.Gameplay
     {
         public enum GameState
         {
+            Menu,          // Main menu / Match setup
+            Paused,        // Mid-match pause
             TossPhase,     // Opening Lag Phase: Players flick-throw towards Pit 3 to decide turn order
             ReadyToAim,    // Precision aim for active player
             Rolling,       // Marble in motion
@@ -94,6 +96,14 @@ namespace PitStriker.Gameplay
         public IReadOnlyList<PlayerData> Players => _players;
 
         // Toss & Bonus Play Tracking
+        [Header("Turn Play Limits")]
+        [Tooltip("Maximum allowed shots for a player in a single turn/round (including bonus strikes).")]
+        [SerializeField] private int _maxShotsPerTurn = 3;
+        private int _shotsTakenThisTurn = 0;
+
+        public int ShotsTakenThisTurn => _shotsTakenThisTurn;
+        public int MaxShotsPerTurn => _maxShotsPerTurn;
+
         private List<TossResult> _tossResults = new List<TossResult>();
         private List<PlayerData> _placementPodium = new List<PlayerData>();
         private int _tossPlayerIndex = 0;
@@ -119,8 +129,18 @@ namespace PitStriker.Gameplay
             OnStatusMessage?.Invoke(message);
         }
 
+        // Menu & Pause Configuration
+        [Header("Menu & Pause Configuration")]
+        [SerializeField] private bool _startInMenu = true;
+        public bool StartInMenu => _startInMenu;
+        private GameState _prePauseState = GameState.ReadyToAim;
+
         public static bool CanAim()
         {
+            if (Instance != null && (Instance.CurrentState == GameState.Menu || Instance.CurrentState == GameState.Paused))
+            {
+                return false;
+            }
             if (Instance != null && Instance.ActivePlayer != null && Instance.ActivePlayer.isAI)
             {
                 return false; // Disable human touch input during AI turn
@@ -163,7 +183,148 @@ namespace PitStriker.Gameplay
         private void Start()
         {
             InitializePlayers();
+            if (_startInMenu)
+            {
+                SetState(GameState.Menu);
+                ParkMarblesForMenu();
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayStartMusic();
+                }
+            }
+            else
+            {
+                RestartMatch();
+            }
+        }
+
+        public void ConfigureAndStartMatch(int playerCount, bool[] isAIFlags, string[] playerNames = null)
+        {
+            _playerCount = Mathf.Clamp(playerCount, 1, 4);
+            InitializePlayersWithConfig(isAIFlags, playerNames);
             RestartMatch();
+        }
+
+        public void InitializePlayersWithConfig(bool[] isAIFlags, string[] playerNames = null)
+        {
+            UnbindAllMarbles();
+
+            MarbleController[] foundMarbles = FindObjectsByType<MarbleController>(FindObjectsInactive.Include);
+            Array.Sort(foundMarbles, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+
+            _players.Clear();
+
+            Color[] themeColors = new Color[]
+            {
+                new Color(0f, 0.85f, 1f, 1f),    // P1: Cyan / Blue Swirl
+                new Color(1f, 0.25f, 0.25f, 1f), // P2: Crimson Red
+                new Color(0.2f, 1f, 0.4f, 1f),   // P3: Emerald Green
+                new Color(1f, 0.75f, 0.1f, 1f)   // P4: Amber Gold
+            };
+
+            int countToUse = Mathf.Min(_playerCount, Mathf.Max(1, foundMarbles.Length));
+
+            for (int i = 0; i < countToUse; i++)
+            {
+                MarbleController marble = i < foundMarbles.Length ? foundMarbles[i] : null;
+                bool isBot = (isAIFlags != null && i < isAIFlags.Length) ? isAIFlags[i] : (i > 0);
+                string pName;
+                if (playerNames != null && i < playerNames.Length && !string.IsNullOrEmpty(playerNames[i]))
+                {
+                    pName = playerNames[i];
+                }
+                else
+                {
+                    pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
+                }
+
+                PlayerData player = new PlayerData(i + 1, pName, themeColors[i % themeColors.Length], marble);
+                player.isAI = isBot;
+                _players.Add(player);
+
+                if (marble != null)
+                {
+                    marble.gameObject.SetActive(true);
+                    marble.IsRetired = false;
+                    Rigidbody rb = marble.GetComponent<Rigidbody>();
+                    if (rb != null) rb.isKinematic = false;
+                    marble.OnMarbleLaunched += HandleMarbleLaunched;
+                    marble.OnMarbleStopped += HandleMarbleStopped;
+                }
+            }
+
+            for (int i = countToUse; i < foundMarbles.Length; i++)
+            {
+                if (foundMarbles[i] != null)
+                {
+                    foundMarbles[i].Halt();
+                    foundMarbles[i].SetVisible(false);
+                    foundMarbles[i].gameObject.SetActive(false);
+                }
+            }
+
+            Debug.Log($"<color=#00FFAA><b>[TURN MANAGER]</b> Configured {_players.Count} players ({string.Join(", ", _players.ConvertAll(p => p.name + (p.isAI ? " [AI]" : " [Human]")))}).</color>");
+        }
+
+        public void ReturnToMainMenu()
+        {
+            if (_settleCoroutine != null) { StopCoroutine(_settleCoroutine); _settleCoroutine = null; }
+            if (_evaluateCoroutine != null) { StopCoroutine(_evaluateCoroutine); _evaluateCoroutine = null; }
+
+            if (PitStriker.AI.AIMarbleController.Instance != null)
+            {
+                PitStriker.AI.AIMarbleController.Instance.ResetAI();
+            }
+
+            if (SwipeLaunchController.Instance != null)
+            {
+                SwipeLaunchController.Instance.HideAimPreview();
+            }
+
+            Time.timeScale = 1f;
+            SetState(GameState.Menu);
+            ParkMarblesForMenu();
+            if (PitStriker.Audio.AudioManager.Instance != null)
+            {
+                PitStriker.Audio.AudioManager.Instance.PlayStartMusic();
+            }
+        }
+
+        public void SetPaused(bool paused)
+        {
+            if (paused)
+            {
+                if (CurrentState != GameState.Menu && CurrentState != GameState.Paused)
+                {
+                    _prePauseState = CurrentState;
+                    SetState(GameState.Paused);
+                    Time.timeScale = 0f;
+                }
+            }
+            else
+            {
+                if (CurrentState == GameState.Paused)
+                {
+                    Time.timeScale = 1f;
+                    SetState(_prePauseState);
+                }
+            }
+        }
+
+        public void ParkMarblesForMenu()
+        {
+            Time.timeScale = 1f;
+            for (int i = 0; i < _players.Count; i++)
+            {
+                PlayerData p = _players[i];
+                if (p.marble != null)
+                {
+                    p.marble.Halt();
+                    float xOffset = (i - (_players.Count - 1) * 0.5f) * 0.85f;
+                    p.marble.ResetPosition(new Vector3(xOffset, 0.28f, -5.5f));
+                    p.marble.SetVisible(true);
+                }
+            }
         }
 
         public void InitializePlayers()
@@ -240,17 +401,27 @@ namespace PitStriker.Gameplay
 
             _opponentHitsThisTurn++;
             _hitOpponentMarbleThisTurn = true;
-            _bonusStrikeEarned = true;
 
-            if (_opponentHitsThisTurn == 1)
+            // Enforce maximum 3 shots per turn cap
+            if (_shotsTakenThisTurn >= _maxShotsPerTurn)
             {
-                Debug.Log($"<color=#FFD700><b>[DIRECT STRIKE]</b> {ActivePlayer.name} struck {hitTarget.name}! EXTRA PLAY AWARDED!</color>");
-                BroadcastStatus($"★ DIRECT STRIKE! {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY! ★");
+                _bonusStrikeEarned = false;
+                Debug.Log($"<color=#FFD700><b>[STRIKE]</b> {ActivePlayer.name} struck {hitTarget.name}, but reached max shots ({_shotsTakenThisTurn}/{_maxShotsPerTurn})!</color>");
+                BroadcastStatus($"★ DIRECT STRIKE! {ActivePlayer.name.ToUpper()} HIT {hitTarget.name.ToUpper()}! (SHOT {_shotsTakenThisTurn}/{_maxShotsPerTurn} - TURN ENDS) ★");
             }
             else
             {
-                Debug.Log($"<color=#FF5500><b>[DOUBLE STRIKE]</b> {ActivePlayer.name} struck secondary target {hitTarget.name}! COMBO!</color>");
-                BroadcastStatus($"★ DOUBLE STRIKE COMBO! {ActivePlayer.name.ToUpper()} MULTI-HIT! ★");
+                _bonusStrikeEarned = true;
+                if (_opponentHitsThisTurn == 1)
+                {
+                    Debug.Log($"<color=#FFD700><b>[DIRECT STRIKE]</b> {ActivePlayer.name} struck {hitTarget.name}! EXTRA PLAY AWARDED ({_shotsTakenThisTurn + 1}/{_maxShotsPerTurn})!</color>");
+                    BroadcastStatus($"★ DIRECT STRIKE! {ActivePlayer.name.ToUpper()} EARNED AN EXTRA PLAY ({_shotsTakenThisTurn + 1}/{_maxShotsPerTurn})! ★");
+                }
+                else
+                {
+                    Debug.Log($"<color=#FF5500><b>[DOUBLE STRIKE]</b> {ActivePlayer.name} struck secondary target {hitTarget.name}! COMBO!</color>");
+                    BroadcastStatus($"★ DOUBLE STRIKE COMBO! {ActivePlayer.name.ToUpper()} MULTI-HIT! ★");
+                }
             }
         }
 
@@ -272,6 +443,7 @@ namespace PitStriker.Gameplay
 
             if (ActivePlayer == null) return;
 
+            _shotsTakenThisTurn++;
             ActivePlayer.totalStrokes++;
             ActivePlayer.hasTakenFirstShot = true;
             _pitSunkThisTurn = false;
@@ -281,7 +453,7 @@ namespace PitStriker.Gameplay
 
             SetState(GameState.Rolling);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
-            OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}: STROKE #{ActivePlayer.totalStrokes}");
+            OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}: STROKE #{ActivePlayer.totalStrokes} (PLAY {_shotsTakenThisTurn}/{_maxShotsPerTurn})");
 
             if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
             _settleCoroutine = StartCoroutine(WaitForMarblesToSettleRoutine());
@@ -459,7 +631,7 @@ namespace PitStriker.Gameplay
 
             // 2. Poll until all active marbles in the match have come to a stable stop
             float settleTimer = 0f;
-            float maxWait = CurrentState == GameState.TossPhase ? 7.5f : 5.0f; // Bounded turn duration
+            float maxWait = CurrentState == GameState.TossPhase ? 8.5f : 7.0f; // Bounded turn duration
             float timeElapsed = 0f;
 
             while (timeElapsed < maxWait)
@@ -555,18 +727,38 @@ namespace PitStriker.Gameplay
                 {
                     ActivePlayer.currentPit++;
                     OnTargetPitChanged?.Invoke(ActivePlayer.currentPit);
-                    OnStatusMessage?.Invoke($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! EXTRA PLAY! ★");
 
                     // Relocate to next tee ahead of the conquered pit
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
                     ResetAllPits();
 
-                    yield return new WaitForSeconds(0.4f);
                     _bonusStrikeEarned = false;
                     _hitOpponentMarbleThisTurn = false;
-                    ActivateCurrentPlayer();
-                    SetState(GameState.ReadyToAim);
-                    OnStatusMessage?.Invoke($"★ EXTRA PLAY! AIM FOR PIT {ActivePlayer.currentPit} ★");
+
+                    // Conquering Pit 1 or Pit 2 awards an Extra Play (up to max shots per turn)!
+                    if (_shotsTakenThisTurn >= _maxShotsPerTurn)
+                    {
+                        BroadcastStatus($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! MAX {_maxShotsPerTurn} SHOTS REACHED — TURN OVER! ★");
+                        yield return new WaitForSeconds(1.5f);
+                        if (_players.Count > 1)
+                        {
+                            AdvanceToNextActivePlayer();
+                        }
+                        else
+                        {
+                            _shotsTakenThisTurn = 0;
+                            ActivateCurrentPlayer();
+                            SetState(GameState.ReadyToAim);
+                        }
+                    }
+                    else
+                    {
+                        BroadcastStatus($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! EXTRA PLAY ({_shotsTakenThisTurn + 1}/{_maxShotsPerTurn})! ★");
+                        yield return new WaitForSeconds(0.6f);
+                        ActivateCurrentPlayer();
+                        SetState(GameState.ReadyToAim);
+                        OnStatusMessage?.Invoke($"★ EXTRA PLAY ({_shotsTakenThisTurn + 1}/{_maxShotsPerTurn})! AIM FOR PIT {ActivePlayer.currentPit} ★");
+                    }
                 }
                 else
                 {
@@ -660,10 +852,30 @@ namespace PitStriker.Gameplay
                 _bonusStrikeEarned = false;
                 _hitOpponentMarbleThisTurn = false;
                 _opponentHitsThisTurn = 0;
-                BroadcastStatus($"★ {ActivePlayer.name.ToUpper()}: BONUS STROKE READY! TAKE YOUR SHOT! ★");
-                yield return new WaitForSeconds(0.6f);
-                ActivateCurrentPlayer();
-                SetState(GameState.ReadyToAim);
+
+                // Enforce maximum shots per turn cap
+                if (_shotsTakenThisTurn >= _maxShotsPerTurn)
+                {
+                    BroadcastStatus($"★ MAX {_maxShotsPerTurn} SHOTS REACHED! {ActivePlayer.name.ToUpper()}'s TURN OVER! ★");
+                    yield return new WaitForSeconds(1.2f);
+                    if (_players.Count > 1)
+                    {
+                        AdvanceToNextActivePlayer();
+                    }
+                    else
+                    {
+                        _shotsTakenThisTurn = 0;
+                        ActivateCurrentPlayer();
+                        SetState(GameState.ReadyToAim);
+                    }
+                }
+                else
+                {
+                    BroadcastStatus($"★ {ActivePlayer.name.ToUpper()}: BONUS STROKE READY ({_shotsTakenThisTurn + 1}/{_maxShotsPerTurn})! TAKE YOUR SHOT! ★");
+                    yield return new WaitForSeconds(0.6f);
+                    ActivateCurrentPlayer();
+                    SetState(GameState.ReadyToAim);
+                }
             }
             else
             {
@@ -674,6 +886,7 @@ namespace PitStriker.Gameplay
                 }
                 else
                 {
+                    _shotsTakenThisTurn = 0;
                     ActivateCurrentPlayer();
                     SetState(GameState.ReadyToAim);
                     OnStatusMessage?.Invoke($"AIM FOR PIT {ActivePlayer.currentPit} • STROKE {ActivePlayer.totalStrokes + 1}");
@@ -784,13 +997,22 @@ namespace PitStriker.Gameplay
                 }
 
                 CurrentPlayerIndex = 0;
+                _shotsTakenThisTurn = 0;
                 ActivateCurrentPlayer();
                 SetState(GameState.ReadyToAim);
+
+                // Stop toss music and start in-game background music when game starts after the toss!
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayGameplayMusic();
+                }
             }
         }
 
         private void AdvanceToNextActivePlayer()
         {
+            _shotsTakenThisTurn = 0;
+
             if (AreAllPlayersFinished())
             {
                 DeclareMatchVictory();
@@ -936,6 +1158,29 @@ namespace PitStriker.Gameplay
         {
             SetState(GameState.MatchVictory);
 
+            // Cleanly halt AI routine and visual previews
+            if (PitStriker.AI.AIMarbleController.Instance != null)
+            {
+                PitStriker.AI.AIMarbleController.Instance.ResetAI();
+            }
+
+            if (SwipeLaunchController.Instance != null)
+            {
+                SwipeLaunchController.Instance.HideAimPreview();
+            }
+
+            // Halt all marbles to prevent runaway physics
+            if (_players != null)
+            {
+                foreach (var p in _players)
+                {
+                    if (p.marble != null)
+                    {
+                        p.marble.Halt();
+                    }
+                }
+            }
+
             // Assemble leaderboard ordered strictly by podium finish (1st, 2nd, 3rd, 4th)
             List<PlayerData> ranked = new List<PlayerData>(_placementPodium);
             foreach (var p in _players)
@@ -1021,6 +1266,7 @@ namespace PitStriker.Gameplay
 
         public void RestartMatch()
         {
+            Time.timeScale = 1f;
             if (_settleCoroutine != null)
             {
                 StopCoroutine(_settleCoroutine);
@@ -1034,6 +1280,7 @@ namespace PitStriker.Gameplay
             }
 
             CurrentPlayerIndex = 0;
+            _shotsTakenThisTurn = 0;
             _tossPlayerIndex = 0;
             _tossResults.Clear();
             _placementPodium.Clear();
@@ -1076,6 +1323,10 @@ namespace PitStriker.Gameplay
             // Start in Toss Phase: Only Player 1 is visible at the starting point!
             SetState(GameState.TossPhase);
             ActivateTossPlayer(0);
+            if (PitStriker.Audio.AudioManager.Instance != null)
+            {
+                PitStriker.Audio.AudioManager.Instance.PlayTossMusic();
+            }
         }
 
         private void SetState(GameState newState)

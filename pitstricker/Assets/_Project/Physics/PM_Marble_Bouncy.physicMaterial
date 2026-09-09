@@ -8,8 +8,8 @@ PhysicMaterial:
   m_PrefabAsset: {fileID: 0}
   m_Name: PM_Marble_Bouncy
   serializedVersion: 2
-  dynamicFriction: 0.3
-  staticFriction: 0.4
+  dynamicFriction: 0.12
+  staticFriction: 0.15
   bounciness: 0.85
   frictionCombine: 0
   bounceCombine: 3

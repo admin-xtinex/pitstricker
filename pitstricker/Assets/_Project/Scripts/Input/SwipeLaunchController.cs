@@ -154,9 +154,22 @@ namespace PitStriker.Input
                 if (_mainCamera == null) return;
             }
 
-            // Pointer Down: Start Drag anywhere on screen
+            // Pointer Down: Start Drag anywhere on screen (unless tapping over a UI element)
             if (justPressed)
             {
+                if (UnityEngine.EventSystems.EventSystem.current != null)
+                {
+                    if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+                    {
+                        int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
+                        if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId)) return;
+                    }
+                    else if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+                    {
+                        return;
+                    }
+                }
+
                 if (_marble.CurrentSpeed < 2.5f)
                 {
                     _marble.Halt();

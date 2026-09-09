@@ -24,9 +24,9 @@ This repository follows a strict multi-tier studio hierarchy separating raw digi
 * `Art/` — Layered Photoshop, Blender, and concept art sources (tracked via Git LFS, isolated from Unity).
 * `Audio/` — High-fidelity audio masters and DAW sessions.
 * `Builds/` — Android test builds (`.apk` / `.aab`).
-* `Unity/` — Clean Unity 6 LTS project root.
-  * `Unity/Assets/_Project/` — Isolated custom project code, prefabs, scenes, and shaders.
-  * `Unity/Assets/ThirdParty/` — Quarantined third-party packages and plugins.
+* `pitstricker/` — Clean Unity 6 LTS project root.
+  * `pitstricker/Assets/_Project/` — Isolated custom project code, prefabs, scenes, and shaders.
+  * `pitstricker/Assets/ThirdParty/` — Quarantined third-party packages and plugins.
 
 ---
 
@@ -65,4 +65,4 @@ All architectural and design specifications live inside [`Docs/`](file:///c:/Use
    git lfs pull
    ```
 3. **Open Project:**
-   * In Unity Hub, click **Add project from disk** and select the [`Unity/`](file:///c:/Users/Tisan/Documents/pitstricker/Unity) folder.
+   * In Unity Hub, click **Add project from disk** and select the [`pitstricker/`](file:///c:/Users/Tisan/Documents/pitstricker/Unity) folder.

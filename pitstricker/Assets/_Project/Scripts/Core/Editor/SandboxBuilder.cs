@@ -78,7 +78,7 @@ namespace PitStriker.EditorTools
             GameObject arenaRoot = new GameObject("Arena_Sandbox");
             Undo.RegisterCreatedObjectUndo(arenaRoot, "Create Arena Root");
 
-            // 2.1 Village Gameplay Kit (Chalk Rings, Red Numbered Flags, Trajectory Arrows, PIT STRIKER Wooden Sign, Pebbles)
+            // 2.1 Village Gameplay Kit (Hollow Chalk Rings, Red Numbered Flags, Trajectory Arrows, PIT STRIKER Wooden Sign, Pebbles)
             GameObject villageKitFbx = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Art/Models/VillageKit/Village_Gameplay_Kit.fbx");
             if (villageKitFbx != null)
             {
@@ -91,24 +91,14 @@ namespace PitStriker.EditorTools
                 // Strip colliders from decorative props so marbles roll uninhibited
                 foreach (var col in kitObj.GetComponentsInChildren<Collider>(true))
                 {
-                    if (!col.gameObject.name.Contains("Ground"))
-                    {
-                        Undo.DestroyObjectImmediate(col);
-                    }
+                    Undo.DestroyObjectImmediate(col);
                 }
 
                 // Apply dedicated materials and colliders by child name
                 foreach (var mr in kitObj.GetComponentsInChildren<MeshRenderer>(true))
                 {
                     string oName = mr.gameObject.name;
-                    if (oName.Contains("Ground"))
-                    {
-                        mr.sharedMaterial = sandMat;
-                        MeshCollider mc = mr.gameObject.GetComponent<MeshCollider>();
-                        if (mc == null) mc = mr.gameObject.AddComponent<MeshCollider>();
-                        if (sandPhys != null) mc.sharedMaterial = sandPhys;
-                    }
-                    else if (oName.Contains("Chalk") || oName.Contains("Arrow"))
+                    if (oName.Contains("Chalk") || oName.Contains("Arrow"))
                     {
                         mr.sharedMaterial = chalkMat;
                     }
@@ -158,8 +148,15 @@ namespace PitStriker.EditorTools
             PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/S1.fbx", dressingRoot.transform, new Vector3(-10.5f, 0.2f, 25.0f), new Vector3(0f, 90f, 0f), Vector3.one * 1.1f, "VIS_VillageStall_Left");
             PlaceVillageProp("Assets/ThirdParty/CrashBash/Fbx/s2.fbx", dressingRoot.transform, new Vector3(9.2f, 0.2f, 18.0f), new Vector3(0f, -90f, 0f), Vector3.one * 1.0f, "VIS_VillageStall_Right");
 
-            // Master safety subfloor underneath the arena
-            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -2.0f, 15f), new Vector3(28f, 0.5f, 60f), sandMat, sandPhys, true);
+            // 2.3 Master safety subfloor underneath the entire arena (48-meter fairway, 2x width 22m)
+            CreateGroundSlab("Ground_Safety_Subfloor", arenaRoot.transform, new Vector3(0f, -1.2f, 15f), new Vector3(22f, 0.5f, 52f), sandMat, sandPhys);
+
+            // Left & Right Bank Slabs (covering x: -8.2m to +8.2m)
+            CreateGroundSlab("Ground_Bank_Left", arenaRoot.transform, new Vector3(-5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
+            CreateGroundSlab("Ground_Bank_Right", arenaRoot.transform, new Vector3(5.2f, -0.25f, 15f), new Vector3(7.6f, 0.5f, 48f), sandMat, sandPhys);
+
+            // Center Track Slab: Continuous seamless fairway covering Z: -8.5m to Z: 38.0m
+            CreateGroundSlab("Ground_Center_Fairway", arenaRoot.transform, new Vector3(0f, -0.25f, 14.75f), new Vector3(2.8f, 0.5f, 46.5f), sandMat, sandPhys);
 
             // 3. Boundary Rails (Left, Right, Back, Front) - Invisible physics barriers
             CreateBoundaryWall("Wall_Left", arenaRoot.transform, new Vector3(-8.2f, 0.35f, 14.5f), new Vector3(0.5f, 0.7f, 47.5f), woodMat, bouncePhys, true);
@@ -167,10 +164,10 @@ namespace PitStriker.EditorTools
             CreateBoundaryWall("Wall_Back", arenaRoot.transform, new Vector3(0f, 0.35f, -9.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
             CreateBoundaryWall("Wall_Front", arenaRoot.transform, new Vector3(0f, 0.35f, 38.1f), new Vector3(16.8f, 0.7f, 0.5f), woodMat, bouncePhys, true);
 
-            // 4. Create 3 TRUE ROUND PIT TRIGGERS (built into the continuous earthen ground)
-            CreatePitTrigger("Pit_01_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1);
-            CreatePitTrigger("Pit_02_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2);
-            CreatePitTrigger("Pit_03_Trigger", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3);
+            // 4. Create ALL 3 TRUE ROUND PITS with 2x marble size (Diameter = 1.0m, R = 0.50m)
+            CreateRoundPitTile("Pit_01_Round", arenaRoot.transform, new Vector3(0f, 0f, 3.0f), 1, sandMat, pitMat, woodMat, sandPhys);
+            CreateRoundPitTile("Pit_02_Round", arenaRoot.transform, new Vector3(0f, 0f, 16.5f), 2, sandMat, pitMat, woodMat, sandPhys);
+            CreateRoundPitTile("Pit_03_Round", arenaRoot.transform, new Vector3(0f, 0f, 31.0f), 3, sandMat, pitMat, woodMat, sandPhys);
 
             // 5. Create 4 Player Striker Marbles (P1..P4) using User-Created Custom Models
             string[] marbleNames = new string[] { "PlayerMarble_1_Blue", "PlayerMarble_2_Red", "PlayerMarble_3_Green", "PlayerMarble_4_Amber" };
@@ -210,8 +207,14 @@ namespace PitStriker.EditorTools
                 }
                 else
                 {
-                    // Sideline waiting area beside the PIT STRIKER wooden sign and rustic bench (Concept_Village_Path.png)
-                    marbleObj.transform.position = new Vector3(-2.2f - (i - 1) * 0.55f, 0.25f, -4.5f - (i - 1) * 0.35f);
+                    // Sideline waiting area beside the PIT STRIKER wooden sign (Concept_Village_Path.png)
+                    Vector3[] sidelinePositions = new Vector3[]
+                    {
+                        new Vector3(-2.2f, 0.25f, -4.6f),
+                        new Vector3(-1.7f, 0.25f, -4.3f),
+                        new Vector3(-1.2f, 0.25f, -4.0f)
+                    };
+                    marbleObj.transform.position = sidelinePositions[i - 1];
                 }
                 Undo.RegisterCreatedObjectUndo(marbleObj, "Create Marble " + marbleNames[i]);
 
@@ -267,7 +270,7 @@ namespace PitStriker.EditorTools
             Camera cam = Camera.main;
             if (cam != null && p1Marble != null)
             {
-                cam.transform.position = new Vector3(0f, 1.45f, -9.6f);
+                cam.transform.position = new Vector3(0f, 1.65f, -9.6f);
                 cam.transform.rotation = Quaternion.Euler(14f, 0f, 0f);
 
                 SmoothFollowCamera follow = cam.GetComponent<SmoothFollowCamera>();
@@ -281,9 +284,9 @@ namespace PitStriker.EditorTools
                 var distProp = camSo.FindProperty("_distance");
                 if (distProp != null) distProp.floatValue = 3.6f;
                 var heightProp = camSo.FindProperty("_height");
-                if (heightProp != null) heightProp.floatValue = 1.45f;
+                if (heightProp != null) heightProp.floatValue = 1.65f;
                 var lookProp = camSo.FindProperty("_lookAtHeightOffset");
-                if (lookProp != null) lookProp.floatValue = 0.45f;
+                if (lookProp != null) lookProp.floatValue = 0.50f;
                 camSo.ApplyModifiedProperties();
             }
 
@@ -297,12 +300,12 @@ namespace PitStriker.EditorTools
                 sun.shadows = LightShadows.Soft;
             }
 
-            // Atmospheric Village Golden Hour Haze (eliminates void cutoffs, gives cinematic village depth)
+            // Atmospheric Village Golden Hour Haze (starts at 45m past Pit 3 so all 3 pits are 100% visible)
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogStartDistance = 24f;
-            RenderSettings.fogEndDistance = 65f;
-            RenderSettings.fogColor = new Color(0.92f, 0.82f, 0.70f, 1.0f);
+            RenderSettings.fogStartDistance = 45f;
+            RenderSettings.fogEndDistance = 110f;
+            RenderSettings.fogColor = new Color(0.92f, 0.84f, 0.72f, 1.0f);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.85f, 0.80f, 0.72f, 1.0f);
             RenderSettings.ambientEquatorColor = new Color(0.70f, 0.60f, 0.48f, 1.0f);
@@ -403,12 +406,10 @@ namespace PitStriker.EditorTools
             MeshFilter mf = pitRoot.AddComponent<MeshFilter>();
             MeshRenderer mr = pitRoot.AddComponent<MeshRenderer>();
 
-            float width = 2.8f;
-            float length = 2.6f;
-            float rimRadius = 0.50f;     // Exactly 2x marble radius (Diameter = 1.0m, marble diameter = 0.50m)
-            float floorRadius = 0.38f;   // Basin floor radius
-            float depth = 0.28f;         // Steep vertical earthen pit depth
-            int segments = 28;
+            float rimRadius = 0.52f;     // 100% circular rim radius (Diameter = 1.04m, >2x marble size)
+            float maxDepth = 0.085f;     // Shallow earthen saucer dish depth
+            int rings = 6;
+            int segments = 36;
 
             Mesh mesh = new Mesh();
             mesh.name = name + "_RoundMesh";
@@ -416,147 +417,113 @@ namespace PitStriker.EditorTools
             List<Vector3> vertices = new List<Vector3>();
             List<Vector3> normals = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
+            List<int> triangles = new List<int>();
 
-            List<int> sandTriangles = new List<int>();
-            List<int> pitTriangles = new List<int>();
-
-            // 1. Top Sand Surface (Outer rectangle to inner rim circle)
-            for (int i = 0; i < segments; i++)
-            {
-                float angle = i * Mathf.PI * 2f / segments;
-                float cos = Mathf.Cos(angle);
-                float sin = Mathf.Sin(angle);
-
-                float tx = Mathf.Abs(cos) > 0.0001f ? (width * 0.5f) / Mathf.Abs(cos) : float.MaxValue;
-                float tz = Mathf.Abs(sin) > 0.0001f ? (length * 0.5f) / Mathf.Abs(sin) : float.MaxValue;
-                float t = Mathf.Min(tx, tz);
-
-                Vector3 outerPt = new Vector3(t * cos, 0f, t * sin);
-                Vector3 innerRimPt = new Vector3(rimRadius * cos, 0f, rimRadius * sin);
-
-                vertices.Add(outerPt);
-                normals.Add(Vector3.up);
-                uvs.Add(new Vector2(outerPt.x, outerPt.z));
-
-                vertices.Add(innerRimPt);
-                normals.Add(Vector3.up);
-                uvs.Add(new Vector2(innerRimPt.x, innerRimPt.z));
-            }
-
-            for (int i = 0; i < segments; i++)
-            {
-                int next = (i + 1) % segments;
-                int outerCurr = i * 2;
-                int innerCurr = i * 2 + 1;
-                int outerNext = next * 2;
-                int innerNext = next * 2 + 1;
-
-                sandTriangles.Add(outerCurr);
-                sandTriangles.Add(innerCurr);
-                sandTriangles.Add(innerNext);
-
-                sandTriangles.Add(outerCurr);
-                sandTriangles.Add(innerNext);
-                sandTriangles.Add(outerNext);
-            }
-
-            // 2. Smooth Sloped Bowl Wall of the Pit Cup (connecting rim to basin floor)
-            int wallStartIndex = vertices.Count;
-            float deltaR = rimRadius - floorRadius;
-            Vector2 slopeNormal2D = new Vector2(-depth, deltaR).normalized;
-
-            for (int i = 0; i < segments; i++)
-            {
-                float angle = i * Mathf.PI * 2f / segments;
-                float cos = Mathf.Cos(angle);
-                float sin = Mathf.Sin(angle);
-
-                Vector3 topPt = new Vector3(rimRadius * cos, 0f, rimRadius * sin);
-                Vector3 bottomPt = new Vector3(floorRadius * cos, -depth, floorRadius * sin);
-                Vector3 slopedNormal = new Vector3(slopeNormal2D.x * cos, slopeNormal2D.y, slopeNormal2D.x * sin);
-
-                vertices.Add(topPt);
-                normals.Add(slopedNormal);
-                uvs.Add(new Vector2((float)i / segments, 0f));
-
-                vertices.Add(bottomPt);
-                normals.Add(slopedNormal);
-                uvs.Add(new Vector2((float)i / segments, 1f));
-            }
-
-            for (int i = 0; i < segments; i++)
-            {
-                int next = (i + 1) % segments;
-                int topCurr = wallStartIndex + i * 2;
-                int botCurr = wallStartIndex + i * 2 + 1;
-                int topNext = wallStartIndex + next * 2;
-                int botNext = wallStartIndex + next * 2 + 1;
-
-                pitTriangles.Add(topCurr);
-                pitTriangles.Add(topNext);
-                pitTriangles.Add(botNext);
-
-                pitTriangles.Add(topCurr);
-                pitTriangles.Add(botNext);
-                pitTriangles.Add(botCurr);
-            }
-
-            // 3. Flat Circular Basin Floor at the bottom of the cup
-            int floorCenterIndex = vertices.Count;
-            vertices.Add(new Vector3(0f, -depth, 0f));
+            // Center vertex
+            int centerIdx = vertices.Count;
+            vertices.Add(new Vector3(0f, -maxDepth, 0f));
             normals.Add(Vector3.up);
             uvs.Add(new Vector2(0.5f, 0.5f));
 
-            int floorRimStartIndex = vertices.Count;
-            for (int i = 0; i < segments; i++)
+            // Concentric circular rings
+            int[][] ringIndices = new int[rings][];
+            for (int r = 1; r <= rings; r++)
             {
-                float angle = i * Mathf.PI * 2f / segments;
-                float cos = Mathf.Cos(angle);
-                float sin = Mathf.Sin(angle);
+                ringIndices[r - 1] = new int[segments];
+                float frac = (float)r / rings;
+                float curRadius = frac * rimRadius;
+                float curY = -maxDepth * Mathf.Pow(Mathf.Cos(frac * Mathf.PI * 0.5f), 2f);
 
-                vertices.Add(new Vector3(floorRadius * cos, -depth, floorRadius * sin));
-                normals.Add(Vector3.up);
-                uvs.Add(new Vector2(cos * 0.5f + 0.5f, sin * 0.5f + 0.5f));
+                for (int s = 0; s < segments; s++)
+                {
+                    float angle = s * Mathf.PI * 2f / segments;
+                    float cos = Mathf.Cos(angle);
+                    float sin = Mathf.Sin(angle);
+
+                    Vector3 pos = new Vector3(curRadius * cos, curY, curRadius * sin);
+                    ringIndices[r - 1][s] = vertices.Count;
+                    vertices.Add(pos);
+
+                    float slope = frac < 1.0f ? Mathf.Sin(frac * Mathf.PI * 0.5f) * Mathf.Cos(frac * Mathf.PI * 0.5f) * Mathf.PI * maxDepth / rimRadius : 0f;
+                    Vector3 norm = new Vector3(-slope * cos, 1f, -slope * sin).normalized;
+                    normals.Add(norm);
+
+                    uvs.Add(new Vector2(cos * frac * 0.5f + 0.5f, sin * frac * 0.5f + 0.5f));
+                }
             }
 
-            for (int i = 0; i < segments; i++)
+            // Triangles from center to ring 1
+            for (int s = 0; s < segments; s++)
             {
-                int next = (i + 1) % segments;
-                pitTriangles.Add(floorCenterIndex);
-                pitTriangles.Add(floorRimStartIndex + i);
-                pitTriangles.Add(floorRimStartIndex + next);
+                int next = (s + 1) % segments;
+                triangles.Add(centerIdx);
+                triangles.Add(ringIndices[0][next]);
+                triangles.Add(ringIndices[0][s]);
+            }
+
+            // Quad strips between concentric circular rings
+            for (int r = 0; r < rings - 1; r++)
+            {
+                for (int s = 0; s < segments; s++)
+                {
+                    int next = (s + 1) % segments;
+                    int innerCurr = ringIndices[r][s];
+                    int innerNext = ringIndices[r][next];
+                    int outerCurr = ringIndices[r + 1][s];
+                    int outerNext = ringIndices[r + 1][next];
+
+                    triangles.Add(innerCurr);
+                    triangles.Add(outerNext);
+                    triangles.Add(outerCurr);
+
+                    triangles.Add(innerCurr);
+                    triangles.Add(innerNext);
+                    triangles.Add(outerNext);
+                }
             }
 
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, uvs);
-
-            mesh.subMeshCount = 2;
-            mesh.SetTriangles(sandTriangles, 0);
-            mesh.SetTriangles(pitTriangles, 1);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
 
             mf.sharedMesh = mesh;
-            mr.sharedMaterials = new Material[] { sandMat, pitMat };
+            mr.sharedMaterials = new Material[] { pitMat };
 
-            // Physical Mesh Collider for 100% round physics
+            Material redInnerMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            redInnerMat.name = "Pit_Interior_Red";
+            redInnerMat.SetColor("_BaseColor", new Color(0.58f, 0.08f, 0.09f, 1f));
+            redInnerMat.SetColor("_Color", new Color(0.58f, 0.08f, 0.09f, 1f));
+            redInnerMat.SetFloat("_Smoothness", 0.18f);
+
+            GameObject redInset = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            redInset.name = "Pit_Interior_Red";
+            redInset.transform.SetParent(pitRoot.transform, false);
+            redInset.transform.localPosition = new Vector3(0f, -0.075f, 0f);
+            redInset.transform.localRotation = Quaternion.identity;
+            redInset.transform.localScale = new Vector3(0.66f, 0.03f, 0.66f);
+            Object.DestroyImmediate(redInset.GetComponent<Collider>());
+            redInset.GetComponent<MeshRenderer>().sharedMaterial = redInnerMat;
+
+            // Physical Mesh Collider for 100% circular saucer rolling
             MeshCollider mc = pitRoot.AddComponent<MeshCollider>();
             mc.sharedMesh = mesh;
             if (physMat != null) mc.sharedMaterial = physMat;
 
-            // Trigger Zone strictly inside the bottom cup
+            // Trigger Zone strictly inside the saucer cup
             SphereCollider trigger = pitRoot.AddComponent<SphereCollider>();
             trigger.isTrigger = true;
-            trigger.radius = 0.55f;
-            trigger.center = new Vector3(0f, -0.14f, 0f);
+            trigger.radius = 0.52f;
+            trigger.center = new Vector3(0f, -0.04f, 0f);
 
             PitZone zone = pitRoot.AddComponent<PitZone>();
             zone.SetPitNumber(pitNumber);
             SerializedObject zoneSo = new SerializedObject(zone);
             zoneSo.FindProperty("_pitNumber").intValue = pitNumber;
             zoneSo.ApplyModifiedProperties();
-
-            // Red Numbered Flags (1, 2, 3) are provided cleanly by Gameplay_Kit_Village (SM_PitFlag_01..03)
-            // CreateMarkerPole("MarkerPole_" + pitNumber, pitRoot.transform, new Vector3(rimRadius + 0.35f, 0f, 0f), pitNumber, woodMat);
         }
 
         private static void CreateMarkerPole(string name, Transform parent, Vector3 localPos, int number, Material woodMat)

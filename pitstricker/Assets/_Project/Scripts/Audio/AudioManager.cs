@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace PitStriker.Audio
@@ -5,14 +6,58 @@ namespace PitStriker.Audio
     /// <summary>
     /// Phase 7 Audio Juice Orchestrator:
     /// Synthesizes and plays tactile sound effects for launches, marble collisions,
-    /// boundary bounces, and pit capture fanfares without external audio dependencies.
+    /// boundary bounces, pit capture fanfares, and background music orchestration
+    /// (Menu theme, Toss phase theme, and In-Game match theme).
     /// </summary>
     public class AudioManager : MonoBehaviour
     {
-        public static AudioManager Instance { get; private set; }
+        private static AudioManager _instance;
+        public static AudioManager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindAnyObjectByType<AudioManager>();
+                    if (_instance == null)
+                    {
+                        GameObject go = new GameObject("AudioManager");
+                        _instance = go.AddComponent<AudioManager>();
+                    }
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
+        [Header("Music Configuration (50% Volume)")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _musicVolume = 0.5f; // 50% sound level required
+        [SerializeField] private AudioClip _startMusicClip;
+        [SerializeField] private AudioClip _tossMusicClip;
+        [SerializeField] private AudioClip _gameplayMusicClip;
+
+        public float MusicVolume
+        {
+            get => _musicVolume;
+            set
+            {
+                _musicVolume = Mathf.Clamp01(value);
+                if (_musicSource != null && _fadeCoroutine == null)
+                {
+                    _musicSource.volume = _musicVolume;
+                }
+            }
+        }
+
+        public AudioClip StartMusicClip { get => _startMusicClip; set => _startMusicClip = value; }
+        public AudioClip TossMusicClip { get => _tossMusicClip; set => _tossMusicClip = value; }
+        public AudioClip GameplayMusicClip { get => _gameplayMusicClip; set => _gameplayMusicClip = value; }
+
+        private AudioSource _musicSource;
         private AudioSource _sfxSource;
         private AudioSource _jingleSource;
+        private Coroutine _fadeCoroutine;
 
         // Procedural Audio Clips
         private AudioClip _strikeClip;
@@ -23,30 +68,221 @@ namespace PitStriker.Audio
 
         private void Awake()
         {
-            if (Instance == null)
+            if (_instance == null)
             {
-                Instance = this;
+                _instance = this;
                 DontDestroyOnLoad(gameObject);
                 InitializeAudio();
             }
-            else
+            else if (_instance != this)
             {
                 Destroy(gameObject);
             }
         }
 
+        private void Start()
+        {
+            // Background music is triggered on demand by MenuManager and TurnManager flows
+        }
+
         private void InitializeAudio()
         {
-            _sfxSource = gameObject.AddComponent<AudioSource>();
-            _sfxSource.playOnAwake = false;
-            _sfxSource.spatialBlend = 0f; // 2D clean audio
+            if (_musicSource == null)
+            {
+                _musicSource = gameObject.AddComponent<AudioSource>();
+                _musicSource.playOnAwake = false;
+                _musicSource.spatialBlend = 0f; // 2D clean stereo audio
+                _musicSource.loop = true;
+                _musicSource.volume = _musicVolume;
+            }
 
-            _jingleSource = gameObject.AddComponent<AudioSource>();
-            _jingleSource.playOnAwake = false;
-            _jingleSource.spatialBlend = 0f;
+            if (_sfxSource == null)
+            {
+                _sfxSource = gameObject.AddComponent<AudioSource>();
+                _sfxSource.playOnAwake = false;
+                _sfxSource.spatialBlend = 0f; // 2D clean audio
+            }
 
+            if (_jingleSource == null)
+            {
+                _jingleSource = gameObject.AddComponent<AudioSource>();
+                _jingleSource.playOnAwake = false;
+                _jingleSource.spatialBlend = 0f;
+            }
+
+            LoadClips();
             GenerateProceduralClips();
         }
+
+        private void LoadClips()
+        {
+            if (_startMusicClip == null)
+            {
+                _startMusicClip = Resources.Load<AudioClip>("Music/Music_Start");
+            }
+            if (_tossMusicClip == null)
+            {
+                _tossMusicClip = Resources.Load<AudioClip>("Music/Music_Toss");
+            }
+            if (_gameplayMusicClip == null)
+            {
+                _gameplayMusicClip = Resources.Load<AudioClip>("Music/Music_Gameplay");
+            }
+        }
+
+        // ================= MUSIC CONTROLLER =================
+
+        /// <summary>
+        /// Plays the Menu / Start music track at 50% volume with optional smooth crossfade.
+        /// </summary>
+        public void PlayStartMusic(bool fade = true)
+        {
+            if (_startMusicClip == null)
+            {
+                _startMusicClip = Resources.Load<AudioClip>("Music/Music_Start");
+            }
+            PlayMusicTrack(_startMusicClip, fade);
+        }
+
+        /// <summary>
+        /// Plays the Toss phase music track at 50% volume with optional smooth crossfade.
+        /// </summary>
+        public void PlayTossMusic(bool fade = true)
+        {
+            if (_tossMusicClip == null)
+            {
+                _tossMusicClip = Resources.Load<AudioClip>("Music/Music_Toss");
+            }
+            PlayMusicTrack(_tossMusicClip, fade);
+        }
+
+        /// <summary>
+        /// Plays the In-Game Match background music track (after the toss) at 50% volume with optional smooth crossfade.
+        /// </summary>
+        public void PlayGameplayMusic(bool fade = true)
+        {
+            if (_gameplayMusicClip == null)
+            {
+                _gameplayMusicClip = Resources.Load<AudioClip>("Music/Music_Gameplay");
+            }
+            PlayMusicTrack(_gameplayMusicClip, fade);
+        }
+
+        /// <summary>
+        /// Plays a specified audio clip on the background music channel at 50% volume.
+        /// </summary>
+        public void PlayMusicTrack(AudioClip clip, bool fade = true)
+        {
+            if (_musicSource == null)
+            {
+                InitializeAudio();
+            }
+
+            if (clip == null) return;
+
+            if (_musicSource.clip == clip && _musicSource.isPlaying)
+            {
+                // Already playing target track; ensure volume matches configuration
+                if (_fadeCoroutine == null)
+                {
+                    _musicSource.volume = _musicVolume;
+                }
+                return;
+            }
+
+            if (!fade)
+            {
+                if (_fadeCoroutine != null)
+                {
+                    StopCoroutine(_fadeCoroutine);
+                    _fadeCoroutine = null;
+                }
+                _musicSource.clip = clip;
+                _musicSource.volume = _musicVolume;
+                _musicSource.loop = true;
+                _musicSource.Play();
+            }
+            else
+            {
+                if (_fadeCoroutine != null)
+                {
+                    StopCoroutine(_fadeCoroutine);
+                }
+                _fadeCoroutine = StartCoroutine(CrossfadeRoutine(clip, 0.6f));
+            }
+        }
+
+        /// <summary>
+        /// Smoothly stops music playback.
+        /// </summary>
+        public void StopMusic(bool fade = true)
+        {
+            if (_musicSource == null || !_musicSource.isPlaying) return;
+
+            if (!fade)
+            {
+                if (_fadeCoroutine != null)
+                {
+                    StopCoroutine(_fadeCoroutine);
+                    _fadeCoroutine = null;
+                }
+                _musicSource.Stop();
+            }
+            else
+            {
+                if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
+                _fadeCoroutine = StartCoroutine(FadeOutRoutine(0.4f));
+            }
+        }
+
+        private IEnumerator CrossfadeRoutine(AudioClip targetClip, float duration)
+        {
+            float halfDuration = Mathf.Max(0.01f, duration * 0.5f);
+            float startVol = _musicSource.isPlaying ? _musicSource.volume : 0f;
+
+            if (_musicSource.isPlaying && startVol > 0.01f)
+            {
+                float t = 0f;
+                while (t < halfDuration)
+                {
+                    t += Time.unscaledDeltaTime;
+                    _musicSource.volume = Mathf.Lerp(startVol, 0f, t / halfDuration);
+                    yield return null;
+                }
+            }
+
+            _musicSource.clip = targetClip;
+            _musicSource.loop = true;
+            _musicSource.Play();
+
+            float tIn = 0f;
+            while (tIn < halfDuration)
+            {
+                tIn += Time.unscaledDeltaTime;
+                _musicSource.volume = Mathf.Lerp(0f, _musicVolume, tIn / halfDuration);
+                yield return null;
+            }
+
+            _musicSource.volume = _musicVolume;
+            _fadeCoroutine = null;
+        }
+
+        private IEnumerator FadeOutRoutine(float duration)
+        {
+            float startVol = _musicSource.volume;
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.unscaledDeltaTime;
+                _musicSource.volume = Mathf.Lerp(startVol, 0f, t / duration);
+                yield return null;
+            }
+            _musicSource.Stop();
+            _musicSource.volume = _musicVolume;
+            _fadeCoroutine = null;
+        }
+
+        // ================= PROCEDURAL SOUND EFFECTS =================
 
         private void GenerateProceduralClips()
         {

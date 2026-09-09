@@ -52,3 +52,13 @@ $RECYCLE.BIN/
 
 # Crashlytics
 crashlytics-build.properties
+
+# Local capture and Python generation artifacts
+__pycache__/
+*.pyc
+*.blend1
+pitstricker/screenshot_*.png
+pitstricker/emulator_*.png
+pitstricker/*.log
+*.log
+**/.utmp/

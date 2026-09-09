@@ -16,17 +16,23 @@ namespace PitStriker.Physics
         [SerializeField] private float _mass = 1.0f;
 
         [Tooltip("Linear drag simulating ground and rolling resistance.")]
-        [SerializeField] private float _linearDrag = 0.3f;
+        [SerializeField] private float _linearDrag = 0.18f;
 
         [Tooltip("Angular drag preventing infinite ice-rink rolling.")]
-        [SerializeField] private float _angularDrag = 0.8f;
+        [SerializeField] private float _angularDrag = 0.5f;
 
         [Tooltip("Speed below which the marble is considered completely stopped.")]
-        [SerializeField] private float _stopThreshold = 0.12f;
+        [SerializeField] private float _stopThreshold = 0.10f;
 
         // Cached Components
         private Rigidbody _rigidbody;
         private SphereCollider _collider;
+        private PhysicsMaterial _contactMaterial;
+        private Vector3 _preStepVelocity;
+        private static int _nextCollisionOrder;
+        private int _collisionOrder;
+        public float WorldRadius => _collider != null
+            ? _collider.radius * Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y), Mathf.Abs(transform.lossyScale.z)) : 0.16f;
 
         // State Tracking
         public bool _wasMoving = false;
@@ -39,6 +45,7 @@ namespace PitStriker.Physics
         public event Action<Collision> OnMarbleCollision;
         public static event Action<MarbleController, MarbleController> OnMarbleHitMarble; // (striker, hitTarget)
 
+        public Rigidbody Rigidbody => _rigidbody;
         public bool IsMoving => _rigidbody != null && (_rigidbody.linearVelocity.sqrMagnitude > (_stopThreshold * _stopThreshold) || _rigidbody.angularVelocity.sqrMagnitude > 0.6f);
         public Vector3 Velocity => _rigidbody != null ? _rigidbody.linearVelocity : Vector3.zero;
         public float CurrentSpeed => _rigidbody != null ? _rigidbody.linearVelocity.magnitude : 0f;
@@ -54,6 +61,7 @@ namespace PitStriker.Physics
             _rigidbody = GetComponent<Rigidbody>();
             _collider = GetComponent<SphereCollider>();
 
+            _collisionOrder = ++_nextCollisionOrder;
             ConfigurePhysicsDefaults();
         }
 
@@ -67,6 +75,17 @@ namespace PitStriker.Physics
             _rigidbody.angularDamping = _angularDrag;
             _rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             _rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            _rigidbody.solverIterations = 12;
+            _rigidbody.solverVelocityIterations = 6;
+            _rigidbody.maxAngularVelocity = 100f;
+            _contactMaterial = new PhysicsMaterial("Marble contact")
+            {
+                dynamicFriction = 0.12f, staticFriction = 0.12f,
+                bounciness = 0.85f,
+                frictionCombine = PhysicsMaterialCombine.Average,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+            _collider.sharedMaterial = _contactMaterial;
         }
 
         /// <summary>
@@ -108,6 +127,8 @@ namespace PitStriker.Physics
         {
             if (IsRetired || _rigidbody == null) return;
 
+            _preStepVelocity = _rigidbody.linearVelocity;
+
             if (_launchGraceTimer > 0f)
             {
                 _launchGraceTimer -= Time.fixedDeltaTime;
@@ -117,15 +138,15 @@ namespace PitStriker.Physics
             }
 
             // Snappy tail-end braking on the flat fairway to eliminate endless micro-crawls.
-            // When dipping inside the pit depression (y < 0.18f), natural 3D physics runs uninhibited so marbles can climb and lip out!
+            // When dipping inside the shallow pit saucer (y < 0.22f), natural 3D physics runs uninhibited so marbles can settle and lip out!
             Vector3 horizVel = new Vector3(_rigidbody.linearVelocity.x, 0f, _rigidbody.linearVelocity.z);
             float horizSpeed = horizVel.magnitude;
-            if (horizSpeed < 0.75f && horizSpeed > 0f && transform.position.y >= 0.18f)
+            if (horizSpeed < 0.15f && horizSpeed > 0f && transform.position.y >= WorldRadius * 0.88f)
             {
-                float brake = Time.fixedDeltaTime * 2.0f;
+                float brake = Time.fixedDeltaTime * 0.6f;
                 Vector3 targetHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, brake);
                 _rigidbody.linearVelocity = new Vector3(targetHoriz.x, _rigidbody.linearVelocity.y, targetHoriz.z);
-                _rigidbody.angularVelocity = Vector3.MoveTowards(_rigidbody.angularVelocity, Vector3.zero, brake * 1.5f);
+                _rigidbody.angularVelocity = Vector3.MoveTowards(_rigidbody.angularVelocity, Vector3.zero, brake * 1.0f);
             }
 
             bool currentlyMoving = IsMoving;
@@ -151,12 +172,70 @@ namespace PitStriker.Physics
                 }
             }
 
+            // Active Boundary Containment & Elastic Wall Reflection:
+            // Aligned with the visual stone wall borders (widening from 5.1m at baseline to 6.6m at Pit 3)
+            // Mathematically guarantees marbles NEVER pass through or jump over the stone walls under any velocity
+            Vector3 pos = transform.position;
+            Vector3 vel = _rigidbody.linearVelocity;
+            bool boundaryHit = false;
+
+            float t = Mathf.Clamp01((pos.z - (-8.5f)) / 46.5f);
+            float currentMaxX = Mathf.Lerp(5.15f, 6.65f, t);
+            float currentMinX = -currentMaxX;
+
+            if (pos.x < currentMinX)
+            {
+                pos.x = currentMinX;
+                vel.x = Mathf.Abs(vel.x) * 0.65f;
+                boundaryHit = true;
+            }
+            else if (pos.x > currentMaxX)
+            {
+                pos.x = currentMaxX;
+                vel.x = -Mathf.Abs(vel.x) * 0.65f;
+                boundaryHit = true;
+            }
+
+            const float minZ = -8.5f;
+            const float maxZ = 37.5f;
+            if (pos.z < minZ)
+            {
+                pos.z = minZ;
+                vel.z = Mathf.Abs(vel.z) * 0.65f;
+                boundaryHit = true;
+            }
+            else if (pos.z > maxZ)
+            {
+                pos.z = maxZ;
+                vel.z = -Mathf.Abs(vel.z) * 0.65f;
+                boundaryHit = true;
+            }
+
+            // Altitude ceiling clamp to prevent vaulting over walls
+            if (pos.y > 1.8f)
+            {
+                pos.y = 1.8f;
+                if (vel.y > 0f) vel.y = -1.0f;
+                boundaryHit = true;
+            }
+
+            if (boundaryHit)
+            {
+                transform.position = pos;
+                _rigidbody.linearVelocity = vel;
+            }
+
             // Safety catch: If marble ever drops into the void below the track, recover it
             if (transform.position.y < -2.0f)
             {
                 ResetPosition(new Vector3(0f, 0.3f, -5.5f));
                 Debug.LogWarning("<color=#FFAA00><b>[SAFETY RESPAWN]</b> Marble recovered from void and placed safely at launch baseline.</color>");
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (_contactMaterial != null) Destroy(_contactMaterial);
         }
 
         private void OnCollisionEnter(Collision collision)
@@ -166,78 +245,27 @@ namespace PitStriker.Physics
             OnMarbleCollision?.Invoke(collision);
 
             MarbleController otherMarble = collision.collider.GetComponent<MarbleController>();
-            bool isMarble = otherMarble != null;
+            bool isMarble = otherMarble != null && !otherMarble.IsRetired;
             if (isMarble)
             {
+                // PhysX has already resolved this contact. Do not overwrite its
+                // post-solver velocities or apply a second energy-adding impulse.
+                _wasMoving = otherMarble._wasMoving = true;
+                _consecutiveRestFrames = otherMarble._consecutiveRestFrames = 0;
+                _launchGraceTimer = Mathf.Max(_launchGraceTimer, 0.08f);
+                otherMarble._launchGraceTimer = Mathf.Max(otherMarble._launchGraceTimer, 0.08f);
+
+                Vector3 n = (otherMarble.transform.position - transform.position).normalized;
+                float mine = Vector3.Dot(_preStepVelocity, n);
+                float theirs = Vector3.Dot(otherMarble._preStepVelocity, -n);
+                bool primary = mine > theirs + 0.0001f ||
+                    (Mathf.Abs(mine - theirs) <= 0.0001f && _collisionOrder < otherMarble._collisionOrder);
+                if (!primary) return; // One scoring/audio/VFX notification per pair.
                 OnMarbleHitMarble?.Invoke(this, otherMarble);
-
-                // Authentic Carrom & 8-Ball Pool Equal-Mass Elastic Collision:
-                // Only process from the striker side (marble with higher speed) to prevent reciprocal double-impulse inversion!
-                if (collision.contactCount > 0 && _rigidbody != null)
-                {
-                    Rigidbody otherRb = otherMarble.GetComponent<Rigidbody>();
-                    if (otherRb != null)
-                    {
-                        Vector3 vStriker = _rigidbody.linearVelocity;
-                        Vector3 vTarget = otherRb.linearVelocity;
-
-                        // Only the faster incoming marble acts as striker
-                        if (vStriker.sqrMagnitude > vTarget.sqrMagnitude)
-                        {
-                            // Contact normal pointing from striker to target
-                            Vector3 normal = (otherMarble.transform.position - transform.position);
-                            normal.y = 0f;
-
-                            if (normal.sqrMagnitude > 0.001f)
-                            {
-                                normal.Normalize();
-
-                                // Striker incoming speed along contact normal
-                                Vector3 relVel = vStriker - vTarget;
-                                float vn = Vector3.Dot(relVel, normal);
-
-                                if (vn > 0.05f) // Valid closing velocity
-                                {
-                                    // 1. Target Marble receives massive kinetic blast forward
-                                    float blastSpeed = Mathf.Max(vn * 2.6f, 5.5f);
-                                    Vector3 blastVelocity = normal * blastSpeed;
-
-                                    // If target marble is sitting down inside a pit depression, pop it up and out over the rim!
-                                    if (otherMarble.transform.position.y < 0.20f)
-                                    {
-                                        blastVelocity += Vector3.up * 3.2f;
-                                    }
-
-                                    otherRb.linearVelocity = blastVelocity;
-                                    otherMarble._wasMoving = true;
-                                    otherMarble._consecutiveRestFrames = 0;
-
-                                    // 2. Striker dumps almost all forward momentum (dead stop / gentle settle)
-                                    _rigidbody.linearVelocity = _rigidbody.linearVelocity * 0.15f;
-                                    _rigidbody.angularVelocity = _rigidbody.angularVelocity * 0.15f;
-                                    _wasMoving = true;
-
-                                    // Audio, VFX, Camera Shake & Haptics Juice for powerful tactical direct strike
-                                    if (PitStriker.VFX.VFXManager.Instance != null && collision.contactCount > 0)
-                                    {
-                                        PitStriker.VFX.VFXManager.Instance.PlayCollisionSparks(collision.contacts[0].point, blastSpeed);
-                                    }
-
-                                    if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null)
-                                    {
-                                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.TriggerImpactShake(Mathf.Clamp(blastSpeed * 0.04f, 0.15f, 0.45f), 0.22f);
-                                        PitStriker.CameraSystem.SmoothFollowCamera.Instance.TrackImpactedTarget(otherMarble.transform, 1.6f);
-                                    }
-#if UNITY_ANDROID || UNITY_IOS
-                                    Handheld.Vibrate();
-#endif
-
-                                    Debug.Log($"<color=#00FFAA><b>[DIRECT STRIKE BLAST]</b> Striker halted. Target {otherMarble.name} blasted away with {blastSpeed:F1} m/s speed!</color>");
-                                }
-                            }
-                        }
-                    }
-                }
+                float impactSpeed = collision.relativeVelocity.magnitude;
+                if (PitStriker.CameraSystem.SmoothFollowCamera.Instance != null && impactSpeed > 1.2f)
+                    PitStriker.CameraSystem.SmoothFollowCamera.Instance.TriggerImpactShake(
+                        Mathf.Clamp(impactSpeed * 0.018f, 0.035f, 0.16f), 0.12f);
             }
 
             float speed = collision.relativeVelocity.magnitude;
