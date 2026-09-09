@@ -5,7 +5,7 @@ namespace PitStriker.EditorTools
 {
     internal static class VillageSceneryDetails
     {
-        internal static void Build(Transform parent, Material wood, Material plaster, Material stone, Material soil, Material mountain)
+        internal static void Build(Transform parent, Material wood, Material plaster, Material stone, Material soil, Material mountain, Material foliage)
         {
             var joinery = new VillageMeshBuilder();
             // Door frame, recessed window mullions and a fascia give the facade a readable scale.
@@ -59,6 +59,59 @@ namespace PitStriker.EditorTools
                 ridge.Quad(Point(x,z),Point(x,z+3),Point(x+3,z+3),Point(x+3,z),Color.white,Color.white);
             }
             ridge.Emit("Distant_Ridge",parent,mountain);
+            BuildPerimeter(parent,soil,foliage);
+
+        }
+
+        static Vector3 BorderPoint(float angle, float scale, float height)
+        {
+            // Superellipse rounds all four corners without a square terrain cutoff.
+            float x=Mathf.Sin(angle),z=Mathf.Cos(angle);
+            if(Mathf.Abs(x)<1e-6f)x=0; if(Mathf.Abs(z)<1e-6f)z=0;
+            x=Mathf.Sign(x)*Mathf.Pow(Mathf.Abs(x),.3f)*10.2f*scale;
+            z=14.5f+Mathf.Sign(z)*Mathf.Pow(Mathf.Abs(z),.3f)*26f*scale;
+            return new Vector3(x,height,z);
+        }
+
+        static float BermHeight(float angle)
+        {
+            return .32f+.12f*Mathf.Sin(angle*5)+.08f*Mathf.Sin(angle*11);
+        }
+
+        static void BuildPerimeter(Transform parent,Material soil,Material foliage)
+        {
+            // A ground skirt underlaps the near terrain and mountains on every side.
+            // Its outer edge is beyond the fog horizon, including when the camera orbits.
+            var skirt=new VillageMeshBuilder();
+            for(int x=-256;x<256;x+=16)for(int z=-256;z<256;z+=16)
+                skirt.Quad(new Vector3(x,-.12f,z),new Vector3(x,-.12f,z+16),
+                    new Vector3(x+16,-.12f,z+16),new Vector3(x+16,-.12f,z),Color.white,Color.white);
+            skirt.Emit("Horizon_Ground_Skirt",parent,soil);
+
+            var berm=new VillageMeshBuilder();var planting=new VillageMeshBuilder();
+            float[] scales={1,1.1f,1.23f,1.32f};
+            for(int i=0;i<128;i++)
+            {
+                float a=i*Mathf.PI*2/128,b=(i+1)*Mathf.PI*2/128;
+                for(int j=0;j<3;j++)
+                {
+                    float ha=j==0?-.04f:BermHeight(a)*(j==1?1:.45f);
+                    float hb=j==0?-.04f:BermHeight(b)*(j==1?1:.45f);
+                    float hc=j==2?-.04f:BermHeight(b)*(j==0?1:.45f);
+                    float hd=j==2?-.04f:BermHeight(a)*(j==0?1:.45f);
+                    berm.Quad(BorderPoint(a,scales[j],ha),BorderPoint(a,scales[j+1],hd),
+                        BorderPoint(b,scales[j+1],hc),BorderPoint(b,scales[j],hb),Color.white,Color.white);
+                }
+                Vector3 root=BorderPoint(a,1.1f,BermHeight(a)+.015f);
+                for(int leaf=0;leaf<12;leaf++)
+                {
+                    float direction=leaf*2.4f+i;
+                    Vector3 d=new Vector3(Mathf.Cos(direction),.65f,Mathf.Sin(direction));
+                    planting.Leaf(root,d,.5f+.15f*Mathf.Sin(i+leaf),.10f,.08f,.82f);
+                }
+            }
+            berm.Emit("Rounded_Perimeter_Berm",parent,soil);
+            planting.Emit("Corner_And_Edge_Planting",parent,foliage);
         }
 
         static Vector3 Point(float x,float z)

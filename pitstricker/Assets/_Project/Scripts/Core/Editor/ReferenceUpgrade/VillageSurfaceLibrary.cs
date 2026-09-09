@@ -81,7 +81,10 @@ namespace PitStriker.EditorTools
                 float dy = Height(kind, u, v + e) - Height(kind, u, v - e);
                 Vector3 n = new Vector3(-dx * relief, -dy * relief, 1).normalized;
                 int i = y * size + x;
-                colors[i] = Color.Lerp(dark, light, Mathf.Clamp01(h));
+                // Low-contrast pigment variation is independent of the relief field.
+                // Using height directly for pigment made plaster and soil look blotchy.
+                float pigment = .5f + (Noise(u,v,4)-.5f)*.22f + (Noise(u,v,64)-.5f)*.18f;
+                colors[i] = Color.Lerp(dark, light, pigment);
                 normals[i] = new Color(n.x * .5f + .5f, n.y * .5f + .5f, n.z * .5f + .5f, 1);
                 masks[i] = new Color(Mathf.Lerp(.8f, 1, h), Mathf.Lerp(.96f, .72f, h), 0, 1);
             }
@@ -95,7 +98,8 @@ namespace PitStriker.EditorTools
             var material = Material(kind, ground ? "Pit Striker/Village Ground" : "Pit Striker/Village Surface", Color.white);
             material.SetTexture("_BaseMap", albedo); material.SetTexture("_BumpMap", normal);
             material.SetTexture("_MaskMap", mask); material.SetFloat("_UseMask", 1);
-            material.SetFloat("_BumpScale", 1); material.SetFloat("_Smoothness", .15f);
+            material.SetFloat("_AmbientFill", .45f);
+            material.SetFloat("_BumpScale", .65f); material.SetFloat("_Smoothness", .15f);
             if (ground) material.SetFloat("_WorldScale", 1.25f);
             EditorUtility.SetDirty(material);
             return material;

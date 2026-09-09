@@ -2,6 +2,7 @@ Shader "Pit Striker/Village Foliage"
 {
     Properties
     {
+        _AmbientFill("Sky fill",Range(0,1))=0
         _BaseColor("Leaf color", Color) = (.3,.5,.06,1)
         _BaseMap("Base", 2D) = "white" {}
         _Transmission("Sunlight through leaves", Range(0,1)) = .35
@@ -16,6 +17,7 @@ Shader "Pit Striker/Village Foliage"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             CBUFFER_START(UnityPerMaterial)
+                float _AmbientFill;
                 float4 _BaseColor, _BaseMap_ST; float _Cull, _Cutoff, _Transmission;
             CBUFFER_END
             struct A { float4 p:POSITION; float3 n:NORMAL; float4 color:COLOR; };
@@ -54,6 +56,9 @@ Shader "Pit Striker/Village Foliage"
                 Light sun=GetMainLight(d.shadowCoord);
                 half through=pow(saturate(dot(-sun.direction,d.viewDirectionWS)),3);
                 s.emission=s.albedo*sun.color*through*_Transmission*sun.shadowAttenuation;
+                // Explicit art-directed hemisphere fill for procedurally generated,
+                // unbaked scenery. Defaults off for existing authored materials.
+                d.bakedGI+=_AmbientFill*lerp(half3(.22,.25,.18),half3(.55,.65,.78),saturate(d.normalWS.y*.5+.5));
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s); c.rgb=MixFog(c.rgb,i.fog); return c;
             }

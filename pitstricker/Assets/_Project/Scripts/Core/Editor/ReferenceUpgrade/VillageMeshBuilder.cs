@@ -41,7 +41,7 @@ namespace PitStriker.EditorTools
                 Vector3 a = root + Vector3.up * (height * t) + direction * (bend * t * t);
                 Vector3 b = root + Vector3.up * (height * q) + direction * (bend * q * q);
                 float wa = width * (1 - t) * .5f, wb = width * (1 - q) * .5f;
-                Color ca = new Color(shade * Mathf.Lerp(.55f, 1, t), shade * Mathf.Lerp(.55f, 1, t), shade * Mathf.Lerp(.55f, 1, t), t);
+                Color ca = new Color(shade * Mathf.Lerp(.72f, 1, t), shade * Mathf.Lerp(.72f, 1, t), shade * Mathf.Lerp(.72f, 1, t), t);
                 Color cb = new Color(shade, shade, shade, q);
                 if (j == segments - 1) Triangle(a - side * wa, a + side * wa, b, cb);
                 else Quad(a - side * wa, a + side * wa, b + side * wb, b - side * wb, ca, cb);

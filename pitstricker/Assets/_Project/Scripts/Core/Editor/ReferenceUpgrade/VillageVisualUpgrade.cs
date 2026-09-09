@@ -19,6 +19,8 @@ namespace PitStriker.EditorTools
         [MenuItem("Pit Striker/Graphics/Apply Full Village Upgrade")]
         public static void ApplyToOpenScene()
         {
+            if(EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play Mode before applying and saving the village upgrade.");
             var scene=SceneManager.GetActiveScene();
             if(scene.path!=VillageGraphicsIntegration.Destination)
                 throw new InvalidOperationException("Open SC_Village_Graphics_Test before applying the village graphics upgrade.");
@@ -53,23 +55,24 @@ namespace PitStriker.EditorTools
             var root=new GameObject(RootName); SceneManager.MoveGameObjectToScene(root,scene);
             try
             {
-                var soil=VillageSurfaceLibrary.Surface("Soil",new Color(.20f,.12f,.055f),new Color(.56f,.40f,.22f),3,true);
+                var soil=VillageSurfaceLibrary.Surface("Soil",new Color(.50f,.36f,.21f),new Color(.68f,.53f,.34f),1.5f,true);
                 var pitSoil=VillageSurfaceLibrary.Material("PitSoil","Pit Striker/Village Ground",Color.white);
                 pitSoil.CopyPropertiesFromMaterial(soil);
                 pitSoil.SetColor("_BaseColor",new Color(.7f,.65f,.57f));
                 EditorUtility.SetDirty(pitSoil);
-                var bark=VillageSurfaceLibrary.Surface("Bark",new Color(.13f,.095f,.055f),new Color(.40f,.30f,.16f),4);
-                var wood=VillageSurfaceLibrary.Surface("Wood",new Color(.10f,.065f,.035f),new Color(.37f,.24f,.12f),2);
-                var plaster=VillageSurfaceLibrary.Surface("Plaster",new Color(.46f,.41f,.29f),new Color(.76f,.69f,.51f),1);
+                var bark=VillageSurfaceLibrary.Surface("Bark",new Color(.32f,.25f,.17f),new Color(.49f,.39f,.27f),2);
+                var wood=VillageSurfaceLibrary.Surface("Wood",new Color(.26f,.18f,.11f),new Color(.43f,.32f,.21f),1.5f);
+                var plaster=VillageSurfaceLibrary.Surface("Plaster",new Color(.65f,.60f,.49f),new Color(.76f,.71f,.59f),.5f);
                 var stone=VillageSurfaceLibrary.Surface("Stone",new Color(.17f,.18f,.14f),new Color(.46f,.44f,.35f),3);
                 var roof=VillageSurfaceLibrary.Surface("Roof",new Color(.15f,.055f,.025f),new Color(.43f,.20f,.10f),2);
-                var grass=VillageSurfaceLibrary.Material("Meadow","Pit Striker/Village Foliage",new Color(.23f,.32f,.065f));
-                var canopy=VillageSurfaceLibrary.Material("Canopy","Pit Striker/Village Foliage",new Color(.16f,.25f,.065f));
+                var grass=VillageSurfaceLibrary.Material("Meadow","Pit Striker/Village Foliage",new Color(.30f,.42f,.10f));
+                var canopy=VillageSurfaceLibrary.Material("Canopy","Pit Striker/Village Foliage",new Color(.23f,.34f,.09f));
                 var mountain=VillageSurfaceLibrary.Material("Mountain","Pit Striker/Village Surface",new Color(.19f,.25f,.23f));
                 mountain.SetFloat("_Smoothness",0);
+                grass.SetFloat("_AmbientFill",.6f);canopy.SetFloat("_AmbientFill",.6f);
                 grass.SetFloat("_Transmission",.22f); canopy.SetFloat("_Transmission",.3f);
                 VillageVegetationBuilder.Build(root.transform,grass,canopy,bark);
-                VillageSceneryDetails.Build(root.transform,wood,plaster,stone,soil,mountain);
+                VillageSceneryDetails.Build(root.transform,wood,plaster,stone,soil,mountain,canopy);
 
                 foreach(var renderer in graphics.GetComponentsInChildren<Renderer>(true))
                 {

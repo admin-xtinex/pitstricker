@@ -2,6 +2,7 @@ Shader "Pit Striker/Village Ground"
 {
     Properties
     {
+        _AmbientFill("Sky fill",Range(0,1))=0
         _BaseMap("Soil detail", 2D) = "white" {}
         _BaseColor("Tint", Color) = (0.7,0.5,0.3,1)
         _MaskMap("AO (R), roughness (G)",2D)="white"{}
@@ -33,6 +34,7 @@ Shader "Pit Striker/Village Ground"
             TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
             TEXTURE2D(_MaskMap); SAMPLER(sampler_MaskMap);
             CBUFFER_START(UnityPerMaterial)
+                float _AmbientFill;
                 float4 _BaseColor; float4 _BaseMap_ST;
                 float _UseMask, _BumpScale, _WorldScale, _Smoothness, _Cull, _Cutoff;
             CBUFFER_END
@@ -67,6 +69,9 @@ Shader "Pit Striker/Village Ground"
                 half2 mask=SAMPLE_TEXTURE2D(_MaskMap,sampler_MaskMap,uv).rg;
                 s.occlusion=lerp(1,mask.r,_UseMask);
                 s.smoothness=lerp(s.smoothness,1-mask.g,_UseMask);
+                // Explicit art-directed hemisphere fill for procedurally generated,
+                // unbaked scenery. Defaults off for existing authored materials.
+                d.bakedGI+=_AmbientFill*lerp(half3(.22,.25,.18),half3(.55,.65,.78),saturate(d.normalWS.y*.5+.5));
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s); c.rgb=MixFog(c.rgb,i.fog); return c;
             }

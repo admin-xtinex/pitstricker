@@ -17,23 +17,24 @@ namespace PitStriker.EditorTools
             {
                 var r = new System.Random(1709 + row * 47 + side * 13);
                 var high = new VillageMeshBuilder(); var low = new VillageMeshBuilder();
-                for (int i = 0; i < 360; i++)
+                for (int i = 0; i < 620; i++)
                 {
                     float z = -9 + row * 8 + Range(r, 0, 8);
                     float edge = 2.6f + .42f * Mathf.Sin(z * .39f) + .22f * Mathf.Sin(z * 1.2f);
-                    float x = side * Range(r, edge, 9);
+                    float outer = r.NextDouble() < .9 ? edge + 2.8f : 9f;
+                    float x = side * Range(r, edge, outer);
                     // Gaps and islands prevent the continuous hedgerow look.
                     float patch = Mathf.PerlinNoise(x * .48f + 40, z * .48f + 40);
-                    if (patch < .36f || (Mathf.Abs(x) > 6 && r.NextDouble() < .5)) continue;
+                    if (patch < .28f || (Mathf.Abs(x) > 6 && r.NextDouble() < .5)) continue;
                     Vector3 root = new Vector3(x, .015f, z);
-                    float height = Range(r, .10f, .26f), shade = Range(r, .72f, 1);
+                    float height = Range(r, .16f, .32f), shade = Range(r, .72f, 1);
                     for (int j = 0; j < 6; j++)
                     {
                         Vector3 d = Direction(Range(r, 0, Mathf.PI * 2));
                         Vector3 p = root + d * Range(r, 0, .05f);
-                        float h = height * Range(r, .65f, 1.25f), width = Range(r, .006f, .014f);
-                        high.Blade(p, d, h, width, h * .55f, 4, shade);
-                        if (j % 2 == 0) low.Blade(p, d, h, width * 1.3f, h * .5f, 2, shade);
+                        float h = height * Range(r, .65f, 1.25f), width = Range(r, .012f, .022f);
+                        high.Blade(p, d, h, width, h * .55f, 3, shade);
+                        if (j % 3 == 0) low.Blade(p, d, h, width * 1.3f, h * .5f, 2, shade);
                     }
                 }
                 var tile = new GameObject("Meadow_" + side + "_" + row); tile.transform.SetParent(parent, false);
@@ -46,7 +47,7 @@ namespace PitStriker.EditorTools
 
             var random = new System.Random(2193);
             // Staggered side planting fills the empty horizon while leaving the lane visible.
-            for (int i = 0; i < 34; i++)
+            for (int i = 0; i < 22; i++)
             {
                 float x = (i % 2 == 0 ? -1 : 1) * Range(random, 11, 26);
                 float z = Range(random, -6, 63);
@@ -73,7 +74,7 @@ namespace PitStriker.EditorTools
                 Vector3 direction = Direction(branch * 2.4f);
                 Vector3 end = fork + direction * Range(random, .8f, 1.8f) + Vector3.up * Range(random, .6f, 1.9f);
                 trunk.Tube(fork, end, .08f, .015f, 6);
-                for (int j = 0; j < 100; j++)
+                for (int j = 0; j < 150; j++)
                 {
                     Vector3 offset = new Vector3(Range(random,-1,1),Range(random,-.55f,.55f),Range(random,-1,1));
                     if (offset.sqrMagnitude > 1.2f) continue;

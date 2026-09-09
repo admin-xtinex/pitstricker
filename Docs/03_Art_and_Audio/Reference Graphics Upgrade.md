@@ -4,7 +4,7 @@
 
 1. Pull `develop` and open the inner `pitstricker/` folder in Unity (the existing Unity 6 project).
 2. Open `Assets/_Project/Scenes/SC_Village_Graphics_Test.unity`.
-3. Choose **Pit Striker > Graphics > Apply Full Village Upgrade**. Allow the editor to finish generating meshes, textures and materials.
+3. Stop Play Mode. Choose **Pit Striker > Graphics > Apply Full Village Upgrade**. Allow the editor to finish generating meshes, textures and materials.
 4. Choose **Pit Striker > Graphics > Validate Village Upgrade**, inspect the Game view, and save the scene with Ctrl+S.
 5. Enter Play Mode and check launch, pit capture, turn changes, marble collisions, camera orbit and UI. Build and profile on the target Android phone before release.
 
@@ -57,3 +57,9 @@ Validation performed in the editing environment: C# syntax parsing, shader/sourc
 The complete procedural upgrade is implemented, but visual acceptance and device profiling require Unity. The reference is a cinematic image; production scanned/authored assets may still be needed for equivalent close-up detail. Do not substitute a generated concept image for a real Game-view capture. Bake static indirect lighting only after the final art placement is approved; this pass does not fabricate lightmaps or claim baked GI.
 
 API references: [LODGroup.SetLODs](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/LODGroup.SetLODs.html), [reflection refresh](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/ReflectionProbe-refreshMode.html), [URP additional lighting](https://docs.unity3d.com/6000.0/Documentation/Manual/urp/use-built-in-shader-methods-additional-lights-fplus.html).
+
+## Follow-up from the first Unity screenshot
+
+The initial generated scene was too dark, sparse and blotchy. The follow-up narrows the grass planting band, increases clump density and blade width, fills tree crowns, separates pigment variation from relief and brightens soil/bark/plaster palettes. Explicit material-controlled sky fill keeps the unbaked procedural vegetation readable without relying solely on SH data. It defaults off for other authored materials.
+
+The perimeter now has a continuous underlapping ground skirt extending beyond the fog horizon, a rounded low berm and planted border around all four corners and sides. These are decorative meshes with no colliders. The editor command rejects Play Mode to prevent generated edits being lost when leaving Play. Pull, stop Play Mode, rerun the full upgrade, review the corners using camera orbit, then save before testing. These revisions still need a new Game-view capture and Android profiling.
