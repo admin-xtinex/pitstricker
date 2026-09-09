@@ -83,10 +83,10 @@ namespace PitStriker.EditorTools
                 foreach (var renderer in graphics.GetComponentsInChildren<Renderer>(true))
                     if (renderer.sharedMaterials.Any(m => !m || !m.shader || !m.shader.isSupported))
                         throw new InvalidOperationException("Missing or incompatible village material: " + renderer.name);
-                VillageReferencePolish.Apply(scene, graphics);
+                VillageVisualUpgrade.Apply(scene, graphics);
                 EditorSceneManager.SaveScene(scene);
                 AssetDatabase.SaveAssets();
-                var camera = roots.SelectMany(r => r.GetComponentsInChildren<Camera>(true)).FirstOrDefault(c => c.CompareTag("MainCamera"));
+                var camera = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<Camera>(true)).FirstOrDefault(c => c.CompareTag("MainCamera"));
                 if (camera) Capture(camera);
                 File.WriteAllText("Library/VillageGraphics.result", "PASS: Updated " + Destination + "\nGameplay preserved; reference scenery, materials, lighting and decorative markers applied.\nGraphics renderers: " + graphics.GetComponentsInChildren<Renderer>(true).Length);
                 Debug.Log("VILLAGE_GRAPHICS_INTEGRATION_OK");

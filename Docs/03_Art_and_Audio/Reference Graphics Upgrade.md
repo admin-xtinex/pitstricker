@@ -1,40 +1,59 @@
-# Village graphics upgrade
+# Full village graphics upgrade
 
-## Baseline and target
+## Apply it
 
-The supplied current-game screenshot shows a working scene, but its foreground vegetation has broad angular blades, the vegetation border forms a uniform strip, buildings have flat surfaces, and the mountains form a sparse backdrop. The supplied target has fine natural grass, uneven dirt/verge transitions, weathered props, layered vegetation and warm directional light. Shader changes alone cannot bridge this asset gap.
+1. Pull `develop` and open the inner `pitstricker/` folder in Unity (the existing Unity 6 project).
+2. Open `Assets/_Project/Scenes/SC_Village_Graphics_Test.unity`.
+3. Choose **Pit Striker > Graphics > Apply Full Village Upgrade**. Allow the editor to finish generating meshes, textures and materials.
+4. Choose **Pit Striker > Graphics > Validate Village Upgrade**, inspect the Game view, and save the scene with Ctrl+S.
+5. Enter Play Mode and check launch, pit capture, turn changes, marble collisions, camera orbit and UI. Build and profile on the target Android phone before release.
 
-## Rendering corrections in this change
+The existing **Create Village Graphics Test Scene** command also runs this full pass after importing the village FBX. No Blender run, asset purchase or package installation is required. Nothing rebuilds automatically on project load. Do not run the old Deep Red Pits command afterward: it intentionally restores red pit materials.
 
-- Remove forced ambient brightness floors from ground, foliage and surface shaders so scene lighting can produce shaded areas.
-- Transform surface normal maps using all three components; preserve curved pit normals with neutral ground normal maps. Remove ground relief inferred from albedo brightness (painted color is not height).
-- Add URP soft-shadow quality variants and per-vertex/per-pixel additional-light variants.
-- Use the same wind displacement for foliage color, depth and shadow passes. Replace constant leaf emission with shadow-aware sunlight transmission.
-- Render marbles as polished dielectric surfaces instead of metallic, emissive balls. This remains an opaque approximation, not refractive glass.
-- Preserve existing authored materials when importing village graphics. Stop the graphics importer from resizing/repositioning gameplay marbles.
+## What this implements
 
-## Review in Unity
+- Replaces the imported coarse foliage batches and palm trunks with narrow curved grass blades, irregular grass islands, feathered palms and staggered broadleaf trees. Grass cells and broadleaf trees have two distance-dependent mesh detail levels; small distant vegetation is culled.
+- Adds foreground gravel, window mullions, veranda joinery, gable infill and steps. Existing tiled-roof and stone-wall geometry is retained and retextured.
+- Fills surrounding terrain and replaces the old mountain batches with a connected, asymmetric ridge behind layered planting.
+- Generates matching periodic albedo, normal and AO/roughness maps for soil, bark, wood, plaster, stone and terracotta. Ground maps are 512 pixels; prop maps are 256 pixels, with mipmaps, repeat wrapping and anisotropic filtering. These are procedural materials, not scanned production assets.
+- Recolors the red bowl/lip materials to soil while retaining pit meshes, colliders and in-pit number markers.
+- Applies a lower gameplay camera (height 1.05 m, follow distance 3.2 m, FOV 55), warm low sun, cooler ambient fill, restrained exposure and depth fog. Camera orbit and tracking logic remain unchanged.
+- Aligns the sky sun disk with the directional light. Adds a 128-pixel reflection probe with a single time-sliced capture at scene startup and enables realtime probes in the existing quality setting.
+- Adds view-dependent internal marble ribbons using a refracted sampling direction. This remains an opaque mobile approximation, not physical transparent glass.
+- Keeps the previous shader corrections: scene-controlled ambient shading, corrected normal transforms, URP lighting variants and wind-consistent foliage shadows/depth. Grass vertex color controls root shading and wind weight.
 
-1. Pull develop and open the inner `pitstricker/` Unity project.
-2. Open `Assets/_Project/Scenes/SC_Village_Graphics_Test.unity`. Existing materials pick up shader edits automatically; regeneration is unnecessary for this shader review.
-3. Let shader import finish and check Console errors. Compare the same gameplay camera, quality setting and time of day against the supplied current-game screenshot.
-4. Inspect foreground ground/pit lighting, foliage backlighting and moving shadows, and marble highlights. Check both mobile and desktop quality levels.
-5. Run the existing `VillageGraphicsSmokeCheck.RunBatch` through Unity batch mode for shader support, gameplay and collision checks. Capture the actual Game view and profile an Android build before accepting the visual result.
+Generated objects live under `Village_Reference_Upgrade`. Generated assets live under `Assets/_Project/Art/Environments/Village/ReferenceUpgrade`. Repeated runs use fixed seeds and update assets at stable paths without changing GUIDs or accumulating extra scenery roots. Save/commit the generated assets and scene from Unity if you want the applied scene available to other developers; this code change supplies the generator, not pre-generated Unity assets.
 
-Local validation: diff whitespace and static source checks only. Unity/Android compilation, rendered appearance and performance are not verified in the editing environment.
+## Gameplay protection and failure behavior
 
-## Asset work still required to approach the reference
+The command compares serialized collider, rigidbody, marble controller, pit zone, turn manager and input-controller state and their attached transforms before and after applying graphics. It refuses to replace a generated root that has acquired manually added colliders, rigidbodies or scripts. Decorative meshes contain no physics components.
 
-| Area | Required change | Acceptance view |
-| --- | --- | --- |
-| Foreground grass | Narrow curved blades, multiple clump shapes and lengths; textured foliage with controlled color variation | Low gameplay camera, no broad ribbon-like foreground leaves |
-| Verge | Irregular clusters, sparse seedlings and gravel crossing the boundary | No continuous straight green wall |
-| Ground | Matching soil albedo/normal/roughness maps at consistent physical scale; small scattered stones | Fine relief visible without noisy sparkling or stretched pit walls |
-| House/walls | Weathered plaster, roof tiles, stone and wood assets with bevels and PBR textures | Material detail remains readable at gameplay distance |
-| Backdrop | Layered palms and broadleaf trees; natural terrain silhouette and atmospheric separation | No exposed empty plane around a row of identical trees |
-| Marbles | Environment reflection capture and designed internal ribbons; evaluate mobile-friendly glass approximation | Bright reflections and convincing volume without self-illumination |
-| Lighting | Tune golden-hour sun against sky fill after asset replacement; bake static indirect light where supported | Warm lit ground, cooler shaded areas and grounded props |
+The open-scene command leaves the scene dirty for review. If an error occurs, do not save the scene; reopen the saved scene before retrying. Generation updates its own shared assets at stable paths, so scene Undo alone is not a full asset rollback. Existing authored source material assets are not overwritten by the new material library; renderer bindings use separate generated materials.
 
-Preserve pit coordinates, colliders and gameplay rules while replacing decorative assets. Profile vegetation overdraw and draw calls on the target phone. Do not treat an offline reference image as proof of achievable real-time mobile performance.
+The existing integration command saves only after upgrade validation succeeds. It reads the new root list after regeneration, avoiding references to the previous destroyed scenery root.
 
-URP lighting reference: https://docs.unity3d.com/6000.0/Documentation/Manual/urp/use-built-in-shader-methods-additional-lights-fplus.html
+## Verification
+
+Implemented Unity validation checks:
+
+- nonempty meshes, finite vertices and nondegenerate triangles;
+- valid LOD renderer references;
+- supported shaders without reported compilation errors;
+- no physics components in generated scenery;
+- a 450,000 all-LOD triangle review budget (this is not an FPS guarantee).
+
+Results are written to `Library/VillageUpgradeValidation.txt`. The existing Play Mode smoke check also invokes this validation.
+
+For unattended editor generation:
+
+```text
+Unity -batchmode -quit -projectPath <repo>/pitstricker -executeMethod PitStriker.EditorTools.VillageVisualUpgrade.RunBatch -logFile <log-path>
+```
+
+Validation performed in the editing environment: C# syntax parsing, shader/source contract checks, Unity GUID checks and `git diff --check`. Unity is not installed here, so Unity compilation, actual generated-mesh validation, rendering and Android performance have NOT been run. Do not treat this change as a verified match to the reference image. Capture the same Game view after applying it and compare vegetation density, material scale, shadow readability, pit visibility and marble reflections.
+
+## Remaining acceptance work
+
+The complete procedural upgrade is implemented, but visual acceptance and device profiling require Unity. The reference is a cinematic image; production scanned/authored assets may still be needed for equivalent close-up detail. Do not substitute a generated concept image for a real Game-view capture. Bake static indirect lighting only after the final art placement is approved; this pass does not fabricate lightmaps or claim baked GI.
+
+API references: [LODGroup.SetLODs](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/LODGroup.SetLODs.html), [reflection refresh](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/ReflectionProbe-refreshMode.html), [URP additional lighting](https://docs.unity3d.com/6000.0/Documentation/Manual/urp/use-built-in-shader-methods-additional-lights-fplus.html).

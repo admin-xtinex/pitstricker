@@ -69,6 +69,8 @@ namespace PitStriker.EditorTools
                     else foreach (var message in ShaderUtil.GetShaderMessages(shader))
                         if (message.severity.ToString() == "Error") errors += message.message + "\n";
                 }
+                try { VillageVisualUpgrade.Validate(SceneManager.GetActiveScene()); }
+                catch (Exception e) { errors += e.Message + "\n"; }
                 if (Camera.main) VillageGraphicsIntegration.Capture(Camera.main);
                 try { File.WriteAllText("Library/MarbleCollisionChecks.result", MarbleCollisionChecks.Run()); }
                 catch(Exception e) { errors+=e.Message+"\n"; File.WriteAllText("Library/MarbleCollisionChecks.result",e.ToString()); }

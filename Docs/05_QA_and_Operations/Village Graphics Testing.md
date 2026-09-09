@@ -1,5 +1,8 @@
 # Village graphics test
 
+For the current full upgrade, see [Reference Graphics Upgrade](../03_Art_and_Audio/Reference%20Graphics%20Upgrade.md). The verification below records the earlier September 8 scene only and does not validate the new upgrade.
+
+
 Open the Unity project at `C:/Users/Tisan/Documents/pitstricker/pitstricker`
 with Unity 6000.6.0f1. Open
 `Assets/_Project/Scenes/SC_Village_Graphics_Test.unity` and press Play.
@@ -7,7 +10,7 @@ with Unity 6000.6.0f1. Open
 This scene copies the current `SC_Sandbox_Learning` gameplay and replaces
 the old village dressing visually with the supplied Blender village environment.
 The original scene remains available. Gameplay scripts, pit positions, physics,
-marbles, camera, input, HUD and rules are retained. The new scenery has no
+marbles, input, HUD and rules are retained. The new graphics pass adjusts camera framing; orbit and follow behavior remain unchanged. The new scenery has no
 colliders or gameplay scripts. Build Settings remain unchanged; this is an
 Editor test scene, not a packaged Android build.
 
@@ -16,7 +19,7 @@ The graphics source is copied from the supplied download into
 with Blender in background mode to regenerate the graphics-only FBX. It does
 not import the download's gameplay dimensions, pits, marbles or cameras.
 The generated Blender file is under `Art/Generated/VillageIntegration`.
-Unity URP materials are recreated from the supplied material palette.
+The supplied palette initializes missing materials. Existing authored source materials are preserved. The current integration command then generates and applies the full reference upgrade.
 
 `Pit Striker > Create Village Graphics Test Scene` creates or updates this
 test scene while preserving its gameplay. Close the test scene before using

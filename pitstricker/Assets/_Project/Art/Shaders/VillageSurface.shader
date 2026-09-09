@@ -4,6 +4,8 @@ Shader "Pit Striker/Village Surface"
     {
         _BaseColor("Color",Color)=(1,1,1,1)
         _BaseMap("Surface texture",2D)="white"{}
+        _MaskMap("AO (R), roughness (G)",2D)="white"{}
+        _UseMask("Use surface mask",Range(0,1))=0
         _BumpMap("Normal",2D)="bump"{}
         _BumpScale("Normal strength",Float)=.6
         _Smoothness("Smoothness",Range(0,1))=.2
@@ -17,9 +19,10 @@ Shader "Pit Striker/Village Surface"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
         TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_MaskMap); SAMPLER(sampler_MaskMap);
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseColor,_BaseMap_ST;
-            float _BumpScale,_Smoothness,_Metallic;
+            float _UseMask, _BumpScale,_Smoothness,_Metallic;
         CBUFFER_END
         struct A {float4 p:POSITION;float3 n:NORMAL;float4 tangent:TANGENT;float2 uv:TEXCOORD0;};
         struct V {float4 p:SV_POSITION;float3 world:TEXCOORD0;float3 n:TEXCOORD1;float2 uv:TEXCOORD2;float fog:TEXCOORD3;half3 vertexLight:TEXCOORD6;float3 t:TEXCOORD4;float3 b:TEXCOORD5;};
@@ -49,6 +52,9 @@ Shader "Pit Striker/Village Surface"
                 d.viewDirectionWS=GetWorldSpaceNormalizeViewDir(i.world);d.shadowCoord=TransformWorldToShadowCoord(i.world);
                 d.bakedGI=SampleSH(d.normalWS);d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p);d.shadowMask=1;
                 SurfaceData s=(SurfaceData)0;s.albedo=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,i.uv).rgb*_BaseColor.rgb;s.smoothness=_Smoothness;s.metallic=_Metallic;s.occlusion=1;s.alpha=1;
+                half2 mask=SAMPLE_TEXTURE2D(_MaskMap,sampler_MaskMap,i.uv).rg;
+                s.occlusion=lerp(1,mask.r,_UseMask);
+                s.smoothness=lerp(s.smoothness,1-mask.g,_UseMask);
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s);c.rgb=MixFog(c.rgb,i.fog);return c;
             }

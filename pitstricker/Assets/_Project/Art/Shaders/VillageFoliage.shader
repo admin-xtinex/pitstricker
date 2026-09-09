@@ -18,18 +18,18 @@ Shader "Pit Striker/Village Foliage"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor, _BaseMap_ST; float _Cull, _Cutoff, _Transmission;
             CBUFFER_END
-            struct A { float4 p:POSITION; float3 n:NORMAL; };
-            struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; float3 normal:TEXCOORD1; float fog:TEXCOORD2;half3 vertexLight:TEXCOORD6; };
-            float3 WindPosition(float3 positionOS)
+            struct A { float4 p:POSITION; float3 n:NORMAL; float4 color:COLOR; };
+            struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; float3 normal:TEXCOORD1; float fog:TEXCOORD2;half3 vertexLight:TEXCOORD6; float4 color:COLOR; };
+            float3 WindPosition(float3 positionOS, float weight)
             {
                 float3 w=TransformObjectToWorld(positionOS);
-                w.x+=sin(w.z*1.1+w.x*.7+_Time.y*1.4)*.035*saturate(w.y*3);
+                w.x+=sin(w.z*1.1+w.x*.7+_Time.y*1.4)*.035*saturate(weight);
                 return w;
             }
             V vert(A a)
             {
-                V o; float3 w=WindPosition(a.p.xyz);
-                o.world=w; o.p=TransformWorldToHClip(w); o.normal=TransformObjectToWorldNormal(a.n); o.fog=ComputeFogFactor(o.p.z); o.vertexLight=VertexLighting(o.world,o.normal);return o;
+                V o; float3 w=WindPosition(a.p.xyz,a.color.a);
+                o.color=a.color;o.world=w; o.p=TransformWorldToHClip(w); o.normal=TransformObjectToWorldNormal(a.n); o.fog=ComputeFogFactor(o.p.z); o.vertexLight=VertexLighting(o.world,o.normal);return o;
             }
         ENDHLSL
         Pass
@@ -49,11 +49,11 @@ Shader "Pit Striker/Village Foliage"
                 d.normalWS=normalize(i.normal)*(front?1:-1); d.viewDirectionWS=GetWorldSpaceNormalizeViewDir(i.world);
                 d.shadowCoord=TransformWorldToShadowCoord(i.world); d.bakedGI=SampleSH(d.normalWS);
                 d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p); d.shadowMask=half4(1,1,1,1);
-                SurfaceData s=(SurfaceData)0; s.albedo=_BaseColor.rgb; s.smoothness=.2; s.occlusion=1; s.alpha=1;
+                SurfaceData s=(SurfaceData)0; s.albedo=_BaseColor.rgb*i.color.rgb; s.smoothness=.2; s.occlusion=1; s.alpha=1;
                 // Backlighting follows the sun and its shadow rather than glowing in shade.
                 Light sun=GetMainLight(d.shadowCoord);
                 half through=pow(saturate(dot(-sun.direction,d.viewDirectionWS)),3);
-                s.emission=_BaseColor.rgb*sun.color*through*_Transmission*sun.shadowAttenuation;
+                s.emission=s.albedo*sun.color*through*_Transmission*sun.shadowAttenuation;
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s); c.rgb=MixFog(c.rgb,i.fog); return c;
             }
@@ -71,7 +71,7 @@ Shader "Pit Striker/Village Foliage"
             float3 _LightDirection, _LightPosition;
             float4 shadow(A a):SV_POSITION
             {
-                float3 w=WindPosition(a.p.xyz);
+                float3 w=WindPosition(a.p.xyz,a.color.a);
                 float3 n=TransformObjectToWorldNormal(a.n);
                 float3 lightDirection=_LightDirection;
                 #if defined(_CASTING_PUNCTUAL_LIGHT_SHADOW)

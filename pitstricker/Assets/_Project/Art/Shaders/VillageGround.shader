@@ -4,6 +4,8 @@ Shader "Pit Striker/Village Ground"
     {
         _BaseMap("Soil detail", 2D) = "white" {}
         _BaseColor("Tint", Color) = (0.7,0.5,0.3,1)
+        _MaskMap("AO (R), roughness (G)",2D)="white"{}
+        _UseMask("Use surface mask",Range(0,1))=0
         _BumpMap("Soil normal", 2D) = "bump" {}
         _BumpScale("Relief", Float) = 0.75
         _WorldScale("Repeats per metre", Float) = 0.65
@@ -29,9 +31,10 @@ Shader "Pit Striker/Village Ground"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_MaskMap); SAMPLER(sampler_MaskMap);
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor; float4 _BaseMap_ST;
-                float _BumpScale, _WorldScale, _Smoothness, _Cull, _Cutoff;
+                float _UseMask, _BumpScale, _WorldScale, _Smoothness, _Cull, _Cutoff;
             CBUFFER_END
             struct A { float4 positionOS:POSITION; float3 normalOS:NORMAL; };
             struct V { float4 positionCS:SV_POSITION; float3 world:TEXCOORD0; float3 normal:TEXCOORD1; float fog:TEXCOORD2;half3 vertexLight:TEXCOORD6; };
@@ -61,6 +64,9 @@ Shader "Pit Striker/Village Ground"
                 d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.positionCS); d.shadowMask=half4(1,1,1,1);
                 SurfaceData s=(SurfaceData)0; s.albedo=detail*_BaseColor.rgb*lerp(.9,1.1,broad.r);
                 s.alpha=1; s.occlusion=1; s.smoothness=_Smoothness; s.specular=half3(.04,.04,.04);
+                half2 mask=SAMPLE_TEXTURE2D(_MaskMap,sampler_MaskMap,uv).rg;
+                s.occlusion=lerp(1,mask.r,_UseMask);
+                s.smoothness=lerp(s.smoothness,1-mask.g,_UseMask);
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s); c.rgb=MixFog(c.rgb,i.fog); return c;
             }

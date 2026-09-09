@@ -22,6 +22,7 @@ Shader "Pit Striker/Swirl Marble"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -38,7 +39,12 @@ Shader "Pit Striker/Swirl Marble"
             }
             half4 frag(V i):SV_Target
             {
-                float3 q=normalize(i.local);
+                // Sample the ribbon beneath the glass shell along a refracted view ray.
+                // Opaque approximation: no expensive scene-color refraction on mobile.
+                float3 shellNormal=normalize(i.local);
+                float3 viewOS=normalize(TransformWorldToObjectDir(GetWorldSpaceNormalizeViewDir(i.world)));
+                float3 innerRay=refract(-viewOS,shellNormal,1.0/1.46);
+                float3 q=normalize(shellNormal+innerRay*.38);
                 float wave=sin(q.x*15+q.y*12+sin(q.z*9+q.x*5)*2.8);
                 float ribbon=smoothstep(.28,.65,wave)*(.5+.5*sin(q.y*4+q.z*6));
                 float fine=pow(saturate(sin(q.x*32+q.y*27+sin(q.z*9)*5)),12);
