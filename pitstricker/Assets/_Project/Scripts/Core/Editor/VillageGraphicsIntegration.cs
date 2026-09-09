@@ -41,12 +41,18 @@ namespace PitStriker.EditorTools
             {
                 string path = Folder + "/" + entry.name + ".mat";
                 var material = AssetDatabase.LoadAssetAtPath<Material>(path);
-                if (!material) { material = new Material(Shader.Find("Universal Render Pipeline/Lit")); AssetDatabase.CreateAsset(material, path); }
-                material.shader = Shader.Find("Universal Render Pipeline/Lit");
-                material.SetColor("_BaseColor", new Color(entry.color[0], entry.color[1], entry.color[2], entry.color[3]));
-                material.SetFloat("_Smoothness", 1 - entry.roughness);
-                material.SetFloat("_Metallic", entry.metallic);
-                EditorUtility.SetDirty(material);
+                if (!material)
+                {
+                    var shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (!shader) throw new InvalidOperationException("URP Lit shader is unavailable.");
+                    material = new Material(shader);
+                    material.SetColor("_BaseColor", new Color(entry.color[0], entry.color[1], entry.color[2], entry.color[3]));
+                    material.SetFloat("_Smoothness", 1 - entry.roughness);
+                    material.SetFloat("_Metallic", entry.metallic);
+                    AssetDatabase.CreateAsset(material, path);
+                }
+                // Existing materials contain authored texture/shader settings.
+                // The Blender palette is only a default for newly imported materials.
                 materials.Add(entry.name, material);
             }
             if (!File.Exists(Destination) && !AssetDatabase.CopyAsset(Source, Destination)) throw new IOException("Could not copy gameplay scene.");
@@ -75,9 +81,8 @@ namespace PitStriker.EditorTools
                     renderer.sharedMaterials = renderer.sharedMaterials.Select(m => m && materials.TryGetValue(m.name, out var replacement) ? replacement : m).ToArray();
                 if (before != GameplaySnapshot(roots)) throw new InvalidOperationException("Gameplay data changed during graphics integration.");
                 foreach (var renderer in graphics.GetComponentsInChildren<Renderer>(true))
-                    if (renderer.sharedMaterials.Any(m => !m || !m.shader || m.shader.name != "Universal Render Pipeline/Lit"))
+                    if (renderer.sharedMaterials.Any(m => !m || !m.shader || !m.shader.isSupported))
                         throw new InvalidOperationException("Missing or incompatible village material: " + renderer.name);
-                MarbleMapScale.Apply(scene);
                 VillageReferencePolish.Apply(scene, graphics);
                 EditorSceneManager.SaveScene(scene);
                 AssetDatabase.SaveAssets();
