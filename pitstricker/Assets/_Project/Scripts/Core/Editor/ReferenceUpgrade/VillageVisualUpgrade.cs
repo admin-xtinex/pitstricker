@@ -183,8 +183,8 @@ namespace PitStriker.EditorTools
                 .Where(c=>c&&(c is Collider||c is Rigidbody||c is PitStriker.Physics.MarbleController||
                     c is PitStriker.Gameplay.PitZone||c is PitStriker.Gameplay.TurnManager||
                     c is PitStriker.Input.SwipeLaunchController))
-                .OrderBy(c=>c.GetInstanceID())
-                .Select(c=>c.GetInstanceID()+":"+EditorJsonUtility.ToJson(c)+":"+EditorJsonUtility.ToJson(c.transform)));
+                .OrderBy(c=>c.GetEntityId().ToString(),StringComparer.Ordinal)
+                .Select(c=>c.GetEntityId().ToString()+":"+EditorJsonUtility.ToJson(c)+":"+EditorJsonUtility.ToJson(c.transform)));
         }
 
         [MenuItem("Pit Striker/Graphics/Validate Village Upgrade")]
