@@ -18,18 +18,13 @@ namespace PitStriker.Networking.Client
 
         [Header("Server Configuration")]
         [Tooltip("WebSocket endpoint of the cloud server.")]
-#if UNITY_EDITOR || UNITY_STANDALONE
-        [SerializeField] private string _serverUrl = "ws://127.0.0.1:7777";
-#else
         [SerializeField] private string _serverUrl = "ws://pitstriker.xtinex.com:7777";
-#endif
         [SerializeField] private float _pingIntervalSeconds = 5.0f;
 
         private static readonly string[] CandidateEndpoints = new string[]
         {
             "ws://pitstriker.xtinex.com:7777",
             "ws://34.69.91.177:7777",
-            "ws://192.168.29.110:7777",
             "ws://127.0.0.1:7777"
         };
         private int _candidateIndex = 0;
@@ -90,9 +85,15 @@ namespace PitStriker.Networking.Client
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
                 string savedUrl = PlayerPrefs.GetString("CloudServerUrl", "");
-                if (!string.IsNullOrEmpty(savedUrl))
+                if (!string.IsNullOrEmpty(savedUrl) && !savedUrl.Contains("127.0.0.1") && !savedUrl.Contains("localhost"))
                 {
                     _serverUrl = savedUrl;
+                }
+                else
+                {
+                    _serverUrl = "ws://pitstriker.xtinex.com:7777";
+                    PlayerPrefs.SetString("CloudServerUrl", _serverUrl);
+                    PlayerPrefs.Save();
                 }
                 InitializeTransport();
             }
