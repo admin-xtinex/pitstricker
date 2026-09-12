@@ -1,0 +1,14 @@
+services:
+  pitstriker-server:
+    build:
+      context: ../../
+      dockerfile: Server/PitStrikerServer/Dockerfile
+    container_name: pitstriker_cloud_server
+    restart: unless-stopped
+    ports:
+      - "7777:7777"
+    environment:
+      - PORT=7777
+      - HOST=0.0.0.0
+      - ENVIRONMENT=Production
+      - LOG_LEVEL=Info

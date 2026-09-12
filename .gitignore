@@ -58,6 +58,13 @@ __pycache__/
 *.pyc
 *.blend1
 pitstricker/screenshot_*.png
+
+# Server build outputs
+Server/**/bin/
+Server/**/obj/
+Server/publish_linux/
+Server/*.zip
+
 pitstricker/emulator_*.png
 pitstricker/*.log
 *.log
