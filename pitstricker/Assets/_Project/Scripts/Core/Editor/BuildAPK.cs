@@ -13,6 +13,7 @@ namespace PitStriker.EditorTools
         private const string BuildOutputDirectory = "../Builds/Android";
         private const string ApkFileName = "PitStriker.apk";
         private const string RequestFile = "Library/BuildAPK.request";
+        private const string PendingFile = "Library/BuildAPK.pending";
         private const string ResultFile = "Library/BuildAPK.result";
 
         static BuildAPK()
@@ -20,17 +21,30 @@ namespace PitStriker.EditorTools
             EditorApplication.update += CheckBuildRequest;
         }
 
-        private static bool _waitingForCompile = false;
-
         private static void CheckBuildRequest()
         {
-            if (Application.isBatchMode) return; // Batch builds use an explicit executeMethod.
+            if (Application.isBatchMode) return;
             if (File.Exists("Library/MenuFlowChecks.running")) return;
 
-            if (_waitingForCompile)
+            if (File.Exists(RequestFile))
+            {
+                if (EditorApplication.isPlaying)
+                {
+                    EditorApplication.isPlaying = false;
+                    return;
+                }
+                if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
+                File.Delete(RequestFile);
+                File.WriteAllText(PendingFile, DateTime.UtcNow.ToString("o"));
+                AssetDatabase.Refresh();
+                return;
+            }
+
+            if (File.Exists(PendingFile))
             {
                 if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-                _waitingForCompile = false;
+                File.Delete(PendingFile);
 
                 if (EditorUtility.scriptCompilationFailed)
                 {
@@ -49,21 +63,7 @@ namespace PitStriker.EditorTools
                     File.WriteAllText(ResultFile, "ERROR: " + ex.Message + "\n" + ex.StackTrace);
                     Debug.LogException(ex);
                 }
-                return;
             }
-
-            if (!File.Exists(RequestFile)) return;
-
-            if (EditorApplication.isPlaying)
-            {
-                EditorApplication.isPlaying = false;
-                return;
-            }
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
-
-            File.Delete(RequestFile);
-            _waitingForCompile = true;
-            AssetDatabase.Refresh();
         }
 
         [MenuItem("Pit Striker/Export Android APK", false, 1)]
@@ -183,62 +183,41 @@ namespace PitStriker.EditorTools
                 options = BuildOptions.None
             };
 
-            // 5. Execute Build Pipeline (with automatic incremental retries for transient Windows file locks)
-            int maxAttempts = 15;
-            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            // Clear any stale Bee lock file from prior runs
+            try
             {
-                try
-                {
-                    Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Executing build (attempt {attempt}/{maxAttempts})...</color>");
-                    BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
-                    BuildSummary summary = report.summary;
+                string tundraLock = Path.Combine(projectRoot, "Library", "Bee", "tundra.lock");
+                if (File.Exists(tundraLock)) File.Delete(tundraLock);
+            }
+            catch { }
 
-                    if (summary.result == BuildResult.Succeeded)
+            // 5. Execute Build Pipeline
+            Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Executing build...</color>");
+            BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
+            BuildSummary summary = report.summary;
+
+            if (summary.result == BuildResult.Succeeded)
+            {
+                float sizeMb = summary.totalSize / (1024f * 1024f);
+                Debug.Log($"<color=#00FF88><b>[BUILD SUCCESS]</b> APK created successfully in {summary.totalTime.TotalSeconds:F1}s!</color>");
+                Debug.Log($"<color=#00FF88><b>[BUILD OUTPUT]</b> {apkPath} ({sizeMb:F2} MB)</color>");
+                if (!Application.isBatchMode) EditorUtility.RevealInFinder(apkPath);
+                return;
+            }
+            else
+            {
+                Debug.LogError($"<color=#FF0044><b>[BUILD FAILED]</b> Android build finished with status {summary.result} ({summary.totalErrors} errors).</color>");
+                foreach (var step in report.steps)
+                {
+                    foreach (var msg in step.messages)
                     {
-                        float sizeMb = summary.totalSize / (1024f * 1024f);
-                        Debug.Log($"<color=#00FF88><b>[BUILD SUCCESS]</b> APK created successfully in {summary.totalTime.TotalSeconds:F1}s!</color>");
-                        Debug.Log($"<color=#00FF88><b>[BUILD OUTPUT]</b> {apkPath} ({sizeMb:F2} MB)</color>");
-                        if (!Application.isBatchMode) EditorUtility.RevealInFinder(apkPath);
-                        return;
-                    }
-                    else if (summary.result == BuildResult.Failed)
-                    {
-                        if (attempt < maxAttempts)
+                        if (msg.type == LogType.Error || msg.type == LogType.Exception)
                         {
-                            Debug.LogWarning($"[BUILD APK] Attempt {attempt} encountered an error (likely transient Windows file lock). Retrying incrementally in 2s...");
-                            System.GC.Collect();
-                            System.GC.WaitForPendingFinalizers();
-                            System.Threading.Thread.Sleep(2000);
-                            continue;
+                            Debug.LogError($"[BUILD STEP ERROR] {step.name}: {msg.content}");
                         }
-                        Debug.LogError($"<color=#FF0044><b>[BUILD FAILED]</b> Android build failed with {summary.totalErrors} errors after {maxAttempts} attempts. Check Console logs for details.</color>");
-                        throw new InvalidOperationException($"Android build failed with {summary.totalErrors} errors.");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[BUILD APK] Build finished with status: {summary.result}");
-                        throw new InvalidOperationException($"Android build finished with non-success status: {summary.result}");
                     }
                 }
-                catch (Exception ex)
-                {
-                    if (attempt < maxAttempts && (ex is InvalidOperationException || ex.Message.Contains("Android build failed")))
-                    {
-                        Debug.LogWarning($"[BUILD APK] Attempt {attempt} exception: {ex.Message}. Retrying incrementally in 2s...");
-                        System.GC.Collect();
-                        System.GC.WaitForPendingFinalizers();
-                        System.Threading.Thread.Sleep(2000);
-                        continue;
-                    }
-
-                    Debug.LogError($"[BUILD APK ERROR] Exception occurred during build: {ex.Message}\n{ex.StackTrace}");
-                    if (ex.Message.Contains("module is not installed") || ex.Message.Contains("target is not supported"))
-                    {
-                        Debug.LogError("<color=#FFD700><b>[ACTION REQUIRED]</b> Android Build Support module is not installed for this Unity version.</color>\n" +
-                                       "Please open <b>Unity Hub > Installs > 6000.6.0f1 (Gear Icon) > Add Modules > Android Build Support</b> (with OpenJDK & Android SDK/NDK Tools) to enable APK builds.");
-                    }
-                    throw;
-                }
+                throw new InvalidOperationException($"Android build failed with status {summary.result} ({summary.totalErrors} errors).");
             }
         }
 
