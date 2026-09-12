@@ -20,8 +20,10 @@
 .idea/
 .vscode/
 *.csproj
+!Server/**/*.csproj
 *.unityproj
 *.sln
+!Server/**/*.sln
 *.slnx
 *.suo
 *.user
