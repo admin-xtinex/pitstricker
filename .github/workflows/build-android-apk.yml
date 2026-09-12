@@ -1,4 +1,4 @@
-name: Build and Deploy Android APK
+name: Build and Upload Android APK
 
 on:
   push:
@@ -11,17 +11,6 @@ on:
       - 'emulator_screen.png'
       - 'build_apk.log'
   workflow_dispatch:
-    inputs:
-      upload_to_firebase:
-        description: 'Deploy to Firebase App Distribution'
-        required: false
-        type: boolean
-        default: true
-      release_notes:
-        description: 'Release notes for Firebase'
-        required: false
-        type: string
-        default: 'Automated build from GitHub Actions'
 
 jobs:
   build-android:
@@ -83,36 +72,3 @@ jobs:
           name: PitStriker-Android-build-${{ github.run_number }}
           path: ${{ steps.find_apk.outputs.apk_path }}
           retention-days: 14
-
-      # Check and deploy to Firebase App Distribution
-      - name: Check Firebase Configuration
-        id: firebase_check
-        run: |
-          if [ -n "${{ secrets.FIREBASE_APP_ID }}" ] && ( [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ] || [ -n "${{ secrets.FIREBASE_TOKEN }}" ] ); then
-            echo "configured=true" >> $GITHUB_OUTPUT
-          else
-            echo "configured=false" >> $GITHUB_OUTPUT
-            echo "::warning::Firebase App Distribution secrets (FIREBASE_APP_ID and FIREBASE_SERVICE_ACCOUNT or FIREBASE_TOKEN) not set. The APK is preserved in GitHub Artifacts."
-          fi
-
-      - name: Deploy to Firebase App Distribution (Service Account)
-        if: steps.firebase_check.outputs.configured == 'true' && secrets.FIREBASE_SERVICE_ACCOUNT != '' && (github.event_name != 'workflow_dispatch' || inputs.upload_to_firebase)
-        uses: wzieba/Firebase-Distribution-Github-Action@v1
-        continue-on-error: true
-        with:
-          appId: ${{ secrets.FIREBASE_APP_ID }}
-          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: ${{ secrets.FIREBASE_GROUPS || 'testers' }}
-          file: ${{ steps.find_apk.outputs.apk_path }}
-          releaseNotes: ${{ inputs.release_notes || github.event.head_commit.message || 'Automated build from GitHub Actions' }}
-
-      - name: Deploy to Firebase App Distribution (CLI Token)
-        if: steps.firebase_check.outputs.configured == 'true' && secrets.FIREBASE_SERVICE_ACCOUNT == '' && secrets.FIREBASE_TOKEN != '' && (github.event_name != 'workflow_dispatch' || inputs.upload_to_firebase)
-        uses: wzieba/Firebase-Distribution-Github-Action@v1
-        continue-on-error: true
-        with:
-          appId: ${{ secrets.FIREBASE_APP_ID }}
-          token: ${{ secrets.FIREBASE_TOKEN }}
-          groups: ${{ secrets.FIREBASE_GROUPS || 'testers' }}
-          file: ${{ steps.find_apk.outputs.apk_path }}
-          releaseNotes: ${{ inputs.release_notes || github.event.head_commit.message || 'Automated build from GitHub Actions' }}
