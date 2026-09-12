@@ -5,6 +5,7 @@ using UnityEngine;
 using PitStriker.Physics;
 using PitStriker.Input;
 using PitStriker.CameraSystem;
+using PitStriker.Networking;
 
 namespace PitStriker.Gameplay
 {
@@ -86,7 +87,7 @@ namespace PitStriker.Gameplay
 
         // State Tracking
         public GameState CurrentState { get; private set; } = GameState.TossPhase;
-        public int CurrentPlayerIndex { get; private set; } = 0;
+        public int CurrentPlayerIndex { get; set; } = 0;
         public PlayerData ActivePlayer => (_players != null && _players.Count > CurrentPlayerIndex) ? _players[CurrentPlayerIndex] : null;
         public int CoursePar => _pitPars[0] + _pitPars[1] + _pitPars[2];
         public int CurrentTargetPit => ActivePlayer != null ? ActivePlayer.currentPit : 1;
@@ -115,6 +116,9 @@ namespace PitStriker.Gameplay
         private Coroutine _settleCoroutine;
 
         public bool HitOpponentThisTurn => _hitOpponentMarbleThisTurn;
+
+        // Tracks AI bots that conquered a pit on their previous scoring turn to prevent continuous back-to-back pit sinks
+        public static HashSet<int> BotsThatConqueredPitLastTurn = new HashSet<int>();
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -145,6 +149,18 @@ namespace PitStriker.Gameplay
             {
                 return false; // Disable human touch input during AI turn
             }
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance != null &&
+                PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive)
+            {
+                return PitStriker.Networking.Client.CloudMatchManager.Instance.IsMyTurn();
+            }
+            if (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None)
+            {
+                if (NetworkMatchState.Instance != null && !NetworkMatchState.Instance.IsMyTurn())
+                {
+                    return false; // Disable touch input if it's not the local player's authoritative turn
+                }
+            }
             return Instance == null || Instance.CurrentState == GameState.ReadyToAim || Instance.CurrentState == GameState.TossPhase;
         }
 
@@ -153,6 +169,10 @@ namespace PitStriker.Gameplay
             if (Instance == null)
             {
                 Instance = this;
+
+                // Ensure stable 60/120 FPS rendering pacing aligned with PhysX simulation
+                QualitySettings.vSyncCount = 1;
+                Application.targetFrameRate = 60;
 
                 // Ensure AIMarbleController is attached to drive autonomous bot turns
                 if (GetComponent<PitStriker.AI.AIMarbleController>() == null)
@@ -171,13 +191,171 @@ namespace PitStriker.Gameplay
         {
             PitZone.OnMarbleSunk += HandleMarbleSunk;
             MarbleController.OnMarbleHitMarble += HandleMarbleHitMarble;
+
+            NetworkMatchState.OnActivePlayerChangedEvent += HandleNetworkActivePlayerChanged;
+            NetworkMatchState.OnPlayerStatsChangedEvent += HandleNetworkPlayerStatsChanged;
+            NetworkMatchState.OnPhaseChangedEvent += HandleNetworkPhaseChanged;
+            NetworkMatchState.OnMatchCompletedNetworkEvent += HandleNetworkMatchCompleted;
+            NetworkMatchState.OnRematchReadyEvent += HandleNetworkRematchReady;
+
+            DisconnectGracePeriodManager.OnGracePeriodExpired += HandleGracePeriodExpired;
+            DisconnectGracePeriodManager.OnOpponentReturned  += HandleOpponentReturned;
+
+            PitStriker.Networking.Client.CloudMatchManager.OnActivePlayerChangedEvent += HandleCloudActivePlayerChanged;
+            PitStriker.Networking.Client.CloudMatchManager.OnPlayerStatsChangedEvent += HandleCloudPlayerStatsChanged;
         }
 
         private void OnDisable()
         {
             PitZone.OnMarbleSunk -= HandleMarbleSunk;
             MarbleController.OnMarbleHitMarble -= HandleMarbleHitMarble;
+
+            NetworkMatchState.OnActivePlayerChangedEvent -= HandleNetworkActivePlayerChanged;
+            NetworkMatchState.OnPlayerStatsChangedEvent -= HandleNetworkPlayerStatsChanged;
+            NetworkMatchState.OnPhaseChangedEvent -= HandleNetworkPhaseChanged;
+            NetworkMatchState.OnMatchCompletedNetworkEvent -= HandleNetworkMatchCompleted;
+            NetworkMatchState.OnRematchReadyEvent -= HandleNetworkRematchReady;
+
+            DisconnectGracePeriodManager.OnGracePeriodExpired -= HandleGracePeriodExpired;
+            DisconnectGracePeriodManager.OnOpponentReturned  -= HandleOpponentReturned;
+
+            PitStriker.Networking.Client.CloudMatchManager.OnActivePlayerChangedEvent -= HandleCloudActivePlayerChanged;
+            PitStriker.Networking.Client.CloudMatchManager.OnPlayerStatsChangedEvent -= HandleCloudPlayerStatsChanged;
+
             UnbindAllMarbles();
+        }
+
+        private void HandleCloudActivePlayerChanged(int newPlayerIndex)
+        {
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance == null ||
+                !PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive) return;
+
+            if (_players != null && newPlayerIndex >= 0 && newPlayerIndex < _players.Count)
+            {
+                CurrentPlayerIndex = newPlayerIndex;
+                ActivateCurrentPlayer();
+            }
+        }
+
+        private void HandleCloudPlayerStatsChanged(int playerIdx, int strokes, int currentPit)
+        {
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance == null ||
+                !PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive) return;
+
+            if (_players != null && playerIdx >= 0 && playerIdx < _players.Count)
+            {
+                _players[playerIdx].totalStrokes = strokes;
+                _players[playerIdx].currentPit = currentPit;
+
+                if (playerIdx == CurrentPlayerIndex)
+                {
+                    OnStrokeCountChanged?.Invoke(strokes, CoursePar);
+                    OnTargetPitChanged?.Invoke(currentPit);
+                }
+            }
+        }
+
+        private void HandleNetworkActivePlayerChanged(int newPlayerIndex)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer) return;
+
+            if (_players != null && newPlayerIndex >= 0 && newPlayerIndex < _players.Count)
+            {
+                CurrentPlayerIndex = newPlayerIndex;
+                ActivateCurrentPlayer();
+            }
+        }
+
+        private void HandleNetworkPlayerStatsChanged(int playerIdx, int strokes, int currentPit)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer) return;
+
+            if (_players != null && playerIdx >= 0 && playerIdx < _players.Count)
+            {
+                _players[playerIdx].totalStrokes = strokes;
+                _players[playerIdx].currentPit = currentPit;
+
+                if (playerIdx == CurrentPlayerIndex)
+                {
+                    OnStrokeCountChanged?.Invoke(strokes, CoursePar);
+                    OnTargetPitChanged?.Invoke(currentPit);
+                }
+            }
+        }
+
+        private void HandleNetworkPhaseChanged(NetworkMatchPhase phase)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer) return;
+
+            switch (phase)
+            {
+                case NetworkMatchPhase.ReadyToAim:
+                    SetState(GameState.ReadyToAim);
+                    break;
+                case NetworkMatchPhase.Rolling:
+                    SetState(GameState.Rolling);
+                    break;
+                case NetworkMatchPhase.Evaluating:
+                    SetState(GameState.Evaluating);
+                    break;
+                case NetworkMatchPhase.MatchCompleted:
+                    DeclareMatchVictory();
+                    break;
+            }
+        }
+
+        private void HandleNetworkMatchCompleted(int winnerIndex)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer) return;
+
+            DeclareMatchVictory();
+        }
+
+        private void HandleNetworkRematchReady()
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+
+            Debug.Log("<color=#00FF88><b>[TURN MANAGER]</b> Rematch confirmed! Restarting match for online session.");
+            RestartMatch();
+
+            // Signal MenuManager to transition back to InGame
+            PitStriker.UI.MenuManager menuManager = PitStriker.UI.MenuManager.Instance;
+            if (menuManager != null)
+            {
+                menuManager.ShowScreen(PitStriker.UI.MenuManager.ScreenType.InGame);
+            }
+        }
+
+        /// <summary>
+        /// Grace period expired: opponent did not return. Server ends match as abandoned (no winner).
+        /// </summary>
+        private void HandleGracePeriodExpired()
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+
+            Debug.LogWarning("[TURN MANAGER] Grace period expired. Declaring match abandoned.");
+
+            // Only host can call ServerEndMatch
+            if (Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                if (NetworkMatchState.Instance != null)
+                {
+                    NetworkMatchState.Instance.ServerEndMatch(-1); // -1 = no winner / abandoned
+                }
+            }
+        }
+
+        /// <summary>
+        /// Opponent returned within the grace window — nothing to do in TurnManager
+        /// since NetworkMatchState timer resumes via DisconnectGracePeriodManager.
+        /// </summary>
+        private void HandleOpponentReturned()
+        {
+            Debug.Log("<color=#00FF88>[TURN MANAGER]</color> Opponent reconnected. Resuming match.");
         }
 
         private void Start()
@@ -235,7 +413,16 @@ namespace PitStriker.Gameplay
                 }
                 else
                 {
-                    pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
+                    if (i == 0)
+                    {
+                        string customName = PlayerPrefs.GetString("PlayerCustomName", "Striker").Trim();
+                        if (string.IsNullOrEmpty(customName)) customName = "Striker";
+                        pName = $"Player 1 - \"{customName}\"";
+                    }
+                    else
+                    {
+                        pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
+                    }
                 }
 
                 PlayerData player = new PlayerData(i + 1, pName, themeColors[i % themeColors.Length], marble);
@@ -336,6 +523,7 @@ namespace PitStriker.Gameplay
             Array.Sort(foundMarbles, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             _players.Clear();
+            BotsThatConqueredPitLastTurn.Clear();
 
             Color[] themeColors = new Color[]
             {
@@ -454,6 +642,12 @@ namespace PitStriker.Gameplay
             SetState(GameState.Rolling);
             OnStrokeCountChanged?.Invoke(ActivePlayer.totalStrokes, CoursePar);
             OnStatusMessage?.Invoke($"{ActivePlayer.name.ToUpper()}: STROKE #{ActivePlayer.totalStrokes} (PLAY {_shotsTakenThisTurn}/{_maxShotsPerTurn})");
+
+            if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                NetworkMatchState.Instance.ServerRecordStroke(CurrentPlayerIndex);
+                NetworkMatchState.Instance.ServerSetPhase(NetworkMatchPhase.Rolling);
+            }
 
             if (_settleCoroutine != null) StopCoroutine(_settleCoroutine);
             _settleCoroutine = StartCoroutine(WaitForMarblesToSettleRoutine());
@@ -683,6 +877,17 @@ namespace PitStriker.Gameplay
                 }
             }
 
+            // Phase 4: Synchronize authoritative rest positions to guest clients
+            if (NetworkMatchState.Instance != null &&
+                Unity.Netcode.NetworkManager.Singleton != null &&
+                Unity.Netcode.NetworkManager.Singleton.IsServer &&
+                _players != null)
+            {
+                Vector3 p1Pos = (_players.Count > 0 && _players[0].marble != null) ? _players[0].marble.transform.position : Vector3.zero;
+                Vector3 p2Pos = (_players.Count > 1 && _players[1].marble != null) ? _players[1].marble.transform.position : Vector3.zero;
+                NetworkMatchState.Instance.ServerSyncRestPositions(p1Pos, p2Pos);
+            }
+
             if (_evaluateCoroutine != null || (ActivePlayer != null && ActivePlayer.isFinished))
             {
                 _settleCoroutine = null;
@@ -728,15 +933,37 @@ namespace PitStriker.Gameplay
                     ActivePlayer.currentPit++;
                     OnTargetPitChanged?.Invoke(ActivePlayer.currentPit);
 
+                    if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                    {
+                        NetworkMatchState.Instance.ServerRecordPitConquered(CurrentPlayerIndex, ActivePlayer.currentPit - 1);
+                    }
+
                     // Relocate to next tee ahead of the conquered pit
                     RelocateToNextTee(ActivePlayer.marble, ActivePlayer.currentPit);
                     ResetAllPits();
 
                     _bonusStrikeEarned = false;
-                    _hitOpponentMarbleThisTurn = false;
-
-                    // Conquering Pit 1 or Pit 2 awards an Extra Play (up to max shots per turn)!
-                    if (_shotsTakenThisTurn >= _maxShotsPerTurn)
+                    // Conquering Pit 1 or Pit 2:
+                    if (ActivePlayer.isAI)
+                    {
+                        // DISABLE BOT FOR CONTINUOUS TWO PITS IN A ROW:
+                        // 1. AI bot never receives an immediate bonus turn after conquering a pit.
+                        // Turn immediately passes to the human player!
+                        BotsThatConqueredPitLastTurn.Add(ActivePlayer.id);
+                        BroadcastStatus($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT {ActivePlayer.currentPit - 1}! TURN PASSES TO PLAYER ★");
+                        yield return new WaitForSeconds(1.2f);
+                        if (_players.Count > 1)
+                        {
+                            AdvanceToNextActivePlayer();
+                        }
+                        else
+                        {
+                            _shotsTakenThisTurn = 0;
+                            ActivateCurrentPlayer();
+                            SetState(GameState.ReadyToAim);
+                        }
+                    }
+                    else if (_shotsTakenThisTurn >= _maxShotsPerTurn)
                     {
                         BroadcastStatus($"★ {ActivePlayer.name.ToUpper()} CONQUERED PIT! MAX {_maxShotsPerTurn} SHOTS REACHED — TURN OVER! ★");
                         yield return new WaitForSeconds(1.5f);
@@ -766,6 +993,11 @@ namespace PitStriker.Gameplay
                     ActivePlayer.isFinished = true;
                     ActivePlayer.currentPit = 3;
                     OnTargetPitChanged?.Invoke(3);
+
+                    if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                    {
+                        NetworkMatchState.Instance.ServerRecordPitConquered(CurrentPlayerIndex, 3);
+                    }
 
                     if (!_placementPodium.Contains(ActivePlayer))
                     {
@@ -875,6 +1107,11 @@ namespace PitStriker.Gameplay
                     yield return new WaitForSeconds(0.6f);
                     ActivateCurrentPlayer();
                     SetState(GameState.ReadyToAim);
+
+                    if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                    {
+                        NetworkMatchState.Instance.ServerAdvanceTurn(true);
+                    }
                 }
             }
             else
@@ -1048,16 +1285,26 @@ namespace PitStriker.Gameplay
             }
 
             SetState(GameState.ReadyToAim);
+
+            if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                NetworkMatchState.Instance.ServerAdvanceTurn(false);
+            }
         }
 
         private void ActivateCurrentPlayer()
         {
             if (ActivePlayer == null) return;
 
-            // If active player has not yet taken their first move, stage them at the start line and make visible
+            // If active player has not yet taken their first move, stage them at the start line
             if (!ActivePlayer.hasTakenFirstShot && ActivePlayer.marble != null)
             {
                 ActivePlayer.marble.ResetPosition(_startCenter);
+            }
+
+            // Unconditionally guarantee active player's marble is visible and active on its turn
+            if (ActivePlayer.marble != null)
+            {
                 ActivePlayer.marble.SetVisible(true);
             }
 
@@ -1190,6 +1437,12 @@ namespace PitStriker.Gameplay
 
             PlayerData winner = ranked.Count > 0 ? ranked[0] : null;
 
+            if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                int winnerIdx = winner != null ? (winner.id - 1) : CurrentPlayerIndex;
+                NetworkMatchState.Instance.ServerEndMatch(winnerIdx);
+            }
+
             if (Audio.AudioManager.Instance != null)
             {
                 Audio.AudioManager.Instance.PlayVictory();
@@ -1320,12 +1573,53 @@ namespace PitStriker.Gameplay
                 }
             }
 
-            // Start in Toss Phase: Only Player 1 is visible at the starting point!
-            SetState(GameState.TossPhase);
-            ActivateTossPlayer(0);
-            if (PitStriker.Audio.AudioManager.Instance != null)
+            // Check if online mode
+            bool isOnline = (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None);
+
+            if (isOnline)
             {
-                PitStriker.Audio.AudioManager.Instance.PlayTossMusic();
+                CurrentPlayerIndex = 0;
+                _shotsTakenThisTurn = 0;
+                ActivateCurrentPlayer();
+                SetState(GameState.ReadyToAim);
+
+                if (NetworkMatchState.Instance != null && Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer)
+                {
+                    // Clear any stale rematch flags before starting the new match
+                    NetworkMatchState.Instance.ServerResetRematchFlags();
+
+                    ulong hostId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+                    ulong guestId = 1;
+                    foreach (var c in Unity.Netcode.NetworkManager.Singleton.ConnectedClientsList)
+                    {
+                        if (c.ClientId != hostId) { guestId = c.ClientId; break; }
+                    }
+                    string hostName = _players.Count > 0 ? _players[0].name : "Host";
+                    string guestName = _players.Count > 1 ? _players[1].name : "Guest";
+                    NetworkMatchState.Instance.ServerInitializeMatch(
+                        NetworkSessionManager.Instance.ActiveJoinCode,
+                        "village_lane",
+                        hostId,
+                        guestId,
+                        hostName,
+                        guestName
+                    );
+                }
+
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayGameplayMusic();
+                }
+            }
+            else
+            {
+                // Start in Toss Phase: Only Player 1 is visible at the starting point!
+                SetState(GameState.TossPhase);
+                ActivateTossPlayer(0);
+                if (PitStriker.Audio.AudioManager.Instance != null)
+                {
+                    PitStriker.Audio.AudioManager.Instance.PlayTossMusic();
+                }
             }
         }
 

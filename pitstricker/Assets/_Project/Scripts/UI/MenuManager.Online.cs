@@ -28,6 +28,8 @@ namespace PitStriker.UI
         private Button _btnPlayLocal;
         private Button _btnPlayOnline;
         private Button _btnBackFromPlayMode;
+        private InputField _inputPlayerNamePlayMode;
+        private InputField _inputPlayerNameOnlineMenu;
 
         // Online Menu Controls
         private Button _btnQuickMatch;
@@ -311,10 +313,12 @@ namespace PitStriker.UI
                 "Compete against remote players over Wi-Fi or mobile data. Host private rooms with shareable 6-digit Join Codes, or jump directly into quick sessions.",
                 0, 20, 390, 80, 15, new Color(.75f, .86f, .84f), TextAnchor.UpperLeft);
 
-            var badge2 = Box("Badge2", onlineCard.transform, 0, -56, 400, 36, Ink);
-            Label(badge2.transform, "⚡  Low Latency  •  Room Codes  •  Head-to-Head", 0, 0, 390, 22, 13, Cream);
+            // Player Name input card right before entering Online Multiplayer
+            var nameCardPlay = Box("NameCard_PlayMode", onlineCard.transform, 0, -46, 400, 48, Ink);
+            Label(nameCardPlay.transform, "PLAYER 1 NAME:", -115, 0, 150, 20, 12, Gold);
+            _inputPlayerNamePlayMode = CreatePlayerNameInputField("Input_PlayerName_PlayMode", nameCardPlay.transform, 75, 0, 220, 36);
 
-            _btnPlayOnline = ActionButton("Btn_PlayOnline", onlineCard.transform, "PLAY ONLINE", 0, -140, 380, 62, Green);
+            _btnPlayOnline = ActionButton("Btn_PlayOnline", onlineCard.transform, "PLAY ONLINE", 0, -125, 380, 58, Green);
             _btnPlayOnline.onClick.AddListener(HandlePlayOnlineSelected);
 
             // Back button
@@ -339,26 +343,31 @@ namespace PitStriker.UI
             Label(_onlineMenuPanel.transform, "ONLINE MULTIPLAYER", 0, 268, 850, 44, 30, Cream);
             Label(_onlineMenuPanel.transform, "Create a private session with a code, join a friend, or find an opponent.", 0, 234, 940, 26, 16, new Color(.72f, .83f, .80f));
 
-            var hubCard = Box("OnlineHubCard", _onlineMenuPanel.transform, 0, 10, 540, 410, Card);
-            Box("HubAccent", hubCard.transform, 0, 201, 540, 6, Green);
+            var hubCard = Box("OnlineHubCard", _onlineMenuPanel.transform, 0, 10, 540, 420, Card);
+            Box("HubAccent", hubCard.transform, 0, 206, 540, 6, Green);
 
-            Label(hubCard.transform, "CHOOSE MATCH TYPE", 0, 162, 480, 28, 18, Gold);
-            Label(hubCard.transform, "Two players  •  Official Pit Striker rules", 0, 134, 480, 22, 13, new Color(.72f, .83f, .80f));
+            // Active Player Name Bar
+            var nameCardOnline = Box("NameCard_OnlineMenu", hubCard.transform, 0, 168, 480, 44, Ink);
+            Label(nameCardOnline.transform, "PLAYER 1 NAME:", -135, 0, 160, 22, 12, Gold);
+            _inputPlayerNameOnlineMenu = CreatePlayerNameInputField("Input_PlayerName_Online", nameCardOnline.transform, 80, 0, 280, 34);
 
-            _btnQuickMatch = ActionButton("Btn_OnlineQuickMatch", hubCard.transform, "QUICK MATCH", 0, 72, 450, 62, Gold);
+            Label(hubCard.transform, "CHOOSE MATCH TYPE", 0, 122, 480, 26, 17, Gold);
+            Label(hubCard.transform, "Two players  •  Official Pit Striker rules", 0, 98, 480, 20, 12, new Color(.72f, .83f, .80f));
+
+            _btnQuickMatch = ActionButton("Btn_OnlineQuickMatch", hubCard.transform, "QUICK MATCH", 0, 42, 450, 58, Gold);
             _btnQuickMatch.onClick.AddListener(HandleQuickMatchClicked);
 
-            _btnCreatePrivateMatch = ActionButton("Btn_OnlineCreateMatch", hubCard.transform, "CREATE PRIVATE MATCH", 0, -2, 450, 62, Green);
+            _btnCreatePrivateMatch = ActionButton("Btn_OnlineCreateMatch", hubCard.transform, "CREATE PRIVATE MATCH", 0, -26, 450, 58, Green);
             _btnCreatePrivateMatch.onClick.AddListener(HandleCreatePrivateMatchClicked);
 
-            _btnJoinPrivateMatch = ActionButton("Btn_OnlineJoinMatch", hubCard.transform, "JOIN PRIVATE MATCH", 0, -76, 450, 62, Card);
+            _btnJoinPrivateMatch = ActionButton("Btn_OnlineJoinMatch", hubCard.transform, "JOIN PRIVATE MATCH", 0, -94, 450, 58, Card);
             // Add subtle border to the Join button
             var joinOutline = _btnJoinPrivateMatch.gameObject.AddComponent<Outline>();
             joinOutline.effectColor = Gold;
             joinOutline.effectDistance = new Vector2(1.5f, -1.5f);
             _btnJoinPrivateMatch.onClick.AddListener(HandleJoinPrivateMatchClicked);
 
-            _btnBackFromOnlineMenu = ActionButton("Btn_OnlineBack", hubCard.transform, "BACK", 0, -150, 450, 52, Ink);
+            _btnBackFromOnlineMenu = ActionButton("Btn_OnlineBack", hubCard.transform, "BACK", 0, -158, 450, 48, Ink);
             _btnBackFromOnlineMenu.onClick.AddListener(() =>
             {
                 if (NetworkSessionManager.Instance != null)
@@ -583,6 +592,95 @@ namespace PitStriker.UI
             return field;
         }
 
+        public static string GetRawPlayerName()
+        {
+            string n = PlayerPrefs.GetString("PlayerCustomName", "Striker").Trim();
+            if (string.IsNullOrEmpty(n)) n = "Striker";
+            return n;
+        }
+
+        public static string GetFormattedPlayer1Name()
+        {
+            string raw = GetRawPlayerName();
+            return $"Player 1 - \"{raw}\"";
+        }
+
+        public void SavePlayerName(string newName)
+        {
+            if (string.IsNullOrWhiteSpace(newName)) newName = "Striker";
+            newName = newName.Trim();
+            if (newName.StartsWith("Player 1 - \"") && newName.EndsWith("\"") && newName.Length > 13)
+            {
+                newName = newName.Substring(12, newName.Length - 13);
+            }
+            PlayerPrefs.SetString("PlayerCustomName", newName);
+            PlayerPrefs.Save();
+
+            string formatted = $"Player 1 - \"{newName}\"";
+            if (PitStriker.Networking.Client.CloudNetworkClient.Instance != null)
+            {
+                PitStriker.Networking.Client.CloudNetworkClient.Instance.LocalPlayerName = formatted;
+            }
+
+            if (_inputPlayerNamePlayMode != null && _inputPlayerNamePlayMode.text != newName)
+            {
+                _inputPlayerNamePlayMode.text = newName;
+            }
+            if (_inputPlayerNameOnlineMenu != null && _inputPlayerNameOnlineMenu.text != newName)
+            {
+                _inputPlayerNameOnlineMenu.text = newName;
+            }
+            if (_txtHostP1Name != null)
+            {
+                _txtHostP1Name.text = $"{formatted} (HOST - YOU)";
+            }
+        }
+
+        private InputField CreatePlayerNameInputField(string name, Transform parent, float x, float y, float w, float h)
+        {
+            GameObject inputObj = Box(name, parent, x, y, w, h, new Color(0.04f, 0.10f, 0.10f, 1f));
+            Image bg = inputObj.GetComponent<Image>();
+            bg.raycastTarget = true;
+
+            var outline = inputObj.AddComponent<Outline>();
+            outline.effectColor = Gold;
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+
+            string initialName = GetRawPlayerName();
+
+            GameObject textObj = CreateText("Text", inputObj.transform, initialName, (int)(h * 0.45f), FontStyle.Bold, Cream, TextAnchor.MiddleCenter);
+            RectTransform textRect = textObj.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = new Vector2(-16, 0);
+            textRect.anchoredPosition = Vector2.zero;
+            Text textComp = textObj.GetComponent<Text>();
+            textComp.supportRichText = false;
+
+            GameObject phObj = CreateText("Placeholder", inputObj.transform, "Enter Name...", (int)(h * 0.42f), FontStyle.Italic, new Color(0.45f, 0.58f, 0.58f, 0.85f), TextAnchor.MiddleCenter);
+            RectTransform phRect = phObj.GetComponent<RectTransform>();
+            phRect.anchorMin = Vector2.zero;
+            phRect.anchorMax = Vector2.one;
+            phRect.sizeDelta = new Vector2(-16, 0);
+            phRect.anchoredPosition = Vector2.zero;
+            Text phComp = phObj.GetComponent<Text>();
+
+            InputField field = inputObj.AddComponent<InputField>();
+            field.textComponent = textComp;
+            field.placeholder = phComp;
+            field.characterLimit = 16;
+            field.contentType = InputField.ContentType.Standard;
+            field.lineType = InputField.LineType.SingleLine;
+            field.text = initialName;
+
+            field.onValueChanged.AddListener((val) =>
+            {
+                SavePlayerName(val);
+            });
+
+            return field;
+        }
+
         // =========================================================================
         // FLOW & BUTTON EVENT HANDLERS
         // =========================================================================
@@ -600,8 +698,16 @@ namespace PitStriker.UI
         private void HandlePlayOnlineSelected()
         {
             Debug.Log("[MENU] Online Play selected -> Initializing Cloud Client & Opening Online Menu...");
+            if (_inputPlayerNamePlayMode != null && !string.IsNullOrWhiteSpace(_inputPlayerNamePlayMode.text))
+            {
+                SavePlayerName(_inputPlayerNamePlayMode.text);
+            }
             EnsureCloudClient();
-            PitStriker.Networking.Client.CloudNetworkClient.Instance?.Connect();
+            if (PitStriker.Networking.Client.CloudNetworkClient.Instance != null)
+            {
+                PitStriker.Networking.Client.CloudNetworkClient.Instance.LocalPlayerName = GetFormattedPlayer1Name();
+                PitStriker.Networking.Client.CloudNetworkClient.Instance.Connect();
+            }
             MultiplayerAnalytics.TrackOnlineMenuOpened();
             ShowScreen(ScreenType.OnlineMenu);
         }
@@ -609,12 +715,17 @@ namespace PitStriker.UI
         private void HandleQuickMatchClicked()
         {
             Debug.Log("[ONLINE] Quick Match clicked -> Requesting cloud matchmaking...");
+            if (_inputPlayerNameOnlineMenu != null && !string.IsNullOrWhiteSpace(_inputPlayerNameOnlineMenu.text))
+            {
+                SavePlayerName(_inputPlayerNameOnlineMenu.text);
+            }
             ShowScreen(ScreenType.QuickMatch);
             EnsureCloudClient();
 
             var client = PitStriker.Networking.Client.CloudNetworkClient.Instance;
             if (client != null)
             {
+                client.LocalPlayerName = GetFormattedPlayer1Name();
                 if (client.IsConnected)
                 {
                     client.RequestQuickMatch();
@@ -636,7 +747,12 @@ namespace PitStriker.UI
         private void HandleCreatePrivateMatchClicked()
         {
             Debug.Log("[ONLINE] Creating private match session via Cloud Server...");
+            if (_inputPlayerNameOnlineMenu != null && !string.IsNullOrWhiteSpace(_inputPlayerNameOnlineMenu.text))
+            {
+                SavePlayerName(_inputPlayerNameOnlineMenu.text);
+            }
             ShowScreen(ScreenType.CreateMatch);
+            if (_txtHostP1Name != null) _txtHostP1Name.text = $"{GetFormattedPlayer1Name()} (HOST - YOU)";
 
             _activeSessionCode = string.Empty;
             if (_txtCreateJoinCode != null) _txtCreateJoinCode.text = "CREATING...";
@@ -734,6 +850,7 @@ namespace PitStriker.UI
             var client = PitStriker.Networking.Client.CloudNetworkClient.Instance;
             if (client != null)
             {
+                client.LocalPlayerName = GetFormattedPlayer1Name();
                 if (client.IsConnected)
                 {
                     client.JoinRoom(code);
@@ -995,7 +1112,7 @@ namespace PitStriker.UI
             if (tm != null)
             {
                 bool[] isAI = new bool[] { false, false };
-                string[] names = new string[] { "Player 1 (Host)", "Player 2 (Guest)" };
+                string[] names = new string[] { GetFormattedPlayer1Name(), "Player 2 (Guest)" };
                 tm.ConfigureAndStartMatch(2, isAI, names);
                 string matchId = !string.IsNullOrEmpty(_activeSessionCode) ? _activeSessionCode : "online_match";
                 MultiplayerAnalytics.TrackMatchStarted(matchId, "village_lane");
