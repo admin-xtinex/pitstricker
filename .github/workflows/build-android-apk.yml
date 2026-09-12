@@ -1,0 +1,118 @@
+name: Build and Deploy Android APK
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'Docs/**'
+      - 'emulator_screen.png'
+      - 'build_apk.log'
+  workflow_dispatch:
+    inputs:
+      upload_to_firebase:
+        description: 'Deploy to Firebase App Distribution'
+        required: false
+        type: boolean
+        default: true
+      release_notes:
+        description: 'Release notes for Firebase'
+        required: false
+        type: string
+        default: 'Automated build from GitHub Actions'
+
+jobs:
+  build-android:
+    name: Build Android APK (GameCI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      # Speed up builds by caching the Unity Library folder
+      - name: Restore Library cache
+        uses: actions/cache@v4
+        with:
+          path: pitstricker/Library
+          key: Library-Android-${{ hashFiles('pitstricker/Packages/manifest.json', 'pitstricker/ProjectSettings/ProjectVersion.txt') }}
+          restore-keys: |
+            Library-Android-
+
+      # Build APK using GameCI unity-builder
+      - name: Build Android APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS || 'xtinex123' }}
+          ANDROID_KEYALIAS_NAME: ${{ secrets.ANDROID_KEYALIAS_NAME || 'pitstriker' }}
+          ANDROID_KEYALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS || 'xtinex123' }}
+        with:
+          targetPlatform: Android
+          projectPath: pitstricker
+          unityVersion: 6000.6.0f1
+          buildMethod: PitStriker.EditorTools.BuildAPK.BuildAndroidPlayer
+          buildsPath: Builds/Android
+
+      # Locate built APK
+      - name: Find Built APK
+        id: find_apk
+        run: |
+          APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "::error::No APK file found after build!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_FILE"
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "apk_size=$(du -h "$APK_FILE" | cut -f1)" >> $GITHUB_OUTPUT
+
+      # Upload APK to GitHub Actions Artifacts
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PitStriker-Android-build-${{ github.run_number }}
+          path: ${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 14
+
+      # Check and deploy to Firebase App Distribution
+      - name: Check Firebase Configuration
+        id: firebase_check
+        run: |
+          if [ -n "${{ secrets.FIREBASE_APP_ID }}" ] && ( [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ] || [ -n "${{ secrets.FIREBASE_TOKEN }}" ] ); then
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning::Firebase App Distribution secrets (FIREBASE_APP_ID and FIREBASE_SERVICE_ACCOUNT or FIREBASE_TOKEN) not set. The APK is preserved in GitHub Artifacts."
+          fi
+
+      - name: Deploy to Firebase App Distribution (Service Account)
+        if: steps.firebase_check.outputs.configured == 'true' && secrets.FIREBASE_SERVICE_ACCOUNT != '' && (github.event_name != 'workflow_dispatch' || inputs.upload_to_firebase)
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        continue-on-error: true
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: ${{ secrets.FIREBASE_GROUPS || 'testers' }}
+          file: ${{ steps.find_apk.outputs.apk_path }}
+          releaseNotes: ${{ inputs.release_notes || github.event.head_commit.message || 'Automated build from GitHub Actions' }}
+
+      - name: Deploy to Firebase App Distribution (CLI Token)
+        if: steps.firebase_check.outputs.configured == 'true' && secrets.FIREBASE_SERVICE_ACCOUNT == '' && secrets.FIREBASE_TOKEN != '' && (github.event_name != 'workflow_dispatch' || inputs.upload_to_firebase)
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        continue-on-error: true
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          token: ${{ secrets.FIREBASE_TOKEN }}
+          groups: ${{ secrets.FIREBASE_GROUPS || 'testers' }}
+          file: ${{ steps.find_apk.outputs.apk_path }}
+          releaseNotes: ${{ inputs.release_notes || github.event.head_commit.message || 'Automated build from GitHub Actions' }}

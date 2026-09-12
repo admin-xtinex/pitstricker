@@ -413,16 +413,7 @@ namespace PitStriker.Gameplay
                 }
                 else
                 {
-                    if (i == 0)
-                    {
-                        string customName = PlayerPrefs.GetString("PlayerCustomName", "Striker").Trim();
-                        if (string.IsNullOrEmpty(customName)) customName = "Striker";
-                        pName = $"Player 1 - \"{customName}\"";
-                    }
-                    else
-                    {
-                        pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
-                    }
+                    pName = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
                 }
 
                 PlayerData player = new PlayerData(i + 1, pName, themeColors[i % themeColors.Length], marble);
@@ -1573,11 +1564,21 @@ namespace PitStriker.Gameplay
                 }
             }
 
-            // Check if online mode
-            bool isOnline = (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None);
+            // Check if online mode (Unity Netcode or Google Cloud WebSocket)
+            bool isOnline = (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None)
+                || (PitStriker.Networking.Client.CloudMatchManager.Instance != null && PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive);
 
             if (isOnline)
             {
+                // In online multiplayer, all players are active and visible in the arena
+                for (int i = 0; i < _players.Count; i++)
+                {
+                    if (_players[i].marble != null)
+                    {
+                        _players[i].marble.SetVisible(true);
+                    }
+                }
+
                 CurrentPlayerIndex = 0;
                 _shotsTakenThisTurn = 0;
                 ActivateCurrentPlayer();

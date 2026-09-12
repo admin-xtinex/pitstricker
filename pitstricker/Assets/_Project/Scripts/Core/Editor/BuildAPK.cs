@@ -92,7 +92,16 @@ namespace PitStriker.EditorTools
                 Directory.CreateDirectory(fullOutputDir);
             }
 
-            string apkPath = Path.Combine(fullOutputDir, ApkFileName);
+            string apkPath = GetCustomBuildPath();
+            if (string.IsNullOrEmpty(apkPath))
+            {
+                apkPath = Path.Combine(fullOutputDir, ApkFileName);
+            }
+            string apkDir = Path.GetDirectoryName(apkPath);
+            if (!string.IsNullOrEmpty(apkDir) && !Directory.Exists(apkDir))
+            {
+                Directory.CreateDirectory(apkDir);
+            }
 
             // 2. Configure Player Settings for Android
             PlayerSettings.productName = "Pit Striker";
@@ -125,15 +134,28 @@ namespace PitStriker.EditorTools
             }
 
             // 3. Keystore Signing Configuration
-            string keystorePath = Path.Combine(projectRoot, "Keystore", "pitstriker.keystore");
+            string keystorePath = Environment.GetEnvironmentVariable("ANDROID_KEYSTORE_PATH");
+            if (string.IsNullOrEmpty(keystorePath) || !File.Exists(keystorePath))
+            {
+                keystorePath = Path.Combine(projectRoot, "Keystore", "pitstriker.keystore");
+                if (!File.Exists(keystorePath))
+                {
+                    keystorePath = Path.Combine(projectRoot, "..", "Keystore", "pitstriker.keystore");
+                }
+            }
+
             if (File.Exists(keystorePath))
             {
+                string pass = Environment.GetEnvironmentVariable("ANDROID_KEYSTORE_PASS") ?? "xtinex123";
+                string alias = Environment.GetEnvironmentVariable("ANDROID_KEYALIAS_NAME") ?? "pitstriker";
+                string aliasPass = Environment.GetEnvironmentVariable("ANDROID_KEYALIAS_PASS") ?? "xtinex123";
+
                 PlayerSettings.Android.useCustomKeystore = true;
-                PlayerSettings.Android.keystoreName = keystorePath;
-                PlayerSettings.Android.keystorePass = "xtinex123";
-                PlayerSettings.Android.keyaliasName = "pitstriker";
-                PlayerSettings.Android.keyaliasPass = "xtinex123";
-                Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Signing using Release Keystore: {keystorePath} (Alias: pitstriker)</color>");
+                PlayerSettings.Android.keystoreName = Path.GetFullPath(keystorePath);
+                PlayerSettings.Android.keystorePass = pass;
+                PlayerSettings.Android.keyaliasName = alias;
+                PlayerSettings.Android.keyaliasPass = aliasPass;
+                Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Signing using Release Keystore: {keystorePath} (Alias: {alias})</color>");
             }
             else
             {
@@ -239,6 +261,48 @@ namespace PitStriker.EditorTools
             }
 
             return list.ToArray();
+        }
+
+        private static string GetCustomBuildPath()
+        {
+            try
+            {
+                string[] args = Environment.GetCommandLineArgs();
+                for (int i = 0; i < args.Length - 1; i++)
+                {
+                    if (string.Equals(args[i], "-customBuildPath", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return args[i + 1];
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BUILD APK] Could not parse customBuildPath argument: {ex.Message}");
+            }
+
+            return Environment.GetEnvironmentVariable("CUSTOM_BUILD_PATH");
+        }
+
+        public static void BuildAndroidPlayerBatch()
+        {
+            try
+            {
+                BuildAndroidPlayer();
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[BATCH BUILD FAILED] {ex.Message}\n{ex.StackTrace}");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                throw;
+            }
         }
     }
 }

@@ -63,12 +63,28 @@ namespace PitStrikerServer
         private async Task NotifyMatchFoundAsync(Room room)
         {
             var writer = new NetworkByteWriter(256);
-            writer.WriteByte((byte)NetworkOpCode.MatchFound);
-            writer.WriteString(room.RoomCode);
-            writer.WriteString(room.Player0?.PlayerName ?? "Player 1");
-            writer.WriteString(room.Player1?.PlayerName ?? "Player 2");
 
-            await room.BroadcastAsync(writer.Buffer, writer.Position);
+            if (room.Player0 != null)
+            {
+                writer.Reset();
+                writer.WriteByte((byte)NetworkOpCode.MatchFound);
+                writer.WriteString(room.RoomCode);
+                writer.WriteString(room.Player0.PlayerName);
+                writer.WriteString(room.Player1?.PlayerName ?? "Player 2");
+                writer.WriteInt32(0); // Tell Player 0 its index is 0
+                await room.Player0.SendAsync(writer.Buffer, writer.Position);
+            }
+
+            if (room.Player1 != null)
+            {
+                writer.Reset();
+                writer.WriteByte((byte)NetworkOpCode.MatchFound);
+                writer.WriteString(room.RoomCode);
+                writer.WriteString(room.Player0?.PlayerName ?? "Player 1");
+                writer.WriteString(room.Player1.PlayerName);
+                writer.WriteInt32(1); // Tell Player 1 its index is 1
+                await room.Player1.SendAsync(writer.Buffer, writer.Position);
+            }
 
             // Start countdown
             _ = RunCountdownAndStartMatchAsync(room);
@@ -90,12 +106,27 @@ namespace PitStrikerServer
             // Start match!
             room.MatchEngine.StartMatch();
 
-            writer.Reset();
-            writer.WriteByte((byte)NetworkOpCode.MatchStarted);
-            writer.WriteString(room.RoomCode);
-            writer.WriteString(room.Player0?.PlayerName ?? "Player 1");
-            writer.WriteString(room.Player1?.PlayerName ?? "Player 2");
-            await room.BroadcastAsync(writer.Buffer, writer.Position);
+            if (room.Player0 != null)
+            {
+                writer.Reset();
+                writer.WriteByte((byte)NetworkOpCode.MatchStarted);
+                writer.WriteString(room.RoomCode);
+                writer.WriteString(room.Player0.PlayerName);
+                writer.WriteString(room.Player1?.PlayerName ?? "Player 2");
+                writer.WriteInt32(0); // Send Player 0 its authoritative index
+                await room.Player0.SendAsync(writer.Buffer, writer.Position);
+            }
+
+            if (room.Player1 != null)
+            {
+                writer.Reset();
+                writer.WriteByte((byte)NetworkOpCode.MatchStarted);
+                writer.WriteString(room.RoomCode);
+                writer.WriteString(room.Player0?.PlayerName ?? "Player 1");
+                writer.WriteString(room.Player1.PlayerName);
+                writer.WriteInt32(1); // Send Player 1 its authoritative index
+                await room.Player1.SendAsync(writer.Buffer, writer.Position);
+            }
 
             // Broadcast initial world snapshot
             await room.BroadcastSnapshotAsync();

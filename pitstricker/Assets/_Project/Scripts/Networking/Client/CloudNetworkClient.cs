@@ -385,8 +385,12 @@ namespace PitStriker.Networking.Client
                     ActiveRoomCode = reader.ReadString();
                     string hostP1 = reader.ReadString();
                     string guestP2 = reader.ReadString();
+                    if (reader.Remaining >= 4)
+                    {
+                        LocalPlayerIndex = reader.ReadInt32();
+                    }
                     OpponentName = LocalPlayerIndex == 0 ? guestP2 : hostP1;
-                    Debug.Log($"[CLOUD CLIENT] Match found! Room: {ActiveRoomCode}, vs: {OpponentName}");
+                    Debug.Log($"[CLOUD CLIENT] Match found! Room: {ActiveRoomCode}, vs: {OpponentName}, LocalPlayerIndex: {LocalPlayerIndex}");
                     OnOpponentJoined?.Invoke(OpponentName);
                     break;
 
@@ -406,7 +410,15 @@ namespace PitStriker.Networking.Client
                     string mCode = reader.ReadString();
                     string p1 = reader.ReadString();
                     string p2 = reader.ReadString();
-                    Debug.Log($"<color=#00FF88>[CLOUD CLIENT] Match started in room {mCode}!</color>");
+                    if (reader.Remaining >= 4)
+                    {
+                        LocalPlayerIndex = reader.ReadInt32();
+                    }
+                    else if (LocalPlayerIndex < 0)
+                    {
+                        LocalPlayerIndex = (!string.IsNullOrEmpty(LocalPlayerName) && LocalPlayerName == p1) ? 0 : 1;
+                    }
+                    Debug.Log($"<color=#00FF88>[CLOUD CLIENT] Match started in room {mCode}! LocalPlayerIndex: {LocalPlayerIndex}</color>");
                     OnMatchStarted?.Invoke(mCode, p1, p2);
                     break;
 
