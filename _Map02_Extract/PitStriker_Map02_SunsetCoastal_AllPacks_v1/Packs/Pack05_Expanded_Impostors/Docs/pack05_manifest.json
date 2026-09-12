@@ -1,0 +1,22 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack": "Pack 05 - Expanded Impostors",
+  "type": "transparent scenic layers / impostors",
+  "assets": [
+    "AtmosphericHaze_Layer_01.png",
+    "CoastalHuts_Far_Strip.png",
+    "LighthouseIsland_Expanded_A.png",
+    "PalmForest_Far_A.png",
+    "PalmForest_Far_B.png",
+    "IslandVegetation_Mass_01.png",
+    "FarBoats_Silhouette_Set.png",
+    "ForegroundFoliage_Frame_A.png",
+    "SunsetCloud_Layer_01.png",
+    "MountainLayer_Far_01.png",
+    "ForegroundFoliage_Frame_B.png",
+    "DistantCliffs_Layer_01.png",
+    "MountainLayer_Far_02.png",
+    "LighthouseIsland_Expanded_B.png"
+  ]
+}

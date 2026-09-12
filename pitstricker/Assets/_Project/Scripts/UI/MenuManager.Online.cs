@@ -1000,7 +1000,7 @@ namespace PitStriker.UI
                 string[] names = new string[] { "Player 1 (Host)", "Player 2 (Guest)" };
                 tm.ConfigureAndStartMatch(2, isAI, names);
                 string matchId = !string.IsNullOrEmpty(_activeSessionCode) ? _activeSessionCode : "online_match";
-                MultiplayerAnalytics.TrackMatchStarted(matchId, "village_lane");
+                MultiplayerAnalytics.TrackMatchStarted(matchId, "sunset_coastal");
                 Debug.Log("<color=#00FF88>[ONLINE MATCH] 2-Player match initialized via TurnManager!</color>");
             }
             else
@@ -1030,7 +1030,7 @@ namespace PitStriker.UI
                     bool[] isAI = new bool[] { false, false };
                     string[] names = new string[] { string.IsNullOrEmpty(hostName) ? "Player 1 (Host)" : hostName, string.IsNullOrEmpty(guestName) ? "Player 2 (Guest)" : guestName };
                     tm.ConfigureAndStartMatch(2, isAI, names);
-                    MultiplayerAnalytics.TrackMatchStarted(matchId, "village_lane");
+                    MultiplayerAnalytics.TrackMatchStarted(matchId, "sunset_coastal");
                     Debug.Log("<color=#00FF88>[ONLINE CLIENT] 2-Player match initialized on Guest via TurnManager!</color>");
                 }
             }

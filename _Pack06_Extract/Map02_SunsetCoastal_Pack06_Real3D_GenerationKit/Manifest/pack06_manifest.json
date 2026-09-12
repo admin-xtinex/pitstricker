@@ -1,0 +1,93 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack": "Pack 06 - Real 3D Generation Kit",
+  "status": "generation_instructions_only_no_3d_meshes_included",
+  "asset_count": 12,
+  "assets": [
+    {
+      "id": "HeroCoastalRock_01",
+      "priority": 1,
+      "target": "GLB/GLTF",
+      "poly_target": "8k-20k tris before LOD",
+      "prompt": "Create a stylized semi-realistic coastal rock cluster for a premium mobile Unity game called Pit Striker, Sunset Coastal map. One cohesive hero rock formation, weathered warm gray-brown stone, subtle algae/moss near the base, rounded erosion, believable natural asymmetry, broad stable base, no floating pieces, no text, no environment, no ground plane. Designed to sit beside a sandy gameplay lane and look good from two elevated three-quarter camera angles. Game-ready proportions, clean silhouette, PBR textures, mobile-conscious topology, watertight where possible."
+    },
+    {
+      "id": "BoundaryLog_Module_01",
+      "priority": 2,
+      "target": "GLB/GLTF",
+      "poly_target": "3k-8k tris",
+      "prompt": "Create a modular weathered coastal boundary log for a premium stylized mobile Unity game. One horizontal driftwood/log segment with believable chipped ends, sun-bleached brown wood, subtle rope wear, slightly irregular but straight enough to tile into a gameplay boundary. No sand, no beach scene, no extra props, no text. Clean pivot-friendly geometry, reusable module, PBR materials, mobile-friendly topology, readable from elevated isometric-like cameras."
+    },
+    {
+      "id": "WoodenPost_Rope_01",
+      "priority": 3,
+      "target": "GLB/GLTF",
+      "poly_target": "3k-8k tris",
+      "prompt": "Create a stylized coastal wooden bollard/post with a short thick rope loop/connection suitable for a beach arena boundary. Weathered timber, simple metal or rope fastening, sun-aged surfaces, compact footprint, clean silhouette, no scene background, no text. Designed for repeated placement along a sandy lane in a mobile Unity game. PBR textures, mobile-friendly topology, realistic proportions, clean base/pivot."
+    },
+    {
+      "id": "BeachShack_Hero_01",
+      "priority": 4,
+      "target": "GLB/GLTF",
+      "poly_target": "20k-45k tris",
+      "prompt": "Create a compact hero beach shack for a stylized semi-realistic tropical sunset game environment. Weathered wood walls, small sloped thatch or corrugated coastal roof, simple open porch, subtle nautical details, one or two hanging lantern points, no interior complexity beyond what is visible from outside, no text/signage. It must look premium from two elevated three-quarter camera angles while remaining mobile-game friendly. PBR textures, efficient topology, simplified unseen backside/interior, clean pivot at ground center."
+    },
+    {
+      "id": "SmallFishingBoat_01",
+      "priority": 5,
+      "target": "GLB/GLTF",
+      "poly_target": "12k-30k tris",
+      "prompt": "Create a small weathered tropical coastal fishing skiff for a premium mobile Unity game. Wooden hull, faded paint accents, simple bench seats, coiled rope and one small crate optional, no motor complexity unless very simple, no water, no background, no text. Stylized semi-realistic proportions, readable from elevated cameras, PBR textures, clean topology, optimized for mobile, stable pivot and sensible scale."
+    },
+    {
+      "id": "DockModule_01",
+      "priority": 6,
+      "target": "GLB/GLTF",
+      "poly_target": "6k-15k tris",
+      "prompt": "Create a modular tropical dock/jetty section for a stylized mobile Unity game. Weathered wooden planks, simple support posts, slight unevenness, subtle rope attachment points, compact reusable module that can tile end-to-end. No water, no scenery, no text. PBR textures, mobile-friendly topology, clean pivot/origin for modular snapping, good silhouette from elevated three-quarter camera angles."
+    },
+    {
+      "id": "Surfboard_01",
+      "priority": 7,
+      "target": "GLB/GLTF",
+      "poly_target": "1k-4k tris",
+      "prompt": "Create a single stylized weathered surfboard prop for a tropical sunset mobile game. Slightly worn paint, subtle coastal pattern without text or logos, rounded board shape, small fins, believable thickness, clean PBR textures, lightweight topology, no stand, no background. Optimized for Unity mobile and readable as a decorative prop from elevated cameras."
+    },
+    {
+      "id": "Crate_01",
+      "priority": 8,
+      "target": "GLB/GLTF",
+      "poly_target": "1.5k-5k tris",
+      "prompt": "Create a compact weathered wooden fishing crate for a stylized coastal mobile Unity game. Reinforced slats, slightly chipped corners, sun-aged wood, no labels, no text, no contents spilling out. PBR textures, simple reusable geometry, clean pivot, low-poly/mobile-friendly topology."
+    },
+    {
+      "id": "WoodenBarrel_01",
+      "priority": 9,
+      "target": "GLB/GLTF",
+      "poly_target": "2k-6k tris",
+      "prompt": "Create a stylized semi-realistic weathered coastal wooden barrel for a mobile Unity game. Darkened metal hoops, sun-aged wood, subtle salt wear, no labels, no text, no scene. PBR textures, efficient topology, clean pivot, suitable as reusable beach dressing."
+    },
+    {
+      "id": "ClayPot_01",
+      "priority": 10,
+      "target": "GLB/GLTF",
+      "poly_target": "1k-4k tris",
+      "prompt": "Create a weathered terracotta clay pot for a stylized tropical coastal mobile Unity game. Warm terracotta color, subtle surface chips and age, optional very simple wave-like painted motif without text, no plant inside, no environment. PBR textures, lightweight topology, clean base and pivot."
+    },
+    {
+      "id": "DriftwoodObstacle_01",
+      "priority": 11,
+      "target": "GLB/GLTF",
+      "poly_target": "2k-8k tris",
+      "prompt": "Create a small driftwood obstacle for a marble gameplay arena in a stylized coastal mobile Unity game. One grounded twisted branch/log shape, low profile so it does not obscure gameplay, rounded worn edges, believable beach-weathered wood, no sharp spikes, no environment, no text. PBR textures, mobile-friendly topology, simple collider-friendly silhouette, clean pivot."
+    },
+    {
+      "id": "HeroPalm_01",
+      "priority": 12,
+      "target": "GLB/GLTF",
+      "poly_target": "8k-20k tris",
+      "prompt": "Create one stylized semi-realistic tropical hero palm tree for a premium mobile Unity game. Slightly curved trunk, layered bark detail, healthy green fronds, a few subtle dried fronds, balanced crown silhouette, no coconuts unless minimal, no ground or scenery. Optimized for mobile, PBR textures, fronds suitable for alpha-cutout material if needed, clean pivot at trunk base, designed for elevated sunset-coastal camera views."
+    }
+  ]
+}

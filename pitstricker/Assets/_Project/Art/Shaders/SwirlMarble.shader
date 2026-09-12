@@ -4,6 +4,8 @@ Shader "Pit Striker/Swirl Marble"
     {
         _BaseColor("Glass body", Color) = (0.015,0.05,0.4,1)
         _VeinColor("Swirl ribbon", Color) = (0.12,0.6,1,1)
+        _RimColor("Cartoon rim", Color) = (0.4,0.7,1,1)
+        _RimPower("Rim power", Range(1,8)) = 3.2
         _Smoothness("Polish", Range(0,1)) = 0.96
         _BaseMap("Base", 2D) = "white" {}
         _Cull("Cull", Float) = 2
@@ -23,24 +25,24 @@ Shader "Pit Striker/Swirl Marble"
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float4 _BaseColor, _VeinColor, _BaseMap_ST;
-                float _Smoothness, _Cull, _Cutoff;
+                float4 _BaseColor, _VeinColor, _RimColor, _BaseMap_ST;
+                float _RimPower, _Smoothness, _Cull, _Cutoff;
             CBUFFER_END
             struct A { float4 p:POSITION; float3 n:NORMAL; };
-            struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; float3 normal:TEXCOORD1; float3 local:TEXCOORD2; float fog:TEXCOORD3;half3 vertexLight:TEXCOORD6; };
+            struct V { float4 p:SV_POSITION; float3 world:TEXCOORD0; float3 normal:TEXCOORD1; float3 local:TEXCOORD2; float fog:TEXCOORD3; half3 vertexLight:TEXCOORD6; };
             V vert(A a)
             {
                 V o; VertexPositionInputs p=GetVertexPositionInputs(a.p.xyz); o.p=p.positionCS; o.world=p.positionWS;
-                o.normal=TransformObjectToWorldNormal(a.n); o.local=a.n; o.fog=ComputeFogFactor(p.positionCS.z); o.vertexLight=VertexLighting(o.world,o.normal);return o;
+                o.normal=TransformObjectToWorldNormal(a.n); o.local=a.n; o.fog=ComputeFogFactor(p.positionCS.z); o.vertexLight=VertexLighting(o.world,o.normal); return o;
             }
             half4 frag(V i):SV_Target
             {
                 // Sample the ribbon beneath the glass shell along a refracted view ray.
-                // Opaque approximation: no expensive scene-color refraction on mobile.
                 float3 shellNormal=normalize(i.local);
                 float3 viewOS=normalize(TransformWorldToObjectDir(GetWorldSpaceNormalizeViewDir(i.world)));
                 float3 innerRay=refract(-viewOS,shellNormal,1.0/1.46);
@@ -50,11 +52,12 @@ Shader "Pit Striker/Swirl Marble"
                 float fine=pow(saturate(sin(q.x*32+q.y*27+sin(q.z*9)*5)),12);
                 InputData d=(InputData)0; d.positionWS=i.world; d.normalWS=normalize(i.normal);
                 d.viewDirectionWS=GetWorldSpaceNormalizeViewDir(i.world); d.shadowCoord=TransformWorldToShadowCoord(i.world);
-                d.bakedGI=SampleSH(d.normalWS); d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p); d.shadowMask=half4(1,1,1,1);
+                d.bakedGI=SampleSH(d.normalWS); d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p.xy); d.shadowMask=half4(1,1,1,1);
                 SurfaceData s=(SurfaceData)0; s.albedo=lerp(_BaseColor.rgb,_VeinColor.rgb,ribbon*.8+fine*.12);
                 s.smoothness=_Smoothness; s.metallic=0; s.occlusion=1; s.alpha=1;
-                // Glass is dielectric; its highlights come from lighting and reflections.
-                s.emission=0;
+                // Stylized rim fresnel to accentuate spherical silhouette
+                float rim=pow(1.0-saturate(dot(d.normalWS,d.viewDirectionWS)),_RimPower);
+                s.emission=_RimColor.rgb*(rim*0.45)+_VeinColor.rgb*(fine*0.2);
                 d.vertexLighting=i.vertexLight;
                 half4 c=UniversalFragmentPBR(d,s); c.rgb=MixFog(c.rgb,i.fog); return c;
             }

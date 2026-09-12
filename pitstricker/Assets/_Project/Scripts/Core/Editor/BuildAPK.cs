@@ -75,11 +75,11 @@ namespace PitStriker.EditorTools
             // Ensure NetworkMatchState prefab and registration exist
             MultiplayerSmokeTest.EnsureNetworkMatchStatePrefab();
 
-            string productionScene = "Assets/_Project/Scenes/SC_Village_Graphics_Test.unity";
+            string productionScene = "Assets/_Project/Scenes/SC_SunsetCoastal_Map02.unity";
             if (File.Exists(productionScene))
             {
                 var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(productionScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
-                Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Target production village scene: " + productionScene + "</color>");
+                Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Target production scene: " + productionScene + "</color>");
             }
 
             Unity.Burst.BurstCompiler.Options.EnableBurstCompilation = false;
@@ -224,7 +224,7 @@ namespace PitStriker.EditorTools
         private static string[] GetBuildScenes()
         {
             var list = new System.Collections.Generic.List<string>();
-            string productionScene = "Assets/_Project/Scenes/SC_Village_Graphics_Test.unity";
+            string productionScene = "Assets/_Project/Scenes/SC_SunsetCoastal_Map02.unity";
             if (File.Exists(productionScene))
             {
                 list.Add(productionScene);

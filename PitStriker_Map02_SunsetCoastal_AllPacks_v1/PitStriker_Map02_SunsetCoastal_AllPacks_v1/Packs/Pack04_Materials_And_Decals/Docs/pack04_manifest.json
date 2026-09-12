@@ -1,0 +1,28 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack": "Pack 04 - Materials And Decals",
+  "texture_resolution": 1024,
+  "materials": [
+    "Sand_Dry",
+    "Sand_Packed",
+    "Sand_Wet",
+    "Wood_Weathered",
+    "Rock_Coastal",
+    "Rope_Coastal"
+  ],
+  "maps_per_material": [
+    "Albedo",
+    "Height",
+    "Normal",
+    "Roughness"
+  ],
+  "decals": [
+    "Footprints_Decal.png",
+    "Shells_Starfish_Decal.png",
+    "Sand_Scratch_Decal.png",
+    "PitEdge_Wear_Decal.png",
+    "Moss_Patch_Decal.png",
+    "Shoreline_Foam_Decal.png"
+  ]
+}

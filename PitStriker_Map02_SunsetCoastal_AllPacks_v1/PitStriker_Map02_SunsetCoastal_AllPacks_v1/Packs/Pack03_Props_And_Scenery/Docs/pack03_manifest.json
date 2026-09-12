@@ -1,0 +1,41 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack": "Pack 03 - Props And Scenery",
+  "pack_type": "transparent_png_source_assets",
+  "asset_count": 8,
+  "assets": [
+    {
+      "file": "Assets/BoundaryFence_Variant_01.png",
+      "role": "boundary/fence module variation"
+    },
+    {
+      "file": "Assets/ForegroundFoliage_Frame_02.png",
+      "role": "foreground framing overlay"
+    },
+    {
+      "file": "Assets/BeachSignage_Set_01.png",
+      "role": "decorative signage set"
+    },
+    {
+      "file": "Assets/Surfboard_Set_01.png",
+      "role": "surfboard prop set"
+    },
+    {
+      "file": "Assets/DockModule_01.png",
+      "role": "dock/jetty module"
+    },
+    {
+      "file": "Assets/Crate_Set_01.png",
+      "role": "crate prop set"
+    },
+    {
+      "file": "Assets/Lantern_Set_02.png",
+      "role": "lantern lighting props"
+    },
+    {
+      "file": "Assets/TropicalFoliage_Cluster_02.png",
+      "role": "dense tropical dressing cluster"
+    }
+  ]
+}

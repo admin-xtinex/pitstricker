@@ -79,7 +79,7 @@ namespace PitStriker.Networking
             new FixedString64Bytes(""), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public NetworkVariable<FixedString32Bytes> MapId = new NetworkVariable<FixedString32Bytes>(
-            new FixedString32Bytes("village_lane"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+            new FixedString32Bytes("sunset_coastal"), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public NetworkVariable<int> ActivePlayerIndex = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -216,7 +216,7 @@ namespace PitStriker.Networking
             }
 
             MatchId.Value = new FixedString64Bytes(matchId ?? "MATCH_01");
-            MapId.Value = new FixedString32Bytes(mapId ?? "village_lane");
+            MapId.Value = new FixedString32Bytes(mapId ?? "sunset_coastal");
             ActivePlayerIndex.Value = 0; // Host plays first or toss decided
             TurnNumber.Value = 1;
             CurrentPhase.Value = NetworkMatchPhase.ReadyToAim;

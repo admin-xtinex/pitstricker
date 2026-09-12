@@ -1,0 +1,121 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "combined_packs": [
+    {
+      "pack": "Pack01_Starter_Impostors_And_Props",
+      "file_count": 13,
+      "files": [
+        "Packs/Pack01_Starter_Impostors_And_Props/README_START_HERE.md",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/PalmCluster_Far_01.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/ForegroundFoliage_01.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/LighthouseIsland_B.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/PalmCluster_Far_02.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/LighthouseIsland_A.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Impostors/ForegroundFoliage_02.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Docs/asset_manifest.json",
+        "Packs/Pack01_Starter_Impostors_And_Props/Docs/PIT_STRIKER_MAP02_SUNSET_COASTAL_PHASE_PROMPTS.md",
+        "Packs/Pack01_Starter_Impostors_And_Props/Props_2D/ClayPot_01.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Props_2D/CoastalRockCluster_01.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Props_2D/WoodenBarrel_01.png",
+        "Packs/Pack01_Starter_Impostors_And_Props/Props_2D/DriftwoodObstacle_01.png"
+      ]
+    },
+    {
+      "pack": "Pack02_Core_Environment_Assets",
+      "file_count": 11,
+      "files": [
+        "Packs/Pack02_Core_Environment_Assets/README_START_HERE.md",
+        "Packs/Pack02_Core_Environment_Assets/Docs/PACK02_CHECKLIST.md",
+        "Packs/Pack02_Core_Environment_Assets/Docs/pack02_manifest.json",
+        "Packs/Pack02_Core_Environment_Assets/Assets/HeroPalm_02.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/LanternTorch_Set_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/BoundaryLog_Module_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/WoodenPost_Rope_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/HeroPalm_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/HeroCoastalRock_Set_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/SmallFishingBoat_01.png",
+        "Packs/Pack02_Core_Environment_Assets/Assets/BeachShack_Hero_01.png"
+      ]
+    },
+    {
+      "pack": "Pack03_Props_And_Scenery",
+      "file_count": 11,
+      "files": [
+        "Packs/Pack03_Props_And_Scenery/README_START_HERE.md",
+        "Packs/Pack03_Props_And_Scenery/Docs/PACK03_CHECKLIST.md",
+        "Packs/Pack03_Props_And_Scenery/Docs/pack03_manifest.json",
+        "Packs/Pack03_Props_And_Scenery/Assets/ForegroundFoliage_Frame_02.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/Crate_Set_01.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/Lantern_Set_02.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/TropicalFoliage_Cluster_02.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/BeachSignage_Set_01.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/DockModule_01.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/Surfboard_Set_01.png",
+        "Packs/Pack03_Props_And_Scenery/Assets/BoundaryFence_Variant_01.png"
+      ]
+    },
+    {
+      "pack": "Pack04_Materials_And_Decals",
+      "file_count": 33,
+      "files": [
+        "Packs/Pack04_Materials_And_Decals/README_START_HERE.md",
+        "Packs/Pack04_Materials_And_Decals/Docs/pack04_manifest.json",
+        "Packs/Pack04_Materials_And_Decals/Docs/PACK04_CHECKLIST.md",
+        "Packs/Pack04_Materials_And_Decals/Decals/Shells_Starfish_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Decals/PitEdge_Wear_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Decals/Moss_Patch_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Decals/Footprints_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Decals/Shoreline_Foam_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Decals/Sand_Scratch_Decal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Packed/Sand_Packed_Roughness.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Packed/Sand_Packed_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Packed/Sand_Packed_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Packed/Sand_Packed_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Wet/Sand_Wet_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Wet/Sand_Wet_Roughness.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Wet/Sand_Wet_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Wet/Sand_Wet_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Wood_Weathered/Wood_Weathered_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Wood_Weathered/Wood_Weathered_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Wood_Weathered/Wood_Weathered_Roughness.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Wood_Weathered/Wood_Weathered_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rock_Coastal/Rock_Coastal_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rock_Coastal/Rock_Coastal_Roughness.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rock_Coastal/Rock_Coastal_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rock_Coastal/Rock_Coastal_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rope_Coastal/Rope_Coastal_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rope_Coastal/Rope_Coastal_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rope_Coastal/Rope_Coastal_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Rope_Coastal/Rope_Coastal_Roughness.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Dry/Sand_Dry_Normal.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Dry/Sand_Dry_Height.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Dry/Sand_Dry_Albedo.png",
+        "Packs/Pack04_Materials_And_Decals/Materials/Sand_Dry/Sand_Dry_Roughness.png"
+      ]
+    },
+    {
+      "pack": "Pack05_Expanded_Impostors",
+      "file_count": 17,
+      "files": [
+        "Packs/Pack05_Expanded_Impostors/README_START_HERE.md",
+        "Packs/Pack05_Expanded_Impostors/Impostors/AtmosphericHaze_Layer_01.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/CoastalHuts_Far_Strip.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/LighthouseIsland_Expanded_A.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/PalmForest_Far_A.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/PalmForest_Far_B.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/IslandVegetation_Mass_01.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/FarBoats_Silhouette_Set.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/ForegroundFoliage_Frame_A.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/SunsetCloud_Layer_01.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/MountainLayer_Far_01.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/ForegroundFoliage_Frame_B.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/DistantCliffs_Layer_01.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/MountainLayer_Far_02.png",
+        "Packs/Pack05_Expanded_Impostors/Impostors/LighthouseIsland_Expanded_B.png",
+        "Packs/Pack05_Expanded_Impostors/Docs/pack05_manifest.json",
+        "Packs/Pack05_Expanded_Impostors/Docs/PACK05_CHECKLIST.md"
+      ]
+    }
+  ]
+}

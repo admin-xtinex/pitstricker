@@ -46,13 +46,17 @@ Shader "Pit Striker/Village Surface"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fog
             half4 frag(V i):SV_Target
             {
                 half3 n=UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap,sampler_BumpMap,i.uv),_BumpScale);
-                InputData d=(InputData)0;d.positionWS=i.world;d.normalWS=normalize(n.x*i.t+n.y*i.b+n.z*i.n);
+                InputData d=(InputData)0;d.positionWS=i.world;
+                half3 normalWS=normalize(n.x*i.t+n.y*i.b+n.z*i.n);
+                if(dot(normalWS,normalWS)<0.01) normalWS=normalize(i.n);
+                d.normalWS=normalWS;
                 d.viewDirectionWS=GetWorldSpaceNormalizeViewDir(i.world);d.shadowCoord=TransformWorldToShadowCoord(i.world);
-                d.bakedGI=SampleSH(d.normalWS);d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p);d.shadowMask=1;
+                d.bakedGI=SampleSH(d.normalWS);d.normalizedScreenSpaceUV=GetNormalizedScreenSpaceUV(i.p.xy);d.shadowMask=half4(1,1,1,1);
                 SurfaceData s=(SurfaceData)0;s.albedo=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,i.uv).rgb*_BaseColor.rgb;s.smoothness=_Smoothness;s.metallic=_Metallic;s.occlusion=1;s.alpha=1;
                 half2 mask=SAMPLE_TEXTURE2D(_MaskMap,sampler_MaskMap,i.uv).rg;
                 s.occlusion=lerp(1,mask.r,_UseMask);

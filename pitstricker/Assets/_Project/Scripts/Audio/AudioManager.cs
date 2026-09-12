@@ -30,12 +30,27 @@ namespace PitStriker.Audio
             private set => _instance = value;
         }
 
-        [Header("Music Configuration (50% Volume)")]
+        [Header("Volume Configuration")]
         [Range(0f, 1f)]
-        [SerializeField] private float _musicVolume = 0.5f; // 50% sound level required
+        [SerializeField] private float _masterVolume = 1.0f;
+        [Range(0f, 1f)]
+        [SerializeField] private float _musicVolume = 1.0f;
+        [Range(0f, 1f)]
+        [SerializeField] private float _sfxVolume = 1.0f;
         [SerializeField] private AudioClip _startMusicClip;
         [SerializeField] private AudioClip _tossMusicClip;
         [SerializeField] private AudioClip _gameplayMusicClip;
+
+        public float MasterVolume
+        {
+            get => _masterVolume;
+            set
+            {
+                _masterVolume = Mathf.Clamp01(value);
+                AudioListener.volume = _masterVolume;
+                PlayerPrefs.SetFloat("Settings.MasterVolume", _masterVolume);
+            }
+        }
 
         public float MusicVolume
         {
@@ -43,10 +58,23 @@ namespace PitStriker.Audio
             set
             {
                 _musicVolume = Mathf.Clamp01(value);
+                PlayerPrefs.SetFloat("Audio.MusicVolume", _musicVolume);
                 if (_musicSource != null && _fadeCoroutine == null)
                 {
                     _musicSource.volume = _musicVolume;
                 }
+            }
+        }
+
+        public float SfxVolume
+        {
+            get => _sfxVolume;
+            set
+            {
+                _sfxVolume = Mathf.Clamp01(value);
+                PlayerPrefs.SetFloat("Audio.SfxVolume", _sfxVolume);
+                if (_sfxSource != null) _sfxSource.volume = _sfxVolume;
+                if (_jingleSource != null) _jingleSource.volume = _sfxVolume;
             }
         }
 
@@ -87,6 +115,11 @@ namespace PitStriker.Audio
 
         private void InitializeAudio()
         {
+            _masterVolume = PlayerPrefs.GetFloat("Settings.MasterVolume", _masterVolume);
+            AudioListener.volume = _masterVolume;
+            _musicVolume = PlayerPrefs.GetFloat("Audio.MusicVolume", _musicVolume);
+            _sfxVolume = PlayerPrefs.GetFloat("Audio.SfxVolume", _sfxVolume);
+
             if (_musicSource == null)
             {
                 _musicSource = gameObject.AddComponent<AudioSource>();
@@ -101,6 +134,7 @@ namespace PitStriker.Audio
                 _sfxSource = gameObject.AddComponent<AudioSource>();
                 _sfxSource.playOnAwake = false;
                 _sfxSource.spatialBlend = 0f; // 2D clean audio
+                _sfxSource.volume = _sfxVolume;
             }
 
             if (_jingleSource == null)
@@ -108,6 +142,7 @@ namespace PitStriker.Audio
                 _jingleSource = gameObject.AddComponent<AudioSource>();
                 _jingleSource.playOnAwake = false;
                 _jingleSource.spatialBlend = 0f;
+                _jingleSource.volume = _sfxVolume;
             }
 
             LoadClips();

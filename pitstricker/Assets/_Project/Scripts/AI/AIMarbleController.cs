@@ -140,22 +140,29 @@ namespace PitStriker.AI
                     targetPos = pitPos;
                     isStrikeAttack = false;
 
-                    if (aiPlayer.currentPit == 3)
+                    float distToTargetPit = Vector3.Distance(marblePos, pitPos);
+                    bool justConqueredPit = TurnManager.BotsThatConqueredPitLastTurn.Contains(aiPlayer.id);
+
+                    // If bot just conquered a pit in the previous round, or it's a long shot (> 5.5m),
+                    // enforce an approach layup to disable back-to-back 1-shot sinks.
+                    if (justConqueredPit || distToTargetPit > 5.5f || aiPlayer.currentPit == 3)
                     {
-                        float distToPit3 = Vector3.Distance(marblePos, pitPos);
-                        // Impossibility for reaching/sinking 3rd pit in a single row from tee:
-                        // Long approach shot (>4.5m) targets the layup zone 1.6m - 2.5m in front of Pit 3.
-                        if (distToPit3 > 4.5f)
+                        if (distToTargetPit > 3.5f)
                         {
-                            Vector3 approachOffset = (marblePos - pitPos).normalized * UnityEngine.Random.Range(1.6f, 2.5f);
+                            Vector3 approachOffset = (marblePos - pitPos).normalized * UnityEngine.Random.Range(1.8f, 2.8f);
                             targetPos = pitPos + approachOffset;
-                            targetDesc = "Pit #3 (Approach Layup)";
-                            Debug.Log($"<color=#FFD700><b>[AI PIT 3 APPROACH]</b> {aiPlayer.name} playing approach layup to Pit 3 (distance {distToPit3:F1}m). Single-row sweep impossible!</color>");
+                            targetDesc = $"Pit #{aiPlayer.currentPit} (Approach Layup)";
+                            Debug.Log($"<color=#FFD700><b>[AI APPROACH LAYUP]</b> {aiPlayer.name} playing strategic approach layup to Pit #{aiPlayer.currentPit} (dist: {distToTargetPit:F1}m, consecutive pit prevented).</color>");
                         }
                         else
                         {
-                            targetDesc = "Pit #3 (Match Point Sink)";
-                            Debug.Log($"<color=#00FFAA><b>[AI PIT 3 CUP SINK]</b> {aiPlayer.name} within scoring range ({distToPit3:F1}m) attempting match point cup sink!</color>");
+                            targetDesc = $"Pit #{aiPlayer.currentPit} (Cup Sink Attempt)";
+                            Debug.Log($"<color=#00FFAA><b>[AI CUP SINK]</b> {aiPlayer.name} within tap-in range ({distToTargetPit:F1}m) attempting cup sink!</color>");
+                        }
+
+                        if (justConqueredPit)
+                        {
+                            TurnManager.BotsThatConqueredPitLastTurn.Remove(aiPlayer.id);
                         }
                     }
                     else
@@ -180,7 +187,7 @@ namespace PitStriker.AI
             // Physics-calibrated force
             float calibratedForce = CalculateRequiredForce(distance, isTossPhase, isStrikeAttack);
 
-            // Natural organic aim variance based on distance and pit (reduced intelligence calibration):
+            // Natural organic aim variance based on distance and pit:
             float dynamicAngleVariance;
             if (isTossPhase)
             {
@@ -219,22 +226,27 @@ namespace PitStriker.AI
                 }
             }
 
+            // Apply +50% difficulty variance multiplier for bot on pit shots, while keeping attack strikes focused
             if (isStrikeAttack)
             {
-                dynamicAngleVariance *= 0.85f;
+                dynamicAngleVariance *= 0.55f;
+            }
+            else
+            {
+                dynamicAngleVariance *= GameDifficulty.BotVarianceMultiplier;
             }
 
             float angleOffset = UnityEngine.Random.Range(-dynamicAngleVariance, dynamicAngleVariance);
             Vector3 finalAimDir = Quaternion.Euler(0f, angleOffset, 0f) * baseDir;
 
-            // Realistic shot weight variation (+/- 15% on long shots, +/- 6.5% on short shots)
-            float forceSpread = distance > 7.0f ? 0.15f : 0.065f;
+            // Realistic shot weight variation (+50% bot spread on pit shots per difficulty config)
+            float forceSpread = (distance > 7.0f ? 0.15f : 0.065f) * (isStrikeAttack ? 0.6f : GameDifficulty.BotVarianceMultiplier);
             float forceErrorFrac = UnityEngine.Random.Range(-forceSpread, forceSpread);
-            float maxForceClamp = isTossPhase ? 26.0f : 24.0f;
+            float maxForceClamp = isTossPhase ? 26.0f : (isStrikeAttack ? 36.0f : 24.0f);
             float finalForce = Mathf.Clamp(calibratedForce * (1f + forceErrorFrac), 1.0f, maxForceClamp);
 
             // 3. Animate Aim Guide Preview (showing trajectory line and charging power bar)
-            float powerFraction = Mathf.Clamp01(finalForce / 24.0f);
+            float powerFraction = Mathf.Clamp01(finalForce / (isStrikeAttack ? 36.0f : 24.0f));
             float elapsed = 0f;
 
             TurnManager.BroadcastStatus($"★ {aiPlayer.name.ToUpper()}: AIMING FOR {targetDesc.ToUpper()}... ★");
@@ -319,7 +331,31 @@ namespace PitStriker.AI
                 Vector3 oppTargetPit = TurnManager.Instance.GetPitPosition(opponent.currentPit);
                 float oppDistToPit = Vector3.Distance(oppPos, oppTargetPit);
                 bool isHumanPlayer = !opponent.isAI || opponent.id == 0;
-                float playerAggressionMultiplier = isHumanPlayer ? 1.25f : 1.0f;
+                float playerAggressionMultiplier = isHumanPlayer ? 1.50f : 1.0f;
+
+                // =========================================================================
+                // ADAPTIVE BEHAVIOR BASED ON PLAYER STATUS:
+                // If human player is closer to winning, bot adapts by aggressively attacking the player!
+                // =========================================================================
+                if (isHumanPlayer)
+                {
+                    bool isPlayerCloserToWin =
+                        (opponent.currentPit == 3) ||                                          // Player on match point pit
+                        (opponent.currentPit > aiPlayer.currentPit) ||                         // Player leading in pits
+                        (opponent.currentPit == aiPlayer.currentPit && oppDistToPit < aiDistToPit) || // Same pit, but player closer to hole
+                        (oppDistToPit <= 5.5f);                                                // Player within direct scoring range
+
+                    if (isPlayerCloserToWin && distToOpponent <= 32.0f)
+                    {
+                        // 92% adaptive response: prioritize attacking the player to blast them away and deny win
+                        if (UnityEngine.Random.value < 0.92f)
+                        {
+                            isCriticalDenial = true;
+                            Debug.Log($"<color=#FF0044><b>[AI ADAPTIVE ATTACK]</b> Player {opponent.name} is closer to winning (Pit {opponent.currentPit}, dist {oppDistToPit:F1}m vs AI Pit {aiPlayer.currentPit}, dist {aiDistToPit:F1}m)! AI adapting tactics to aggressively attack player marble!</color>");
+                            return opponent;
+                        }
+                    }
+                }
 
                 // =========================================================================
                 // CRITICAL CONDITION 1: OPPONENT IS ON MATCH POINT (PIT 3) & IN SCORING RANGE
@@ -410,8 +446,8 @@ namespace PitStriker.AI
 
             if (isAttack)
             {
-                // Tactical strike applies extra impulse (+20% power) for decisive, high-energy displacement
-                return Mathf.Clamp((distance * 0.48f + 3.0f) * 1.35f, 5.0f, 22.0f);
+                // Tactical strike applies doubled physical impulse for explosive kinetic displacement
+                return Mathf.Clamp((distance * 0.48f + 3.0f) * 2.70f, 10.0f, 36.0f);
             }
 
             // Direct Pit shot: Calibrated formula F = distance * 0.43f + 1.95f

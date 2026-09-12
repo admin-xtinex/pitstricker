@@ -65,6 +65,14 @@ namespace PitStriker.Physics
             ConfigurePhysicsDefaults();
         }
 
+        private void Start()
+        {
+            if (GetComponent<PitStriker.Visuals.MarbleSquashAndStretch>() == null)
+            {
+                gameObject.AddComponent<PitStriker.Visuals.MarbleSquashAndStretch>();
+            }
+        }
+
         /// <summary>
         /// Applies studio physics standards to ensure smooth rolling and prevent tunneling.
         /// </summary>
@@ -173,15 +181,26 @@ namespace PitStriker.Physics
             }
 
             // Active Boundary Containment & Elastic Wall Reflection:
-            // Aligned with the visual stone wall borders (widening from 5.1m at baseline to 6.6m at Pit 3)
-            // Mathematically guarantees marbles NEVER pass through or jump over the stone walls under any velocity
+            // Aligned strictly with the visual stacked stone wall along the fairway border.
+            // Fairway inner edge of the left stone wall sits at x = -3.30f (front of house) to -3.85f (towards Pit 3).
+            // Bounds prevent marbles from ever passing through stone walls or entering the house yard/veranda.
             Vector3 pos = transform.position;
             Vector3 vel = _rigidbody.linearVelocity;
             bool boundaryHit = false;
 
+            float currentMinX;
+            if (pos.z <= 15.5f)
+            {
+                currentMinX = -3.30f;
+            }
+            else
+            {
+                float leftT = Mathf.Clamp01((pos.z - 15.5f) / 22.0f);
+                currentMinX = Mathf.Lerp(-3.30f, -3.85f, leftT);
+            }
+
             float t = Mathf.Clamp01((pos.z - (-8.5f)) / 46.5f);
-            float currentMaxX = Mathf.Lerp(5.15f, 6.65f, t);
-            float currentMinX = -currentMaxX;
+            float currentMaxX = Mathf.Lerp(4.5f, 6.8f, t);
 
             if (pos.x < currentMinX)
             {
@@ -219,17 +238,39 @@ namespace PitStriker.Physics
                 boundaryHit = true;
             }
 
+            // Safety catch: Recover marble if it somehow penetrates behind the left stone wall into the house yard
+            if (pos.z >= 0.0f && pos.z <= 16.5f && pos.x < -3.20f)
+            {
+                pos.x = -2.2f;
+                pos.y = 0.25f;
+                vel = Vector3.zero;
+                boundaryHit = true;
+                Debug.LogWarning("<color=#FFAA00><b>[WALL RECOVERY]</b> Marble penetrated stone wall into house yard — safely relocated onto fairway verge.</color>");
+            }
+            else if (pos.x < -3.85f)
+            {
+                pos.x = -2.5f;
+                pos.y = 0.25f;
+                vel = Vector3.zero;
+                boundaryHit = true;
+                Debug.LogWarning("<color=#FFAA00><b>[WALL RECOVERY]</b> Marble penetrated left boundary — safely relocated onto fairway verge.</color>");
+            }
+
+            // Safety catch: If marble ever drops below track surface or into void
+            if (pos.y < -0.2f)
+            {
+                pos.y = 0.25f;
+                pos.x = Mathf.Clamp(pos.x, -4.2f, 4.2f);
+                pos.z = Mathf.Clamp(pos.z, -6.0f, 35.0f);
+                vel = Vector3.zero;
+                boundaryHit = true;
+                Debug.LogWarning("<color=#FFAA00><b>[SAFETY RESPAWN]</b> Marble recovered from below track ground and placed safely on fairway.</color>");
+            }
+
             if (boundaryHit)
             {
                 transform.position = pos;
                 _rigidbody.linearVelocity = vel;
-            }
-
-            // Safety catch: If marble ever drops into the void below the track, recover it
-            if (transform.position.y < -2.0f)
-            {
-                ResetPosition(new Vector3(0f, 0.3f, -5.5f));
-                Debug.LogWarning("<color=#FFAA00><b>[SAFETY RESPAWN]</b> Marble recovered from void and placed safely at launch baseline.</color>");
             }
         }
 
@@ -324,11 +365,22 @@ namespace PitStriker.Physics
         /// </summary>
         public void SetVisible(bool visible)
         {
-            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
-            foreach (var r in renderers)
+            Transform visualMesh = transform.Find("VisualMesh");
+            if (visualMesh != null)
             {
-                if (r is LineRenderer) continue; // Keep aiming guide intact
-                r.enabled = visible;
+                MeshRenderer childMR = visualMesh.GetComponent<MeshRenderer>();
+                if (childMR != null) childMR.enabled = visible;
+                MeshRenderer parentMR = GetComponent<MeshRenderer>();
+                if (parentMR != null) parentMR.enabled = false;
+            }
+            else
+            {
+                Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+                foreach (var r in renderers)
+                {
+                    if (r is LineRenderer) continue; // Keep aiming guide intact
+                    r.enabled = visible;
+                }
             }
 
             if (_collider == null) _collider = GetComponent<SphereCollider>();

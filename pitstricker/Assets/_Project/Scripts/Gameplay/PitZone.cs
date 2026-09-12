@@ -61,6 +61,19 @@ namespace PitStriker.Gameplay
             }
         }
 
+        private void Start()
+        {
+            Transform ceramicRim = transform.Find("Stylized_Ceramic_Rim");
+            if (ceramicRim != null) Destroy(ceramicRim.gameObject);
+            Transform badge = transform.Find("PitNumber_Badge");
+            if (badge != null) Destroy(badge.gameObject);
+
+            if (GetComponent<PitStriker.Visuals.StylizedPitFeedback>() == null)
+            {
+                gameObject.AddComponent<PitStriker.Visuals.StylizedPitFeedback>();
+            }
+        }
+
         /// <summary>
         /// Deterministically evaluates whether a marble is physically nestled inside this shallow earthen pit basin.
         /// Calibrated for realistic shallow pit depth (-0.08m) and 0.52m saucer rim radius.
@@ -77,8 +90,8 @@ namespace PitStriker.Gameplay
             // In shallow saucer pits (depth -0.08m, rim radius 0.52m), a resting marble center sits at relativeY ~= 0.17m.
             // When resting on the surrounding flat road, relativeY is 0.25m.
             float marbleRadius = marble.WorldRadius;
-            return horizontalDist <= .52f * _sizeScale - marbleRadius * .25f
-                && relativeY < marbleRadius * .85f;
+            float catchRadius = 0.50f * _sizeScale * GameDifficulty.PitCatchRadiusMultiplier - marbleRadius * 0.25f;
+            return horizontalDist <= catchRadius && relativeY < marbleRadius * 0.85f;
         }
 
         /// <summary>
@@ -117,7 +130,8 @@ namespace PitStriker.Gameplay
             if (IsMarbleInsidePit(marble))
             {
                 // Settled speed check: Marble must have settled or slowed down inside the pit.
-                bool isSettled = marble.CurrentSpeed <= _maxCaptureSpeed;
+                float effectiveMaxSpeed = Mathf.Min(_maxCaptureSpeed, GameDifficulty.MaxCaptureSpeed);
+                bool isSettled = marble.CurrentSpeed <= effectiveMaxSpeed;
                 if (!isSettled) return;
 
                 // If this marble was already captured and registered, keep it settled

@@ -1,0 +1,57 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack_type": "starter_asset_pack",
+  "assets": [
+    {
+      "file": "Impostors/LighthouseIsland_A.png",
+      "type": "impostor",
+      "use": "distant scenic card"
+    },
+    {
+      "file": "Impostors/LighthouseIsland_B.png",
+      "type": "impostor",
+      "use": "distant scenic card, mirrored"
+    },
+    {
+      "file": "Impostors/PalmCluster_Far_01.png",
+      "type": "impostor",
+      "use": "far palm cluster"
+    },
+    {
+      "file": "Impostors/PalmCluster_Far_02.png",
+      "type": "impostor",
+      "use": "far palm cluster, mirrored"
+    },
+    {
+      "file": "Impostors/ForegroundFoliage_01.png",
+      "type": "foreground card",
+      "use": "camera framing foliage"
+    },
+    {
+      "file": "Impostors/ForegroundFoliage_02.png",
+      "type": "foreground card",
+      "use": "camera framing foliage, mirrored"
+    },
+    {
+      "file": "Props_2D/WoodenBarrel_01.png",
+      "type": "prop cutout",
+      "use": "reference or temporary sprite/card, 3D conversion candidate"
+    },
+    {
+      "file": "Props_2D/ClayPot_01.png",
+      "type": "prop cutout",
+      "use": "reference or temporary sprite/card, 3D conversion candidate"
+    },
+    {
+      "file": "Props_2D/DriftwoodObstacle_01.png",
+      "type": "prop cutout",
+      "use": "reference or temporary sprite/card, 3D conversion candidate"
+    },
+    {
+      "file": "Props_2D/CoastalRockCluster_01.png",
+      "type": "prop cutout",
+      "use": "reference or temporary sprite/card, 3D conversion candidate"
+    }
+  ]
+}

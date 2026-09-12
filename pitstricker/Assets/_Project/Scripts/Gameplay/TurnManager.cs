@@ -1599,7 +1599,7 @@ namespace PitStriker.Gameplay
                     string guestName = _players.Count > 1 ? _players[1].name : "Guest";
                     NetworkMatchState.Instance.ServerInitializeMatch(
                         NetworkSessionManager.Instance.ActiveJoinCode,
-                        "village_lane",
+                        "sunset_coastal",
                         hostId,
                         guestId,
                         hostName,

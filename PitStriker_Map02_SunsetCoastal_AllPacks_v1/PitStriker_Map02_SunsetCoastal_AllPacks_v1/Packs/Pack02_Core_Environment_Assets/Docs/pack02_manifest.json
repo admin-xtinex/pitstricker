@@ -1,0 +1,41 @@
+{
+  "project": "Pit Striker",
+  "map": "Map 02 - Sunset Coastal",
+  "pack": "Pack 02 - Core Environment Assets",
+  "pack_type": "transparent_png_source_assets",
+  "asset_count": 8,
+  "assets": [
+    {
+      "file": "Assets/BoundaryLog_Module_01.png",
+      "role": "boundary / lane edge module"
+    },
+    {
+      "file": "Assets/WoodenPost_Rope_01.png",
+      "role": "rope post / bollard module"
+    },
+    {
+      "file": "Assets/HeroCoastalRock_Set_01.png",
+      "role": "hero coastal rock cluster"
+    },
+    {
+      "file": "Assets/BeachShack_Hero_01.png",
+      "role": "hero hut / shack"
+    },
+    {
+      "file": "Assets/HeroPalm_01.png",
+      "role": "hero palm tree variant"
+    },
+    {
+      "file": "Assets/HeroPalm_02.png",
+      "role": "hero palm tree variant"
+    },
+    {
+      "file": "Assets/SmallFishingBoat_01.png",
+      "role": "hero small fishing boat"
+    },
+    {
+      "file": "Assets/LanternTorch_Set_01.png",
+      "role": "lighting props set"
+    }
+  ]
+}

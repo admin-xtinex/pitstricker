@@ -9,8 +9,8 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/SC_Sandbox_Learning.unity
     guid: 00e52995c345c58448a3df0e27e85416
   - enabled: 1
-    path: Assets/_Project/Scenes/SC_Village_Graphics_Test.unity
-    guid: 7916e85e69ecfb14d98191a3c3122923
+    path: Assets/_Project/Scenes/SC_SunsetCoastal_Map02.unity
+    guid: 941c6c5b28601334c98613c9da4aff87
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

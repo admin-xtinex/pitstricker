@@ -2,15 +2,26 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using PitStriker.Physics;
 using PitStriker.Gameplay;
+using PitStriker.Networking;
+using PitStriker.CameraSystem;
 
 namespace PitStriker.Input
 {
     /// <summary>
     /// Handles mobile touch and mouse drag-and-release swipe mechanics for launching marbles.
-    /// Draws an aiming trajectory indicator on the ground plane.
+    /// Operates on the RIGHT ZONE of the screen in the TWO-ZONE layout:
+    /// - Touching/dragging in the right zone controls marble aim direction and power.
+    /// - Locks camera rotation during aiming.
+    /// - Touches originating in the left zone are ignored here (handled by SmoothFollowCamera).
+    /// - A gesture that begins in the right zone remains an aiming gesture even if it crosses to the left.
     /// </summary>
     public class SwipeLaunchController : MonoBehaviour
     {
+        [Header("Two-Zone Screen Layout")]
+        [Range(0.2f, 0.8f)]
+        [Tooltip("Fraction of screen width (0.0 to 1.0) on the left dedicated to camera control. Right portion is for aiming.")]
+        [SerializeField] private float _cameraZoneSplitRatio = 0.5f;
+
         [Header("Launch Physics Tuning")]
         [Tooltip("Minimum drag distance in world units required to register a stroke.")]
         [SerializeField] private float _minDragDistance = 0.2f;
@@ -46,12 +57,22 @@ namespace PitStriker.Input
         // Events
         public static event System.Action<float> OnPowerChanged;
 
-        // Drag & Flick State
+        // Drag & Aim State
         private bool _isDragging = false;
         private Vector2 _dragScreenStart;
         private float _dragStartTime;
         private float _currentPower = 0f;
         private Vector3 _shootDirection = Vector3.forward;
+
+        // Two-Zone Touch & Mouse Tracking
+        private int _aimTouchId = -1;
+        private bool _isMouseAimDragging = false;
+
+        public float CameraZoneSplitRatio => SmoothFollowCamera.Instance != null 
+            ? SmoothFollowCamera.Instance.CameraZoneSplitRatio 
+            : _cameraZoneSplitRatio;
+
+        public bool IsAiming => _isDragging;
 
         private void Awake()
         {
@@ -59,7 +80,6 @@ namespace PitStriker.Input
             _marble = GetComponent<MarbleController>();
             _mainCamera = Camera.main;
 
-            // Ensure LineRenderer has clean defaults if attached
             if (_trajectoryLine == null)
             {
                 _trajectoryLine = GetComponent<LineRenderer>();
@@ -126,27 +146,116 @@ namespace PitStriker.Input
                 return;
             }
 
-            Vector2 screenPos = Vector2.zero;
-            bool isPressed = false;
-            bool justPressed = false;
-            bool justReleased = false;
+            float splitX = Screen.width * CameraZoneSplitRatio;
 
-            // 1. Prioritize Touchscreen if active
-            if (Touchscreen.current != null && (Touchscreen.current.primaryTouch.press.isPressed || Touchscreen.current.primaryTouch.press.wasPressedThisFrame || Touchscreen.current.primaryTouch.press.wasReleasedThisFrame))
+            // Check if any touchscreen touch is actively in progress
+            bool hasTouchInput = false;
+            if (Touchscreen.current != null)
             {
-                screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
-                isPressed = Touchscreen.current.primaryTouch.press.isPressed;
-                justPressed = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
-                justReleased = Touchscreen.current.primaryTouch.press.wasReleasedThisFrame;
+                var touches = Touchscreen.current.touches;
+                for (int i = 0; i < touches.Count; i++)
+                {
+                    if (touches[i].press.isPressed || touches[i].press.wasPressedThisFrame || touches[i].press.wasReleasedThisFrame)
+                    {
+                        hasTouchInput = true;
+                        break;
+                    }
+                }
             }
-            // 2. Mouse / Trackpad
+
+            // 1. Prioritize Mobile Touchscreen
+            if (hasTouchInput && Touchscreen.current != null)
+            {
+                var touches = Touchscreen.current.touches;
+                for (int i = 0; i < touches.Count; i++)
+                {
+                    var touch = touches[i];
+                    int touchId = touch.touchId.ReadValue();
+                    bool wasPressed = touch.press.wasPressedThisFrame;
+                    bool isPressed = touch.press.isPressed;
+                    bool wasReleased = touch.press.wasReleasedThisFrame;
+                    Vector2 pos = touch.position.ReadValue();
+
+                    if (wasPressed)
+                    {
+                        // Touch MUST start in the Aiming Zone (>= splitX)
+                        if (pos.x >= splitX)
+                        {
+                            if (UnityEngine.EventSystems.EventSystem.current == null ||
+                                !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId))
+                            {
+                                if (_aimTouchId == -1)
+                                {
+                                    _aimTouchId = touchId;
+                                    StartAim(pos);
+                                }
+                            }
+                        }
+                    }
+                    else if (isPressed && touchId == _aimTouchId)
+                    {
+                        // Continuous Aim Drag: Finger started in aim zone, continues aiming even if dragged left!
+                        UpdateAim(pos);
+                    }
+                    else if (wasReleased && touchId == _aimTouchId)
+                    {
+                        _aimTouchId = -1;
+                        ExecuteLaunch();
+                    }
+                }
+            }
+            // 2. Mouse / Trackpad (active when no touch is being processed)
             else if (Mouse.current != null)
             {
-                screenPos = Mouse.current.position.ReadValue();
-                isPressed = Mouse.current.leftButton.isPressed;
-                justPressed = Mouse.current.leftButton.wasPressedThisFrame;
-                justReleased = Mouse.current.leftButton.wasReleasedThisFrame;
+                Vector2 mousePos = Mouse.current.position.ReadValue();
+
+                if (Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    // Mouse MUST start in the Aiming Zone (>= splitX)
+                    if (mousePos.x >= splitX)
+                    {
+                        if (UnityEngine.EventSystems.EventSystem.current == null ||
+                            !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+                        {
+                            _isMouseAimDragging = true;
+                            StartAim(mousePos);
+                        }
+                    }
+                }
+                else if (Mouse.current.leftButton.isPressed && _isMouseAimDragging)
+                {
+                    UpdateAim(mousePos);
+                }
+                else if (Mouse.current.leftButton.wasReleasedThisFrame && _isMouseAimDragging)
+                {
+                    _isMouseAimDragging = false;
+                    ExecuteLaunch();
+                }
             }
+        }
+
+        private void StartAim(Vector2 screenPos)
+        {
+            if (_marble != null && _marble.CurrentSpeed < 2.5f)
+            {
+                _marble.Halt();
+            }
+
+            _isDragging = true;
+            _dragScreenStart = screenPos;
+            _dragStartTime = Time.time;
+            _currentPower = 0f;
+
+            // Lock camera orientation immediately when player begins aiming
+            if (SmoothFollowCamera.Instance != null)
+            {
+                SmoothFollowCamera.Instance.SetAimLocked(true);
+            }
+        }
+
+        private void UpdateAim(Vector2 currentScreenPos)
+        {
+            if (!_isDragging) return;
 
             if (_mainCamera == null)
             {
@@ -154,127 +263,106 @@ namespace PitStriker.Input
                 if (_mainCamera == null) return;
             }
 
-            // Pointer Down: Start Drag anywhere on screen (unless tapping over a UI element)
-            if (justPressed)
+            Vector2 screenDelta = currentScreenPos - _dragScreenStart;
+
+            if (_aimMode == AimMode.ForwardFlickThrow)
             {
-                if (UnityEngine.EventSystems.EventSystem.current != null)
+                // Forward Flick Mode (Toss Phase): Upward swipe on screen throws forward
+                float dt = Mathf.Max(0.001f, Time.time - _dragStartTime);
+                float flickSpeed = screenDelta.magnitude / dt;
+
+                if (screenDelta.y > 15f)
                 {
-                    if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-                    {
-                        int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
-                        if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId)) return;
-                    }
-                    else if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-                    {
-                        return;
-                    }
-                }
+                    _currentPower = Mathf.Clamp01(flickSpeed / (Screen.height * 1.5f));
+                    OnPowerChanged?.Invoke(_currentPower);
 
-                if (_marble.CurrentSpeed < 2.5f)
-                {
-                    _marble.Halt();
-                }
+                    Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
+                    Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
+                    Vector2 aimDir = screenDelta.normalized;
+                    _shootDirection = (camRight * aimDir.x + camFwd * aimDir.y).normalized;
 
-                _isDragging = true;
-                _dragScreenStart = screenPos;
-                _dragStartTime = Time.time;
-                _currentPower = 0f;
-            }
-
-            // Pointer Dragging / Flicking
-            if (_isDragging && isPressed)
-            {
-                Vector2 screenDelta = screenPos - _dragScreenStart;
-
-                if (_aimMode == AimMode.ForwardFlickThrow)
-                {
-                    // Forward Flick Mode (Toss Phase): Upward swipe on screen means forward throw
-                    float dt = Mathf.Max(0.001f, Time.time - _dragStartTime);
-                    float flickSpeed = screenDelta.magnitude / dt;
-
-                    if (screenDelta.y > 15f)
-                    {
-                        _currentPower = Mathf.Clamp01(flickSpeed / (Screen.height * 1.5f));
-                        OnPowerChanged?.Invoke(_currentPower);
-
-                        Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
-                        Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
-                        Vector2 aimDir = screenDelta.normalized;
-                        _shootDirection = (camRight * aimDir.x + camFwd * aimDir.y).normalized;
-
-                        if (_trajectoryLine != null)
-                        {
-                            _trajectoryLine.enabled = true;
-                            Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
-                            Vector3 startPos = marblePos + (Vector3.up * 0.05f);
-                            Vector3 endPos = startPos + (_shootDirection * (Mathf.Max(0.3f, _currentPower) * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
-
-                            _trajectoryLine.SetPosition(0, startPos);
-                            _trajectoryLine.SetPosition(1, endPos);
-                        }
-                    }
-                    else
-                    {
-                        _currentPower = 0f;
-                        if (_trajectoryLine != null) _trajectoryLine.enabled = false;
-                        OnPowerChanged?.Invoke(0f);
-                    }
+                    UpdateTrajectoryVisuals();
                 }
                 else
                 {
-                    // Precision Slingshot Mode (Main Match): Pull backward to shoot forward
-                    float dragPixels = screenDelta.magnitude;
-                    float minPixels = Mathf.Max(10f, _minDragDistance * 60f);
-                    float maxPixels = Mathf.Clamp(_maxDragDistance * 80f, 160f, Screen.height * 0.45f);
+                    _currentPower = 0f;
+                    if (_trajectoryLine != null) _trajectoryLine.enabled = false;
+                    OnPowerChanged?.Invoke(0f);
+                }
+            }
+            else
+            {
+                // Precision Slingshot Mode (Main Match): Pull backward to shoot forward
+                float dragPixels = screenDelta.magnitude;
+                float minPixels = Mathf.Max(10f, _minDragDistance * 60f);
+                float maxPixels = Mathf.Clamp(_maxDragDistance * 80f, 160f, Screen.height * 0.45f);
 
-                    if (dragPixels < minPixels)
+                if (dragPixels < minPixels)
+                {
+                    _currentPower = 0f;
+                    if (_trajectoryLine != null) _trajectoryLine.enabled = false;
+                    OnPowerChanged?.Invoke(0f);
+                }
+                else
+                {
+                    _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
+                    OnPowerChanged?.Invoke(_currentPower);
+
+                    Vector2 aimScreenDir;
+                    if (screenDelta.y < 0f)
                     {
-                        _currentPower = 0f;
-                        if (_trajectoryLine != null) _trajectoryLine.enabled = false;
-                        OnPowerChanged?.Invoke(0f);
+                        // Slingshot pull: pulling down on screen shoots forward
+                        aimScreenDir = -screenDelta.normalized;
                     }
                     else
                     {
-                        _currentPower = Mathf.Clamp01((dragPixels - minPixels) / (maxPixels - minPixels));
-                        OnPowerChanged?.Invoke(_currentPower);
-
-                        // Intuitive aim:
-                        // If pulled backward (screenDelta.y < 0), invert to shoot forward (slingshot pull).
-                        // If swiped forward (screenDelta.y > 0), follow forward drag to shoot forward (direct flick).
-                        Vector2 aimScreenDir;
-                        if (screenDelta.y < 0f)
-                        {
-                            // Pull-back slingshot: pull down on screen shoots forward
-                            aimScreenDir = -screenDelta.normalized;
-                        }
-                        else
-                        {
-                            // Forward swipe/flick: push up on screen shoots forward
-                            aimScreenDir = screenDelta.normalized;
-                        }
-
-                        Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
-                        Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
-                        _shootDirection = (camRight * aimScreenDir.x + camFwd * aimScreenDir.y).normalized;
-
-                        if (_trajectoryLine != null)
-                        {
-                            _trajectoryLine.enabled = true;
-                            Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
-                            Vector3 startPos = marblePos + (Vector3.up * 0.05f);
-                            Vector3 endPos = startPos + (_shootDirection * (_currentPower * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
-
-                            _trajectoryLine.SetPosition(0, startPos);
-                            _trajectoryLine.SetPosition(1, endPos);
-                        }
+                        // Forward flick/drag: pushing up shoots forward
+                        aimScreenDir = screenDelta.normalized;
                     }
+
+                    Vector3 camFwd = Vector3.ProjectOnPlane(_mainCamera.transform.forward, Vector3.up).normalized;
+                    Vector3 camRight = Vector3.ProjectOnPlane(_mainCamera.transform.right, Vector3.up).normalized;
+                    _shootDirection = (camRight * aimScreenDir.x + camFwd * aimScreenDir.y).normalized;
+
+                    UpdateTrajectoryVisuals();
                 }
             }
+        }
 
-            // Pointer Released: Execute Launch or Flick
-            if (_isDragging && justReleased)
+        private void UpdateTrajectoryVisuals()
+        {
+            if (_trajectoryLine != null)
             {
-                ExecuteLaunch();
+                _trajectoryLine.enabled = true;
+                Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
+                Vector3 startPos = marblePos + (Vector3.up * 0.05f);
+                Vector3 endPos = startPos + (_shootDirection * (Mathf.Max(0.3f, _currentPower) * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
+
+                _trajectoryLine.SetPosition(0, startPos);
+                _trajectoryLine.SetPosition(1, endPos);
+            }
+        }
+
+        private void DispatchLaunch(Vector3 direction, float force)
+        {
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance != null &&
+                PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive)
+            {
+                PitStriker.Networking.Client.CloudMatchManager.Instance.SubmitLocalShot(direction, force);
+            }
+            else if (NetworkSessionManager.Instance != null &&
+                NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None &&
+                NetworkMatchState.Instance != null)
+            {
+                NetworkMatchState.Instance.SubmitLocalShot(direction, force);
+            }
+            else
+            {
+                if (_marble != null)
+                {
+                    _marble.Halt();
+                    _marble.ApplyImpulse(direction, force);
+                }
             }
         }
 
@@ -282,25 +370,22 @@ namespace PitStriker.Input
         {
             if (_aimMode == AimMode.ForwardFlickThrow)
             {
-                // Forward Flick Throw Execution
                 if (_currentPower > 0.05f)
                 {
                     Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
-                    Vector3 throwDir = (dir + Vector3.up * 0.08f).normalized; // Natural upward lob
+                    Vector3 throwDir = (dir + Vector3.up * 0.08f).normalized;
                     float force = _currentPower * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier;
 
-                    _marble.Halt();
-                    _marble.ApplyImpulse(throwDir, force);
+                    DispatchLaunch(throwDir, force);
                     Debug.Log($"<color=#00FFAA><b>[FLICK THROW]</b> Forward swipe tossed marble with {_currentPower * 100:F0}% power ({force:F1} N)!</color>");
                 }
             }
             else
             {
-                // Precision Slingshot Execution
                 if (_currentPower > 0.03f)
                 {
                     float finalForce = _currentPower * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier;
-                    _marble.ApplyImpulse(_shootDirection, finalForce);
+                    DispatchLaunch(_shootDirection, finalForce);
                     Debug.Log($"<color=#00FFAA><b>[PRECISION STRIKE]</b> Launched with {_currentPower * 100:F0}% power ({finalForce:F1} N)!</color>");
                 }
             }
@@ -318,9 +403,9 @@ namespace PitStriker.Input
             float power = powerFraction >= 0f ? powerFraction : (_currentPower > 0.05f ? _currentPower : 0.65f);
             Vector3 dir = _shootDirection != Vector3.zero ? _shootDirection : Vector3.forward;
             Vector3 finalDir = _aimMode == AimMode.ForwardFlickThrow ? (dir + Vector3.up * 0.08f).normalized : dir;
+            float strikeForce = power * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier;
 
-            _marble.Halt();
-            _marble.ApplyImpulse(finalDir, power * _maxLaunchForce * GameDifficulty.LaunchForceMultiplier);
+            DispatchLaunch(finalDir, strikeForce);
             Debug.Log($"<color=#00FFAA><b>[STRIKE BUTTON]</b> Executed launch with {power * 100:F0}% power towards {finalDir}!</color>");
             CancelDrag();
         }
@@ -332,18 +417,7 @@ namespace PitStriker.Input
         {
             _shootDirection = direction;
             _currentPower = Mathf.Clamp01(power01);
-
-            if (_trajectoryLine != null)
-            {
-                _trajectoryLine.enabled = true;
-                Vector3 marblePos = _marble != null ? _marble.transform.position : transform.position;
-                Vector3 startPos = marblePos + (Vector3.up * 0.05f);
-                Vector3 endPos = startPos + (_shootDirection * (Mathf.Max(0.3f, _currentPower) * _maxVisualTrajectoryLength * GameDifficulty.TrajectoryLengthMultiplier));
-
-                _trajectoryLine.SetPosition(0, startPos);
-                _trajectoryLine.SetPosition(1, endPos);
-            }
-
+            UpdateTrajectoryVisuals();
             OnPowerChanged?.Invoke(_currentPower);
         }
 
@@ -358,11 +432,19 @@ namespace PitStriker.Input
         private void CancelDrag()
         {
             _isDragging = false;
+            _aimTouchId = -1;
+            _isMouseAimDragging = false;
             _currentPower = 0f;
             OnPowerChanged?.Invoke(0f);
             if (_trajectoryLine != null)
             {
                 _trajectoryLine.enabled = false;
+            }
+
+            // Return camera orientation control to free look
+            if (SmoothFollowCamera.Instance != null)
+            {
+                SmoothFollowCamera.Instance.SetAimLocked(false);
             }
         }
     }

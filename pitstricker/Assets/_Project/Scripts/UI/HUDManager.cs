@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using PitStriker.Input;
 using PitStriker.Gameplay;
+using PitStriker.Networking;
 
 namespace PitStriker.UI
 {
@@ -167,6 +168,19 @@ namespace PitStriker.UI
 
         private void HandleTopPauseClicked()
         {
+            bool isOnline = (PitStriker.Networking.Client.CloudMatchManager.Instance != null &&
+                             PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive) ||
+                            (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.IsConnected);
+
+            if (isOnline)
+            {
+                if (MenuManager.Instance != null)
+                {
+                    MenuManager.Instance.ShowOnlineNotice("LIVE MATCH", "You cannot pause a live online match. To forfeit and return to menu, use the options menu.");
+                }
+                return;
+            }
+
             if (MenuManager.Instance != null)
             {
                 MenuManager.Instance.ShowScreen(MenuManager.ScreenType.Pause);
@@ -190,6 +204,12 @@ namespace PitStriker.UI
             TurnManager.OnMatchVictory += HandleMatchVictory;
             TurnManager.OnStatusMessage += HandleStatusMessage;
             TurnManager.OnStateChanged += HandleStateChanged;
+
+            NetworkMatchState.OnTimerTickEvent += HandleNetworkTimerTick;
+            NetworkMatchState.OnActivePlayerChangedEvent += HandleNetworkActivePlayerChanged;
+
+            PitStriker.Networking.Client.CloudMatchManager.OnTimerTickEvent += HandleCloudTimerTick;
+            PitStriker.Networking.Client.CloudMatchManager.OnActivePlayerChangedEvent += HandleCloudActivePlayerChanged;
         }
 
         private void OnDisable()
@@ -201,6 +221,99 @@ namespace PitStriker.UI
             TurnManager.OnMatchVictory -= HandleMatchVictory;
             TurnManager.OnStatusMessage -= HandleStatusMessage;
             TurnManager.OnStateChanged -= HandleStateChanged;
+
+            NetworkMatchState.OnTimerTickEvent -= HandleNetworkTimerTick;
+            NetworkMatchState.OnActivePlayerChangedEvent -= HandleNetworkActivePlayerChanged;
+
+            PitStriker.Networking.Client.CloudMatchManager.OnTimerTickEvent -= HandleCloudTimerTick;
+            PitStriker.Networking.Client.CloudMatchManager.OnActivePlayerChangedEvent -= HandleCloudActivePlayerChanged;
+        }
+
+        private void HandleNetworkTimerTick(float secondsRemaining)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (NetworkMatchState.Instance == null || NetworkMatchState.Instance.IsMatchCompleted.Value) return;
+
+            int secs = Mathf.Max(0, Mathf.CeilToInt(secondsRemaining));
+            bool isMyTurn = NetworkMatchState.Instance.IsMyTurn();
+
+            if (_parText != null && TurnManager.Instance != null)
+            {
+                _parText.text = $"TIME: {secs}s  |  COURSE PAR: {TurnManager.Instance.CoursePar}";
+            }
+
+            if (_statusBanner != null && NetworkMatchState.Instance.CurrentPhase.Value == NetworkMatchPhase.ReadyToAim)
+            {
+                if (isMyTurn)
+                {
+                    _statusBanner.text = $"★ YOUR TURN ({secs}s) • AIM FOR PIT {TurnManager.Instance?.CurrentTargetPit} ★";
+                }
+                else
+                {
+                    _statusBanner.text = $"OPPONENT'S TURN ({secs}s) • WATCHING PLAY";
+                }
+            }
+
+            if (_strikeButton != null && TurnManager.Instance != null && TurnManager.Instance.ActivePlayer != null)
+            {
+                _strikeButton.interactable = isMyTurn && !TurnManager.Instance.ActivePlayer.isAI;
+            }
+        }
+
+        private void HandleNetworkActivePlayerChanged(int activePlayerIndex)
+        {
+            if (NetworkSessionManager.Instance == null || NetworkSessionManager.Instance.ActiveNetworkMode == NetworkSessionManager.NetworkMode.None) return;
+            if (NetworkMatchState.Instance == null) return;
+
+            bool isMyTurn = NetworkMatchState.Instance.IsMyTurn();
+            if (_strikeButton != null)
+            {
+                _strikeButton.interactable = isMyTurn;
+            }
+
+            if (_statusBanner != null)
+            {
+                _statusBanner.text = isMyTurn ? "★ YOUR TURN! AIM & STRIKE ★" : "OPPONENT'S TURN • WATCHING PLAY";
+            }
+        }
+
+        private void HandleCloudTimerTick(float secondsRemaining)
+        {
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance == null || !PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive) return;
+
+            int secs = Mathf.Max(0, Mathf.CeilToInt(secondsRemaining));
+            bool isMyTurn = PitStriker.Networking.Client.CloudMatchManager.Instance.IsMyTurn();
+
+            if (_parText != null && TurnManager.Instance != null)
+            {
+                _parText.text = $"TIME: {secs}s  |  COURSE PAR: {TurnManager.Instance.CoursePar}";
+            }
+
+            if (_statusBanner != null && PitStriker.Networking.Client.CloudMatchManager.Instance.CurrentPhase == PitStriker.Networking.Shared.CloudMatchPhase.ReadyToAim)
+            {
+                _statusBanner.text = isMyTurn ? $"★ YOUR TURN ({secs}s) • AIM & STRIKE ★" : $"OPPONENT'S TURN ({secs}s) • WATCHING PLAY";
+            }
+
+            if (_strikeButton != null)
+            {
+                _strikeButton.interactable = isMyTurn;
+            }
+        }
+
+        private void HandleCloudActivePlayerChanged(int activePlayerIndex)
+        {
+            if (PitStriker.Networking.Client.CloudMatchManager.Instance == null || !PitStriker.Networking.Client.CloudMatchManager.Instance.IsOnlineMatchActive) return;
+
+            bool isMyTurn = PitStriker.Networking.Client.CloudMatchManager.Instance.IsMyTurn();
+            if (_strikeButton != null)
+            {
+                _strikeButton.interactable = isMyTurn;
+            }
+
+            if (_statusBanner != null)
+            {
+                _statusBanner.text = isMyTurn ? "★ YOUR TURN! AIM & STRIKE ★" : "OPPONENT'S TURN • WATCHING PLAY";
+            }
         }
 
         private void Start()
@@ -280,10 +393,15 @@ namespace PitStriker.UI
                 _strokeCounterText.text = $"{activePlayer.name.ToUpper()}: {activePlayer.totalStrokes} STROKES";
             }
 
-            // Disable Strike button during autonomous AI turns
+            // Disable Strike button during autonomous AI turns or opponent turns
             if (_strikeButton != null)
             {
-                _strikeButton.interactable = !activePlayer.isAI;
+                bool allowed = !activePlayer.isAI;
+                if (NetworkMatchState.Instance != null && NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None)
+                {
+                    allowed = allowed && NetworkMatchState.Instance.IsMyTurn();
+                }
+                _strikeButton.interactable = allowed;
             }
         }
 
@@ -305,6 +423,14 @@ namespace PitStriker.UI
             if (TurnManager.Instance != null && TurnManager.Instance.ActivePlayer != null && TurnManager.Instance.ActivePlayer.isAI)
             {
                 return; // Guard against clicking strike during AI turn
+            }
+
+            if (NetworkSessionManager.Instance != null && NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None)
+            {
+                if (NetworkMatchState.Instance != null && !NetworkMatchState.Instance.IsMyTurn())
+                {
+                    return; // Guard against clicking strike during opponent turn
+                }
             }
 
             if (SwipeLaunchController.Instance != null)
