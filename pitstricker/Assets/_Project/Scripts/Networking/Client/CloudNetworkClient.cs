@@ -28,6 +28,7 @@ namespace PitStriker.Networking.Client
         private static readonly string[] CandidateEndpoints = new string[]
         {
             "ws://pitstriker.xtinex.com:7777",
+            "ws://34.69.91.177:7777",
             "ws://192.168.29.110:7777",
             "ws://127.0.0.1:7777"
         };
