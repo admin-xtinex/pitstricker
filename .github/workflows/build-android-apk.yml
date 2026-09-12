@@ -11,10 +11,21 @@ on:
       - 'emulator_screen.png'
       - 'build_apk.log'
   workflow_dispatch:
+    inputs:
+      runner_type:
+        description: 'Choose runner type'
+        required: true
+        default: 'github-hosted (Ubuntu)'
+        type: choice
+        options:
+          - 'github-hosted (Ubuntu)'
+          - 'self-hosted (Windows PC)'
 
 jobs:
-  build-android:
-    name: Build Android APK (GameCI)
+  # Job 1: Cloud GitHub-hosted runner (GameCI Docker container)
+  build-cloud:
+    name: Build on GitHub Cloud (GameCI)
+    if: github.event_name != 'workflow_dispatch' || inputs.runner_type == 'github-hosted (Ubuntu)'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -25,7 +36,6 @@ jobs:
           lfs: true
           fetch-depth: 0
 
-      # Speed up builds by caching the Unity Library folder
       - name: Restore Library cache
         uses: actions/cache@v4
         with:
@@ -34,7 +44,6 @@ jobs:
           restore-keys: |
             Library-Android-
 
-      # Build APK using GameCI unity-builder
       - name: Build Android APK
         uses: game-ci/unity-builder@v4
         env:
@@ -52,7 +61,6 @@ jobs:
           buildMethod: PitStriker.EditorTools.BuildAPK.BuildAndroidPlayer
           buildsPath: Builds/Android
 
-      # Locate built APK
       - name: Find Built APK
         id: find_apk
         run: |
@@ -63,12 +71,46 @@ jobs:
           fi
           echo "Found APK at: $APK_FILE"
           echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
-          echo "apk_size=$(du -h "$APK_FILE" | cut -f1)" >> $GITHUB_OUTPUT
 
-      # Upload APK to GitHub Actions Artifacts
-      - name: Upload APK to Artifacts
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PitStriker-Android-build-${{ github.run_number }}
+          name: PitStriker-Android-Cloud-v${{ github.run_number }}
           path: ${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 14
+
+  # Job 2: Self-hosted runner (Uses your already-licensed local Unity on Windows with ZERO license secrets needed!)
+  build-self-hosted:
+    name: Build on Self-Hosted Windows Runner
+    if: github.event_name == 'workflow_dispatch' && inputs.runner_type == 'self-hosted (Windows PC)'
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Execute Unity Android Batch Build
+        shell: powershell
+        run: |
+          $unityPath = "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe"
+          if (-not (Test-Path $unityPath)) {
+            Write-Error "Unity 6000.6.0f1 not found at $unityPath"
+            exit 1
+          }
+          Write-Host "Running Unity Android build via batchmode..."
+          & $unityPath -batchmode -projectPath pitstricker -executeMethod PitStriker.EditorTools.BuildAPK.BuildAndroidPlayerBatch -quit -logfile unity_build.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content unity_build.log -Tail 100
+            Write-Error "Unity batch build failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PitStriker-Android-Local-v${{ github.run_number }}
+          path: Builds/Android/*.apk
           retention-days: 14
