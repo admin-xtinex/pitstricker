@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
 
+PLAY_LANE_WIDTH = 14.0
+SIDE_BAND_WIDTH = 3.0
+
+
 @dataclass(frozen=True)
 class MapPreset:
     name: str
@@ -10,11 +14,11 @@ class MapPreset:
     arena_length: float
     prop_density: int
     ground_bump: float
+    side_theme: str
 
 
 @dataclass
 class ArenaConfig:
-    # Blender UI runs now default to the Kerala-village / rough-soil target.
     map_name: str = "rough_soil"
     pit_radius: float = 0.18
     pit_depth: float = 0.12
@@ -26,7 +30,6 @@ class ArenaConfig:
 
     @property
     def pit_positions(self):
-        # Gameplay invariant: all three pits are mathematically collinear.
         return [
             (0.0, 0.0, 0.0),
             (0.0, self.pit_spacing, 0.0),
@@ -38,41 +41,52 @@ class ArenaConfig:
         return (0.0, -self.launch_distance, self.marble_radius)
 
 
+@dataclass(frozen=True)
+class PlayFrame:
+    width: float
+    length: float
+    center_y: float
+    half_width: float
+    lane_half: float
+    side_width: float
+    y_min: float
+    y_max: float
+    far_y: float
+
+
+def play_frame(config, preset):
+    length = max(preset.arena_length, config.pit_spacing * 2.0 + 10.0)
+    center_y = config.pit_spacing
+    half = preset.arena_width * 0.5
+    return PlayFrame(
+        width=preset.arena_width,
+        length=length,
+        center_y=center_y,
+        half_width=half,
+        lane_half=PLAY_LANE_WIDTH * 0.5,
+        side_width=SIDE_BAND_WIDTH,
+        y_min=center_y - length * 0.5,
+        y_max=center_y + length * 0.5,
+        far_y=center_y + length * 0.5,
+    )
+
+
+def _shared_preset(name, color, roughness, bump, density, theme):
+    return MapPreset(
+        name=name,
+        ground_color=color,
+        roughness=roughness,
+        arena_width=PLAY_LANE_WIDTH + SIDE_BAND_WIDTH * 2.0,
+        arena_length=34.0,
+        prop_density=density,
+        ground_bump=bump,
+        side_theme=theme,
+    )
+
+
 MAP_PRESETS = {
-    "beach": MapPreset(
-        name="Beach",
-        ground_color=(0.74, 0.48, 0.22, 1.0),
-        roughness=0.82,
-        arena_width=13.0,
-        arena_length=34.0,
-        prop_density=18,
-        ground_bump=0.035,
-    ),
-    "grass": MapPreset(
-        name="Grass Field",
-        ground_color=(0.14, 0.34, 0.08, 1.0),
-        roughness=0.93,
-        arena_width=13.0,
-        arena_length=34.0,
-        prop_density=30,
-        ground_bump=0.025,
-    ),
-    "rough_soil": MapPreset(
-        name="Kerala Village Rough Soil",
-        ground_color=(0.31, 0.135, 0.052, 1.0),
-        roughness=0.96,
-        arena_width=20.0,
-        arena_length=34.0,
-        prop_density=18,
-        ground_bump=0.075,
-    ),
-    "smooth_clay": MapPreset(
-        name="Smooth Clay",
-        ground_color=(0.46, 0.16, 0.07, 1.0),
-        roughness=0.58,
-        arena_width=13.0,
-        arena_length=34.0,
-        prop_density=10,
-        ground_bump=0.008,
-    ),
+    "beach": _shared_preset("Beach", (0.74, 0.48, 0.22, 1.0), 0.82, 0.035, 12, "ocean"),
+    "grass": _shared_preset("Grass Field", (0.14, 0.34, 0.08, 1.0), 0.93, 0.025, 16, "meadow"),
+    "rough_soil": _shared_preset("Kerala Village Rough Soil", (0.31, 0.135, 0.052, 1.0), 0.96, 0.075, 14, "paddy"),
+    "smooth_clay": _shared_preset("Smooth Clay", (0.46, 0.16, 0.07, 1.0), 0.58, 0.008, 8, "curb"),
 }
