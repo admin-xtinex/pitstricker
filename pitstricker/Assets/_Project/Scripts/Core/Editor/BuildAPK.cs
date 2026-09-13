@@ -188,6 +188,10 @@ namespace PitStriker.EditorTools
             {
                 string tundraLock = Path.Combine(projectRoot, "Library", "Bee", "tundra.lock");
                 if (File.Exists(tundraLock)) File.Delete(tundraLock);
+                string regO = Path.Combine(projectRoot, "Library", "Bee", "artifacts", "Android", "libunity", "arm64-v8a", "UnityClassRegistration.o");
+                if (File.Exists(regO)) File.Delete(regO);
+                string icallO = Path.Combine(projectRoot, "Library", "Bee", "artifacts", "Android", "libunity", "arm64-v8a", "UnityICallRegistration.o");
+                if (File.Exists(icallO)) File.Delete(icallO);
             }
             catch { }
 
