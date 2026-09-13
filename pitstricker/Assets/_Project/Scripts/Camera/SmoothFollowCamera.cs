@@ -4,29 +4,29 @@ using PitStriker.Physics;
 
 namespace PitStriker.CameraSystem
 {
-<<<<<<< HEAD
     /// <summary>
     /// Smoothly follows the active marble and dynamically aligns the camera view behind the marble.
     /// Supports a TWO-ZONE input system:
     /// - Left side: Camera orbit (yaw and pitch) with smooth interpolation, damping/inertia, limits, and dead zone.
     /// - Right side: Aiming & shooting (locks camera orientation during aim).
     /// </summary>
-=======
->>>>>>> origin/dev-isotrophic
     public class SmoothFollowCamera : MonoBehaviour
     {
         public static SmoothFollowCamera Instance { get; private set; }
 
+        [Header("Target Tracking")]
+        [Tooltip("Target transform to follow (typically the active marble).")]
         [SerializeField] private Transform _target;
+
+        [Header("Framing Distance & Elevation")]
+        [Tooltip("Distance behind the marble along the aim vector.")]
         [SerializeField] private float _distance = 4.8f;
-<<<<<<< HEAD
 
         [Tooltip("Base height of the camera above the ground plane.")]
-=======
->>>>>>> origin/dev-isotrophic
         [SerializeField] private float _height = 2.6f;
+
+        [Tooltip("Look-at height offset above target pivot.")]
         [SerializeField] private float _lookAtHeightOffset = 0.45f;
-<<<<<<< HEAD
 
         [Header("Tracking Smoothing")]
         [Tooltip("Smooth time for position tracking damping (lower is snappier, higher is smoother).")]
@@ -87,12 +87,6 @@ namespace PitStriker.CameraSystem
         [SerializeField] private bool _preserveViewingAngleAcrossTurns = false;
 
         // Alignment & Orbit State
-=======
-        [SerializeField] private float _smoothTime = 0.22f;
-        [SerializeField] private float _orbitSensitivity = 0.25f;
-        [SerializeField] private float _keyOrbitSpeed = 65.0f;
-
->>>>>>> origin/dev-isotrophic
         private Vector3 _baseAimDirection = Vector3.forward;
         private float _manualOrbitAngle = 0f;
         private float _targetOrbitAngle = 0f;
@@ -105,7 +99,6 @@ namespace PitStriker.CameraSystem
         private float _pitchInertiaVelocity = 0f;
 
         private Vector3 _currentVelocity;
-<<<<<<< HEAD
         private bool _isAimLocked = false;
         private bool _isDraggingCamera = false;
 
@@ -117,16 +110,10 @@ namespace PitStriker.CameraSystem
         private bool _isRightMouseDragging = false;
         private Vector2 _lastRightMousePos;
 
-        // Camera Impact Shake
-        private float _shakeTimer = 0f;
-        private float _shakeIntensity = 0f;
-=======
-        private Vector2 _lastPointerPos;
-        private bool _isOrbitDragging = false;
+        // Camera Impact Shake & Punch
         private float _shakeTimer = 0f;
         private float _shakeIntensity = 0f;
         private Coroutine _scorePunchRoutine;
->>>>>>> origin/dev-isotrophic
         private Coroutine _impactTrackCoroutine;
 
         // Public Properties
@@ -145,11 +132,47 @@ namespace PitStriker.CameraSystem
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
-            else if (Instance != this) Destroy(gameObject);
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+            else if (Instance != this)
+            {
+                Destroy(gameObject);
+            }
         }
 
-<<<<<<< HEAD
+        public void TriggerImpactShake(float intensity = 0.25f, float duration = 0.2f)
+        {
+            _shakeIntensity = intensity;
+            _shakeTimer = duration;
+        }
+
+        public void TriggerScorePunch()
+        {
+            TriggerImpactShake(0.10f, 0.28f);
+            if (_scorePunchRoutine != null) StopCoroutine(_scorePunchRoutine);
+            _scorePunchRoutine = StartCoroutine(ScorePunchRoutine());
+        }
+
+        private System.Collections.IEnumerator ScorePunchRoutine()
+        {
+            float startDist = _distance;
+            float startHeight = _height;
+            float t = 0f;
+            while (t < 0.42f)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Sin(Mathf.Clamp01(t / 0.42f) * Mathf.PI);
+                _distance = Mathf.Lerp(startDist, startDist * 0.84f, k);
+                _height = Mathf.Lerp(startHeight, startHeight * 0.9f, k);
+                yield return null;
+            }
+            _distance = startDist;
+            _height = startHeight;
+            _scorePunchRoutine = null;
+        }
+
         /// <summary>
         /// Locks or unlocks camera orientation. When locked (e.g. during aiming/power pull),
         /// camera rotation input is completely ignored and orientation stays rock-solid.
@@ -231,40 +254,6 @@ namespace PitStriker.CameraSystem
         }
 
         /// <summary>
-        /// Triggers camera screen shake for high-energy direct strikes and heavy impacts.
-        /// </summary>
-        public void TriggerImpactShake(float intensity = 0.25f, float duration = 0.2f)
-        {
-            _shakeIntensity = intensity;
-            _shakeTimer = duration;
-        }
-
-        public void TriggerScorePunch()
-        {
-            TriggerImpactShake(0.10f, 0.28f);
-            if (_scorePunchRoutine != null) StopCoroutine(_scorePunchRoutine);
-            _scorePunchRoutine = StartCoroutine(ScorePunchRoutine());
-        }
-
-        private System.Collections.IEnumerator ScorePunchRoutine()
-        {
-            float startDist = _distance;
-            float startHeight = _height;
-            float t = 0f;
-            while (t < 0.42f)
-            {
-                t += Time.unscaledDeltaTime;
-                float k = Mathf.Sin(Mathf.Clamp01(t / 0.42f) * Mathf.PI);
-                _distance = Mathf.Lerp(startDist, startDist * 0.84f, k);
-                _height = Mathf.Lerp(startHeight, startHeight * 0.9f, k);
-                yield return null;
-            }
-            _distance = startDist;
-            _height = startHeight;
-            _scorePunchRoutine = null;
-        }
-
-        /// <summary>
         /// Temporarily shifts camera tracking to the blasted opponent marble during a strike impact.
         /// </summary>
         public void TrackImpactedTarget(Transform struckTarget, float duration = 1.6f)
@@ -280,7 +269,9 @@ namespace PitStriker.CameraSystem
             _target = struckTarget;
             yield return new WaitForSeconds(duration);
             if (_target == struckTarget && originalTarget != null)
+            {
                 _target = originalTarget;
+            }
             _impactTrackCoroutine = null;
         }
 
@@ -294,13 +285,20 @@ namespace PitStriker.CameraSystem
 
             bool isDifferentTarget = (_target != newTarget);
             _target = newTarget;
+
             if (objectivePoint.HasValue && _target != null)
             {
                 Vector3 toObj = objectivePoint.Value - _target.position;
                 toObj.y = 0f;
-                _baseAimDirection = toObj.sqrMagnitude > 0.04f ? toObj.normalized : Vector3.forward;
+                if (toObj.sqrMagnitude > 0.04f)
+                {
+                    _baseAimDirection = toObj.normalized;
+                }
+                else
+                {
+                    _baseAimDirection = Vector3.forward;
+                }
             }
-<<<<<<< HEAD
             else if (_baseAimDirection == Vector3.zero)
             {
                 _baseAimDirection = Vector3.forward;
@@ -311,10 +309,6 @@ namespace PitStriker.CameraSystem
             {
                 ResetOrbitToObjective();
             }
-=======
-            else _baseAimDirection = Vector3.forward;
-            _manualOrbitAngle = 0f;
->>>>>>> origin/dev-isotrophic
         }
 
         public void SetObjectiveTarget(Vector3 objectivePoint)
@@ -323,11 +317,16 @@ namespace PitStriker.CameraSystem
             {
                 Vector3 toObj = objectivePoint - _target.position;
                 toObj.y = 0f;
-                if (toObj.sqrMagnitude > 0.04f) _baseAimDirection = toObj.normalized;
+                if (toObj.sqrMagnitude > 0.04f)
+                {
+                    _baseAimDirection = toObj.normalized;
+                }
             }
+            _targetOrbitAngle = 0f;
+            _manualOrbitAngle = 0f;
+            _yawInertiaVelocity = 0f;
         }
 
-<<<<<<< HEAD
         public void RotateOrbit(float deltaDegrees)
         {
             if (_isAimLocked) return;
@@ -355,16 +354,9 @@ namespace PitStriker.CameraSystem
             HandleTwoZoneCameraInput();
             UpdateOrbitPhysics();
         }
-=======
-        public void RotateOrbit(float deltaDegrees) { _manualOrbitAngle += deltaDegrees; }
-        public void ResetOrbitToObjective() { _manualOrbitAngle = 0f; }
-
-        private void Update() { HandleManualOrbitInput(); }
->>>>>>> origin/dev-isotrophic
 
         private void HandleTwoZoneCameraInput()
         {
-<<<<<<< HEAD
             if (_isAimLocked)
             {
                 _isCameraTouchDragging = false;
@@ -497,16 +489,20 @@ namespace PitStriker.CameraSystem
             }
 
             // 3. Keyboard A/D / Arrows / Q/E orbit
-=======
->>>>>>> origin/dev-isotrophic
             float keyInput = 0f;
             if (Keyboard.current != null)
             {
-                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed || Keyboard.current.qKey.isPressed) keyInput -= 1f;
-                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed || Keyboard.current.eKey.isPressed) keyInput += 1f;
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed || Keyboard.current.qKey.isPressed)
+                {
+                    keyInput -= 1f;
+                }
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed || Keyboard.current.eKey.isPressed)
+                {
+                    keyInput += 1f;
+                }
             }
+
             if (Mathf.Abs(keyInput) > 0.01f)
-<<<<<<< HEAD
             {
                 _targetOrbitAngle += keyInput * _keyOrbitSpeed * Time.deltaTime;
                 if (_limitHorizontalRotation)

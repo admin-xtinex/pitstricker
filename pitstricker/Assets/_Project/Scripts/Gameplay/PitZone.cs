@@ -41,8 +41,6 @@ namespace PitStriker.Gameplay
                 sphereTrigger.center = Vector3.zero;
             }
         }
-
-<<<<<<< HEAD
         private void Start()
         {
             Transform ceramicRim = transform.Find("Stylized_Ceramic_Rim");
