@@ -16,6 +16,11 @@ The primary interaction utilizes a **Pull-Back Slingshot** mechanic:
 * **Power Arc / Ring:** An expanding circular reticle around the marble indicating force percentage (0% to 100%).
 * **Color Tint:** Shifts from green (gentle nudge) to yellow (moderate strike) to vibrant orange/red (maximum power).
 
-## 3. Touch Handling Safeguards
+## 3. On-Screen Play Controls
+* **Left hint (`Hint_Swipe`):** Small card, alpha about `0.42` (under 50%). Text only: "Swipe or drag to aim". `raycastTarget` is off so it does not block aiming.
+* **Right action (`Btn_Strike`):** Circular STRIKE button. Taps call `SwipeLaunchController.LaunchStrike`. Hidden interaction during AI turns.
+* Swipe-on-dirt remains the primary control. The button is a secondary, readable action.
+
+## 4. Touch Handling Safeguards
 * **Palm / Accidental Edge Rejection:** Ignore multi-touch inputs when one finger is already tracking a drag vector.
 * **Off-Screen Drag:** If finger drags outside the screen boundary, preserve the clamped maximum force rather than dropping the stroke.
