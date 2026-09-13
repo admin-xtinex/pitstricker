@@ -88,8 +88,15 @@ namespace PitStriker.UI
             hintText.raycastTarget = false;
         }
 
+        private void Update()
+        {
+            if (_strikeButton != null)
+                _strikeButton.interactable = TurnManager.CanAim();
+        }
+
         private void HandleStrike()
         {
+            if (!TurnManager.CanAim()) return;
             if (TurnManager.Instance != null && TurnManager.Instance.ActivePlayer != null && TurnManager.Instance.ActivePlayer.isAI)
                 return;
             if (SwipeLaunchController.Instance != null)
