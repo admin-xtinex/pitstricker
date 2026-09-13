@@ -23,6 +23,7 @@ namespace PitStriker.Networking.Client
                                           _currentPhase != CloudMatchPhase.WaitingForPlayers &&
                                           _currentPhase != CloudMatchPhase.Abandoned;
 
+        private bool _eventsBound;
         private MarbleController _marble0;
         private MarbleController _marble1;
         public CompactPlayerData Player0Data { get; private set; }
@@ -46,6 +47,19 @@ namespace PitStriker.Networking.Client
         {
             FindSceneMarbles();
             RegisterClientEvents();
+        }
+
+        private void Update()
+        {
+            if (!_eventsBound)
+                RegisterClientEvents();
+
+            if (!IsOnlineMatchActive || PredictionAndInterpolationController.Instance == null) return;
+            int localIdx = CloudNetworkClient.Instance != null ? CloudNetworkClient.Instance.ResolvedLocalPlayerIndex() : 0;
+            if (localIdx < 0) localIdx = 0;
+            MarbleController remoteMarble = GetMarble(1 - localIdx);
+            if (remoteMarble != null)
+                PredictionAndInterpolationController.Instance.UpdateRemoteMarble(remoteMarble, 1 - localIdx);
         }
 
         private void OnDestroy()
@@ -91,12 +105,14 @@ namespace PitStriker.Networking.Client
 
         private void RegisterClientEvents()
         {
-            if (CloudNetworkClient.Instance == null) return;
+            if (_eventsBound || CloudNetworkClient.Instance == null) return;
             CloudNetworkClient.Instance.OnMatchStarted += HandleMatchStarted;
             CloudNetworkClient.Instance.OnSnapshotReceived += HandleSnapshotReceived;
             CloudNetworkClient.Instance.OnShotBroadcastReceived += HandleShotBroadcast;
             CloudNetworkClient.Instance.OnMatchCompleted += HandleMatchCompleted;
             CloudNetworkClient.Instance.OnRematchConfirmed += HandleRematchConfirmed;
+            _eventsBound = true;
+            Debug.Log("[CLOUD MATCH] Bound to CloudNetworkClient events.");
         }
 
         private void UnregisterClientEvents()
@@ -107,6 +123,7 @@ namespace PitStriker.Networking.Client
             CloudNetworkClient.Instance.OnShotBroadcastReceived -= HandleShotBroadcast;
             CloudNetworkClient.Instance.OnMatchCompleted -= HandleMatchCompleted;
             CloudNetworkClient.Instance.OnRematchConfirmed -= HandleRematchConfirmed;
+            _eventsBound = false;
         }
 
         private void HandleMatchStarted(string roomCode, string p1, string p2)
@@ -150,16 +167,6 @@ namespace PitStriker.Networking.Client
             CompactMarbleState localState = localIdx == 0 ? snapshot.Marble0 : snapshot.Marble1;
             if (PredictionAndInterpolationController.Instance != null)
                 PredictionAndInterpolationController.Instance.ReconcileLocalMarble(GetMarble(localIdx), localState);
-        }
-
-        private void Update()
-        {
-            if (!IsOnlineMatchActive || PredictionAndInterpolationController.Instance == null) return;
-            int localIdx = CloudNetworkClient.Instance != null ? CloudNetworkClient.Instance.ResolvedLocalPlayerIndex() : 0;
-            if (localIdx < 0) localIdx = 0;
-            MarbleController remoteMarble = GetMarble(1 - localIdx);
-            if (remoteMarble != null)
-                PredictionAndInterpolationController.Instance.UpdateRemoteMarble(remoteMarble, 1 - localIdx);
         }
 
         private void HandleShotBroadcast(int playerIndex, ShotIntentData intent)
