@@ -55,15 +55,16 @@ def create_unity_anchors(config):
 
 
 def default_unity_fbx_path(script_dir, map_name):
-    """Place generated FBX inside the Unity project so Unity auto-imports it."""
+    """Place generated FBX inside the real Unity project folder."""
     repo_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
     models_dir = os.path.join(
         repo_root,
-        "Unity",
+        "pitstricker",
         "Assets",
         "_Project",
         "Art",
-        "Models",
+        "Environments",
+        "Village",
         "Generated",
     )
     os.makedirs(models_dir, exist_ok=True)
@@ -92,10 +93,41 @@ def _should_export(obj, include_debug=False):
     return True
 
 
+def _convert_curves_to_mesh():
+    """Blender 5 FBX exporter no longer accepts CURVE object_types."""
+    curves = [obj for obj in bpy.context.scene.objects if obj.type == "CURVE"]
+    if not curves:
+        return 0
+
+    bpy.ops.object.select_all(action="DESELECT")
+    converted = 0
+    for obj in curves:
+        try:
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.convert(target="MESH")
+            converted += 1
+        except Exception as exc:
+            print(f"WARNING: could not convert curve {obj.name} to mesh: {exc}")
+        finally:
+            obj.select_set(False)
+    print(f"Converted {converted} curve object(s) to mesh for FBX")
+    return converted
+
+
+def _fbx_object_types():
+    version = getattr(bpy.app, "version", (4, 0, 0))
+    if version[0] >= 5:
+        return {"MESH", "EMPTY", "OTHER"}
+    return {"MESH", "CURVE", "EMPTY"}
+
+
 def export_unity_fbx(filepath, include_debug=False):
     """Export generated arena to Unity-friendly FBX coordinates."""
     filepath = os.path.abspath(filepath)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    _convert_curves_to_mesh()
 
     bpy.ops.object.select_all(action="DESELECT")
     export_objects = []
@@ -108,6 +140,8 @@ def export_unity_fbx(filepath, include_debug=False):
         raise RuntimeError("No Unity-exportable objects found in the Blender scene")
 
     bpy.context.view_layer.objects.active = export_objects[0]
+    object_types = _fbx_object_types()
+    print(f"FBX object_types={sorted(object_types)} blender={bpy.app.version_string}")
 
     try:
         bpy.ops.export_scene.fbx(
@@ -115,7 +149,7 @@ def export_unity_fbx(filepath, include_debug=False):
             use_selection=True,
             apply_unit_scale=True,
             apply_scale_options="FBX_SCALE_UNITS",
-            object_types={"MESH", "CURVE", "EMPTY"},
+            object_types=object_types,
             use_mesh_modifiers=True,
             mesh_smooth_type="FACE",
             axis_forward="-Z",
@@ -130,6 +164,9 @@ def export_unity_fbx(filepath, include_debug=False):
             "FBX export failed. Make sure Blender's FBX exporter is available. "
             f"Original error: {exc}"
         ) from exc
+
+    if not os.path.isfile(filepath):
+        raise RuntimeError(f"FBX operator returned but file is missing: {filepath}")
 
     print(f"Unity FBX exported: {filepath}")
     return filepath
