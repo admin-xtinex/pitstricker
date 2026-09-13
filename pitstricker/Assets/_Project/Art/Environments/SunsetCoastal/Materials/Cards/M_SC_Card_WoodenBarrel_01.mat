@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientFill: 0.3
-    - _Cutoff: 0.35
+    - _Cutoff: 0.25
     - _Transmission: 0.1
     - _WindSpeed: 0
     - _WindStrength: 0

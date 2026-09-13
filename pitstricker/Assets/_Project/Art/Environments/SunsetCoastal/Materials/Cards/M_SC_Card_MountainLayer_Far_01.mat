@@ -30,11 +30,11 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientFill: 0.3
-    - _Cutoff: 0.08
+    - _Cutoff: 0.1
     - _Transmission: 0.1
     - _WindSpeed: 0
     - _WindStrength: 0
     m_Colors:
-    - _BaseColor: {r: 2.6, g: 1.75, b: 2.05, a: 1}
+    - _BaseColor: {r: 2.4, g: 1.65, b: 1.95, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

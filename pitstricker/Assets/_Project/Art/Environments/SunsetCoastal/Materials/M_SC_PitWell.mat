@@ -40,9 +40,9 @@ Material:
     - _AmbientFill: 0
     - _BumpScale: 0.6
     - _Metallic: 0
-    - _Smoothness: 0.1
+    - _Smoothness: 0.08
     - _UseMask: 0
     m_Colors:
-    - _BaseColor: {r: 0.16, g: 0.11, b: 0.09, a: 1}
+    - _BaseColor: {r: 0.08, g: 0.05, b: 0.03, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

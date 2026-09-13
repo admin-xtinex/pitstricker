@@ -7,10 +7,11 @@ using UnityEngine.Rendering.Universal;
 namespace PitStriker.EditorTools
 {
     /// <summary>
-    /// Phase 6: sunset directional light, atmospheric haze fog, sunset skybox, and a
-    /// scene-local (non-global-asset) Volume profile with controlled bloom/vignette/color
-    /// grading. Entirely scoped to the Sunset Coastal scene's own RenderSettings/Volume —
-    /// Village's lighting and its SampleSceneProfile.asset are never touched.
+    /// Configures the warm, cinematic golden-hour sunset lighting matching the Phase 4 concept:
+    /// - Directional Light angled from upper-left (Pitch 22°, Yaw 122°) casting diagonal palm shadows.
+    /// - Warm peach & amber trilight ambient bounce.
+    /// - Soft atmospheric sunset haze.
+    /// - URP Volume with bloom (lanterns, torches, sun corona) and rich color saturation.
     /// </summary>
     public static class SunsetCoastalLighting
     {
@@ -33,35 +34,30 @@ namespace PitStriker.EditorTools
                 return;
             }
             var light = lightGo.GetComponent<Light>();
-            light.color = new Color(1.0f, 0.74f, 0.48f);
-            light.intensity = 1.75f;
-            light.transform.rotation = Quaternion.Euler(22f, -128f, 0f);
+            // Key light from upper-left casting diagonal palm shadows across fairway towards lower-right
+            light.color = new Color(1.0f, 0.78f, 0.52f);
+            light.intensity = 2.2f;
+            light.transform.rotation = Quaternion.Euler(22f, 122f, 0f);
+            light.shadows = LightShadows.Soft;
+            light.shadowStrength = 0.85f;
+            light.shadowBias = 0.03f;
+            light.shadowNormalBias = 0.2f;
         }
 
-        // Fog/ambient were muddying the vivid warm palette in live play testing —
-        // pulled fog density down and shifted ambient warmer so direct-lit color
-        // (sand, wood, foliage) reads punchy instead of washed-out and grey.
         private static void ConfigureAmbientAndFog()
         {
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.58f, 0.60f, 0.66f);
-            RenderSettings.ambientEquatorColor = new Color(0.68f, 0.52f, 0.40f);
-            RenderSettings.ambientGroundColor = new Color(0.34f, 0.28f, 0.24f);
-            RenderSettings.ambientIntensity = 0.85f;
+            RenderSettings.ambientSkyColor = new Color(0.92f, 0.60f, 0.48f); // Warm peach/amber sky
+            RenderSettings.ambientEquatorColor = new Color(0.85f, 0.52f, 0.38f); // Golden dusk horizon
+            RenderSettings.ambientGroundColor = new Color(0.48f, 0.32f, 0.22f); // Warm sand bounce
+            RenderSettings.ambientIntensity = 1.15f;
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Exponential;
-            RenderSettings.fogColor = new Color(0.90f, 0.74f, 0.60f);
-            RenderSettings.fogDensity = 0.0040f;
+            RenderSettings.fogColor = new Color(0.96f, 0.72f, 0.52f);
+            RenderSettings.fogDensity = 0.0018f;
         }
 
-        /// <summary>
-        /// "Skybox/Procedural" is a legacy Built-in-RP shader with no UniversalPipeline
-        /// tag, so URP renders it as an invalid/magenta shader even though it resolves
-        /// fine via Shader.Find. A flat solid-color background avoids that pipeline
-        /// mismatch entirely; the SunsetCloud/AtmosphericHaze impostor cards (Phase 5)
-        /// already carry the actual sky detail, per the doc's own layering approach.
-        /// </summary>
         private static void ConfigureCameraBackground()
         {
             RenderSettings.skybox = null;
@@ -69,7 +65,7 @@ namespace PitStriker.EditorTools
             var cam = camGo != null ? camGo.GetComponent<Camera>() : null;
             if (cam == null) return;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.93f, 0.66f, 0.48f);
+            cam.backgroundColor = new Color(0.96f, 0.70f, 0.48f);
         }
 
         private static void ConfigureVolume(GameObject artRoot)
@@ -83,45 +79,47 @@ namespace PitStriker.EditorTools
 
             var bloom = GetOrAdd<Bloom>(profile);
             bloom.active = true;
-            bloom.threshold.overrideState = true; bloom.threshold.value = 1.0f;
-            bloom.intensity.overrideState = true; bloom.intensity.value = 0.24f;
-            bloom.scatter.overrideState = true; bloom.scatter.value = 0.55f;
-            bloom.tint.overrideState = true; bloom.tint.value = new Color(1f, 0.85f, 0.65f);
+            bloom.threshold.overrideState = true; bloom.threshold.value = 0.82f;
+            bloom.intensity.overrideState = true; bloom.intensity.value = 0.65f;
+            bloom.scatter.overrideState = true; bloom.scatter.value = 0.60f;
+            bloom.tint.overrideState = true; bloom.tint.value = new Color(1f, 0.88f, 0.68f);
 
             var color = GetOrAdd<ColorAdjustments>(profile);
             color.active = true;
-            color.postExposure.overrideState = true; color.postExposure.value = 0.15f;
-            color.contrast.overrideState = true; color.contrast.value = 14f;
-            color.saturation.overrideState = true; color.saturation.value = 22f;
-            color.colorFilter.overrideState = true; color.colorFilter.value = new Color(1.0f, 0.95f, 0.90f);
+            color.postExposure.overrideState = true; color.postExposure.value = 0.12f;
+            color.contrast.overrideState = true; color.contrast.value = 16f;
+            color.saturation.overrideState = true; color.saturation.value = 25f;
+            color.colorFilter.overrideState = true; color.colorFilter.value = new Color(1.0f, 0.96f, 0.92f);
 
             var vignette = GetOrAdd<Vignette>(profile);
             vignette.active = true;
-            vignette.intensity.overrideState = true; vignette.intensity.value = 0.20f;
-            vignette.smoothness.overrideState = true; vignette.smoothness.value = 0.6f;
-
-            var tonemap = GetOrAdd<Tonemapping>(profile);
-            tonemap.active = true;
-            tonemap.mode.overrideState = true; tonemap.mode.value = TonemappingMode.ACES;
+            vignette.intensity.overrideState = true; vignette.intensity.value = 0.18f;
+            vignette.smoothness.overrideState = true; vignette.smoothness.value = 0.35f;
 
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
 
-            var volumeGo = new GameObject("SunsetCoastal_Volume");
-            volumeGo.transform.SetParent(artRoot.transform, false);
-            var volume = volumeGo.AddComponent<Volume>();
+            var volGo = artRoot.transform.Find("SunsetCoastal_PostFX_Volume");
+            Volume volume;
+            if (volGo == null)
+            {
+                var go = new GameObject("SunsetCoastal_PostFX_Volume");
+                go.transform.SetParent(artRoot.transform, false);
+                volume = go.AddComponent<Volume>();
+            }
+            else
+            {
+                volume = volGo.GetComponent<Volume>();
+            }
             volume.isGlobal = true;
             volume.priority = 10f;
-            volume.sharedProfile = profile;
+            volume.profile = profile;
         }
 
         private static T GetOrAdd<T>(VolumeProfile profile) where T : VolumeComponent
         {
-            if (!profile.TryGet<T>(out var component))
-            {
-                component = profile.Add<T>(true);
-            }
-            return component;
+            if (profile.TryGet<T>(out var component)) return component;
+            return profile.Add<T>(true);
         }
     }
 }

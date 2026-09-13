@@ -1,0 +1,12 @@
+# Blender 5.2.0 LTS MTL File: 'None'
+# www.blender.org
+
+newmtl M_HeroPalm_02
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd C:/Users/Tisan/Documents/pitstricker/pitstricker/Assets/_Project/Art/Environments/SunsetCoastal/Source/Pack02_Core_Environment_Assets/Assets/HeroPalm_02.png
+map_d C:/Users/Tisan/Documents/pitstricker/pitstricker/Assets/_Project/Art/Environments/SunsetCoastal/Source/Pack02_Core_Environment_Assets/Assets/HeroPalm_02.png
