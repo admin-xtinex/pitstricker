@@ -9,15 +9,30 @@ namespace PitStriker.Input
 {
     public static class OnlineShotRouter
     {
+        public static bool IsCloudMatchLive()
+        {
+            var cloud = CloudMatchManager.Instance;
+            var client = CloudNetworkClient.Instance;
+            return cloud != null && cloud.IsOnlineMatchActive && client != null && client.IsConnected;
+        }
+
+        public static bool IsRelayMatchLive()
+        {
+            if (IsCloudMatchLive()) return false;
+            return NetworkSessionManager.Instance != null &&
+                   NetworkSessionManager.Instance.ActiveNetworkMode != NetworkSessionManager.NetworkMode.None &&
+                   NetworkSessionManager.Instance.IsConnected;
+        }
+
         public static bool TryDispatch(Vector3 direction, float force, MarbleController marble)
         {
-            if (TurnManager.IsCloudMatchLive() && CloudMatchManager.Instance != null)
+            if (IsCloudMatchLive() && CloudMatchManager.Instance != null)
             {
                 CloudMatchManager.Instance.SubmitLocalShot(direction, force);
                 return true;
             }
 
-            if (TurnManager.IsRelayMatchLive() && NetworkMatchState.Instance != null)
+            if (IsRelayMatchLive() && NetworkMatchState.Instance != null)
             {
                 if (marble != null) marble.Halt();
                 NetworkMatchState.Instance.SubmitLocalShot(direction, force);
