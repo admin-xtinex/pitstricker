@@ -12,15 +12,15 @@ namespace PitStriker.EditorTools
     public static class VillageConceptDress
     {
         const string RootName = "Environment_Concept_Dress";
-        const string ScenePath = "Assets/_Project/Scenes/SC_Village_Graphics_Test.unity";
 
         [MenuItem("Pit Striker/Apply Concept Village Dress (Paddy + Side Fences)", false, 22)]
         public static void Apply()
         {
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            string scenePath = VillageSceneRename.ActiveVillageScenePath();
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             if (!scene.IsValid())
             {
-                Debug.LogError("[CONCEPT DRESS] Could not open " + ScenePath);
+                Debug.LogError("[CONCEPT DRESS] Could not open " + scenePath);
                 return;
             }
 
@@ -35,9 +35,7 @@ namespace PitStriker.EditorTools
             var paddy = MakeMat("M_Concept_PaddyField", new Color(0.16f, 0.46f, 0.10f, 1f), 0.88f);
             var wood = MakeMat("M_Concept_FenceWood", new Color(0.22f, 0.085f, 0.028f, 1f), 0.87f);
 
-            // Full play-lane soil: launch through pit 3. Width stays inside the fences.
             Box("Dirt_Lane", root.transform, new Vector3(0f, 0.025f, 11.5f), new Vector3(6.7f, 0.05f, 34f), dirt);
-
             Box("Paddy_Water_L", root.transform, new Vector3(-6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
             Box("Paddy_Water_R", root.transform, new Vector3(6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
             Box("Paddy_Field_L", root.transform, new Vector3(-10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
@@ -66,7 +64,7 @@ namespace PitStriker.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Selection.activeGameObject = root;
-            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Dirt lane now spans launch through pit 3 (z=-5.5..28.5).</color>");
+            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Applied on " + scenePath + "</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Village Dress", false, 23)]
