@@ -34,7 +34,7 @@ namespace PitStriker.EditorTools
             "village", "paddy", "foliage", "laterite", "hedge", "reed",
             "vis_home", "vis_stone", "vis_barr", "vis_base", "vis_s1", "vis_s2",
             "ground_bank", "home1", "house", "cottage", "verand", "thatch_roof",
-            "coconut", "plant_clump", "tuft", "bush"
+            "coconut", "plant_clump", "tuft", "bush", "chalk", "pitnumber", "launchring"
         };
 
         [MenuItem("Pit Striker/Apply Concept Beach Dress (Ocean + Driftwood)", false, 24)]
@@ -51,29 +51,15 @@ namespace PitStriker.EditorTools
         {
             if (!System.IO.File.Exists(VillageScene))
                 throw new System.InvalidOperationException("[BEACH DRESS] Village scene missing: " + VillageScene);
-
             if (!System.IO.File.Exists(BeachScene))
             {
                 if (!AssetDatabase.CopyAsset(VillageScene, BeachScene))
                     throw new System.InvalidOperationException("[BEACH DRESS] Could not copy village scene to beach scene.");
                 AssetDatabase.Refresh();
             }
-
             var scene = EditorSceneManager.OpenScene(BeachScene, OpenSceneMode.Single);
             Apply(scene, save: true);
             EnsureBuildSettings();
-            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Scene ready: " + BeachScene + "</color>");
-        }
-
-        [MenuItem("Pit Striker/Remove Concept Beach Dress", false, 26)]
-        public static void Remove()
-        {
-            var old = GameObject.Find(RootName);
-            if (old) Undo.DestroyObjectImmediate(old);
-            var ground = GameObject.Find(SolidGroundName);
-            if (ground) Undo.DestroyObjectImmediate(ground);
-            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
         }
 
         public static void Apply(Scene scene, bool save)
@@ -102,7 +88,8 @@ namespace PitStriker.EditorTools
             var leaf = MakeMat("M_Beach_PalmLeaf", new Color(0.10f, 0.38f, 0.08f, 1f), 0.78f);
             var white = MakeMat("M_Beach_Lighthouse", new Color(0.92f, 0.90f, 0.84f, 1f), 0.55f);
             var red = MakeMat("M_Beach_LighthouseStripe", new Color(0.62f, 0.12f, 0.08f, 1f), 0.55f);
-            var rock = MakeMat("M_Beach_Rock", new Color(0.32f, 0.30f, 0.26f, 1f), 0.95f);
+            var pitMat = MakeMat("M_Beach_Pit", new Color(0.38f, 0.04f, 0.04f, 1f), 0.40f);
+            var rimMat = MakeMat("M_Beach_PitRim", new Color(0.82f, 0.10f, 0.07f, 1f), 0.30f);
 
             Box("Sand_PlayLane", root.transform, new Vector3(0f, -0.03f, ArenaFrame.MidZ), new Vector3(ArenaFrame.PlayLaneWidth, 0.06f, ArenaFrame.ArenaLength), sand);
             Box("Sand_Verge_L", root.transform, new Vector3(-8.2f, 0.02f, 12f), new Vector3(4.0f, 0.05f, 33f), sand);
@@ -145,6 +132,7 @@ namespace PitStriker.EditorTools
             for (int i = 0; i < palms.Length; i++)
                 Palm(root.transform, new Vector3(palms[i][0], 0f, palms[i][1]), palms[i][2], trunk, leaf, i);
 
+            PlacePitMarks(root.transform, pitMat, rimMat);
             TintPlayGround(sand);
             foreach (var col in root.GetComponentsInChildren<Collider>(true))
                 Object.DestroyImmediate(col);
@@ -156,6 +144,29 @@ namespace PitStriker.EditorTools
             }
         }
 
+        static void PlacePitMarks(Transform parent, Material pitMat, Material rimMat)
+        {
+            for (int i = 1; i <= 3; i++)
+            {
+                Vector3 p = ArenaFrame.PitPosition(i);
+                p.y = 0.04f;
+                Cyl("Beach_PitBowl_" + i, parent, p, new Vector3(0.46f, 0.012f, 0.46f), pitMat);
+                Cyl("Beach_PitRim_" + i, parent, p + new Vector3(0f, 0.012f, 0f), new Vector3(0.56f, 0.01f, 0.56f), rimMat);
+                var label = new GameObject("Beach_PitNum_" + i);
+                label.transform.SetParent(parent, true);
+                label.transform.position = p + new Vector3(0f, 0.03f, 0f);
+                label.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                var text = label.AddComponent<TextMesh>();
+                text.text = i.ToString();
+                text.fontSize = 64;
+                text.characterSize = 0.035f;
+                text.anchor = TextAnchor.MiddleCenter;
+                text.alignment = TextAlignment.Center;
+                text.color = Color.white;
+                text.fontStyle = FontStyle.Bold;
+            }
+        }
+
         static void HideVillageDress(Scene scene)
         {
             foreach (var sceneRoot in scene.GetRootGameObjects())
@@ -164,25 +175,18 @@ namespace PitStriker.EditorTools
                 if (n.Contains("blender_village") || n.Contains("villagemap") ||
                     n == "environment_concept_dress" || n.Contains("village_dress") ||
                     n.Contains("village_foliage") || n.Contains("village_scenery"))
-                {
                     sceneRoot.SetActive(false);
-                    continue;
-                }
             }
-
             foreach (var name in HideRoots)
             {
                 var go = GameObject.Find(name);
-                if (go) MuteVisualTree(go, deactivate: true);
+                if (go) MuteVisualTree(go, true);
             }
-
             foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
-                if (!t) continue;
-                if (IsProtectedGameplay(t.gameObject)) continue;
+                if (!t || IsProtectedGameplay(t.gameObject)) continue;
                 if (t.gameObject.name == RootName || t.gameObject.name == SolidGroundName) continue;
                 if (t.gameObject.name.StartsWith("Beach_")) continue;
-
                 string n = t.gameObject.name.ToLowerInvariant();
                 bool hide = false;
                 for (int i = 0; i < HideNameBits.Length; i++)
@@ -190,13 +194,7 @@ namespace PitStriker.EditorTools
                 if (n.Contains("grass") && !n.Contains("beach")) hide = true;
                 if ((n.Contains("palm") || n.Contains("tree")) && !n.Contains("beach")) hide = true;
                 if (n.Contains("fence") || n.Contains("stone_wall")) hide = true;
-                if (!hide && t.position.x < -5.4f && !IsProtectedGameplay(t.gameObject))
-                {
-                    var rend = t.GetComponent<Renderer>();
-                    if (rend && t.GetComponent<Camera>() == null && t.GetComponent<Light>() == null)
-                        hide = true;
-                }
-                if (hide) MuteVisualTree(t.gameObject, deactivate: true);
+                if (hide) MuteVisualTree(t.gameObject, true);
             }
         }
 
@@ -228,16 +226,13 @@ namespace PitStriker.EditorTools
                 foreach (var col in go.GetComponents<Collider>())
                     col.enabled = false;
             }
-
             var existing = GameObject.Find(SolidGroundName);
             if (existing) Object.DestroyImmediate(existing);
-
             var ground = new GameObject(SolidGroundName);
             ground.transform.position = new Vector3(0f, 0f, ArenaFrame.MidZ);
             var box = ground.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, -0.12f, 0f);
             box.size = new Vector3(ArenaFrame.PlayLaneWidth, 0.24f, ArenaFrame.ArenaLength + 10f);
-            box.enabled = true;
         }
 
         static void RepairPits()
@@ -252,12 +247,13 @@ namespace PitStriker.EditorTools
                 zone.transform.rotation = Quaternion.identity;
                 foreach (var meshCol in zone.GetComponentsInChildren<MeshCollider>(true))
                     meshCol.enabled = false;
+                foreach (var rend in zone.GetComponentsInChildren<Renderer>(true))
+                    rend.enabled = true;
                 var sphere = zone.GetComponent<SphereCollider>();
                 if (!sphere) sphere = zone.gameObject.AddComponent<SphereCollider>();
                 sphere.isTrigger = true;
                 sphere.center = new Vector3(0f, 0.08f, 0f);
                 sphere.radius = 0.42f;
-                sphere.enabled = true;
                 zone.SetPitNumber(n);
                 EditorUtility.SetDirty(zone);
             }
@@ -266,11 +262,8 @@ namespace PitStriker.EditorTools
         static bool IsProtectedGameplay(GameObject go)
         {
             if (!go) return false;
-            if (go.GetComponent<PitZone>()) return true;
-            if (go.GetComponent<MarbleController>()) return true;
-            if (go.GetComponent<Camera>()) return true;
-            if (go.GetComponent<Light>()) return true;
-            if (go.GetComponent<TurnManager>()) return true;
+            if (go.GetComponent<PitZone>() || go.GetComponent<MarbleController>()) return true;
+            if (go.GetComponent<Camera>() || go.GetComponent<Light>() || go.GetComponent<TurnManager>()) return true;
             string n = go.name;
             if (n == SolidGroundName || n == RootName) return true;
             if (n.StartsWith("Pit_") || n.StartsWith("Beach_")) return true;
