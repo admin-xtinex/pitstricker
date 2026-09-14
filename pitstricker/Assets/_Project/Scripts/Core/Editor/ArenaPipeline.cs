@@ -6,21 +6,16 @@ using UnityEngine;
 
 namespace PitStriker.EditorTools
 {
-    /// <summary>
-    /// Headless entry points for the self-hosted Windows GitHub runner.
-    /// Beach test: Unity -batchmode -quit -executeMethod PitStriker.EditorTools.ArenaPipeline.RunBeachAlign
-    /// </summary>
     public static class ArenaPipeline
     {
         const string ResultFile = "Library/ArenaPipeline.result";
 
-        [MenuItem("Pit Striker/Run Arena Pipeline (Align + Rebuild Pits + Village Dress)", false, 9)]
+        [MenuItem("Pit Striker/Run Arena Pipeline (Align + Village Dress)", false, 9)]
         public static void RunVillageAlign()
         {
             Run("village", () =>
             {
                 ArenaAligner.Align();
-                VillagePitMeshGenerator.RebuildVillagePits();
                 VillageConceptDress.Apply();
             });
         }
@@ -40,7 +35,6 @@ namespace PitStriker.EditorTools
             Run("village-apk", () =>
             {
                 ArenaAligner.Align();
-                VillagePitMeshGenerator.RebuildVillagePits();
                 VillageConceptDress.Apply();
                 BuildAPK.BuildAndroidPlayer();
             });
