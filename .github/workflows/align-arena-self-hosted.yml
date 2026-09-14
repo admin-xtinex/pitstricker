@@ -32,7 +32,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
     runs-on: [self-hosted, Windows]
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: write
 
@@ -45,43 +45,49 @@ jobs:
 
       - name: Locate Unity 6000.6.0f1
         id: unity
-        shell: powershell
+        shell: cmd
         run: |
-          $unityPath = "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe"
-          if (-not (Test-Path $unityPath)) {
-            Write-Error "Unity 6000.6.0f1 not found at $unityPath. Sign in to Unity Hub on this VM and install that editor with Android modules."
-            exit 1
-          }
-          Write-Host "Using $unityPath"
-          "unity=$unityPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          if not exist "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe" (
+            echo Unity 6000.6.0f1 not found.
+            exit /b 1
+          )
+          echo unity=C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe>> "%GITHUB_OUTPUT%"
 
       - name: Run arena pipeline in Unity batchmode
         shell: powershell
         run: |
           $map = "${{ github.event_name == 'workflow_dispatch' && inputs.map || 'village' }}"
-          $method = switch ($map) {
-            "beach" { "PitStriker.EditorTools.ArenaPipeline.RunBeachAlign" }
-            default { "PitStriker.EditorTools.ArenaPipeline.RunVillageAlign" }
+          $method = if ($map -eq 'beach') {
+            'PitStriker.EditorTools.ArenaPipeline.RunBeachAlign'
+          } else {
+            'PitStriker.EditorTools.ArenaPipeline.RunVillageAlign'
           }
-          $log = Join-Path $pwd "unity_align.log"
+          $unity = 'C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe'
+          $log = Join-Path $pwd 'unity_align.log'
           Write-Host "executeMethod $method"
-          & "${{ steps.unity.outputs.unity }}" `
-            -batchmode -nographics -quit `
-            -projectPath pitstricker `
-            -executeMethod $method `
-            -logfile $log
-          $code = $LASTEXITCODE
+          $proc = Start-Process -FilePath $unity -ArgumentList @(
+            '-batchmode',
+            '-nographics',
+            '-quit',
+            '-projectPath', 'pitstricker',
+            '-executeMethod', $method,
+            '-logfile', $log
+          ) -PassThru -Wait -NoNewWindow
+          $code = $proc.ExitCode
+          Write-Host "Unity exit code: $code"
           if (Test-Path $log) {
-            Write-Host "---- unity log tail ----"
-            Get-Content $log -Tail 80
+            Write-Host '---- unity log tail ----'
+            Get-Content $log -Tail 120
+          } else {
+            Write-Host 'unity_align.log was not created'
           }
-          if ($code -ne 0) {
+          if ($null -eq $code -or $code -ne 0) {
             Write-Error "Unity arena pipeline failed with exit code $code"
-            exit $code
+            exit 1
           }
-          $result = "pitstricker/Library/ArenaPipeline.result"
+          $result = 'pitstricker/Library/ArenaPipeline.result'
           if (Test-Path $result) {
-            Write-Host "Pipeline result:"
+            Write-Host 'Pipeline result:'
             Get-Content $result
           }
 
