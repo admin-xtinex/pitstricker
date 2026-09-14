@@ -8,7 +8,7 @@ namespace PitStriker.EditorTools
 {
     /// <summary>
     /// Headless entry points for the self-hosted Windows GitHub runner.
-    /// Unity -batchmode -quit -executeMethod PitStriker.EditorTools.ArenaPipeline.RunVillageAlign
+    /// Beach test: Unity -batchmode -quit -executeMethod PitStriker.EditorTools.ArenaPipeline.RunBeachAlign
     /// </summary>
     public static class ArenaPipeline
     {
@@ -25,14 +25,13 @@ namespace PitStriker.EditorTools
             });
         }
 
-        [MenuItem("Pit Striker/Run Arena Pipeline (Align + Rebuild Pits + Beach Dress)", false, 10)]
+        [MenuItem("Pit Striker/Run Arena Pipeline (Create Beach Scene + Align + Beach Dress)", false, 10)]
         public static void RunBeachAlign()
         {
             Run("beach", () =>
             {
-                ArenaAligner.Align();
-                VillagePitMeshGenerator.RebuildVillagePits();
                 BeachConceptDress.CreateBeachScene();
+                ArenaAligner.Align();
             });
         }
 

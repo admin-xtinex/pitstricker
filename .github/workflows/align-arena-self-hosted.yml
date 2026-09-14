@@ -19,11 +19,11 @@ on:
       map:
         description: 'Dress to apply after snapping pits to 0/12/24'
         required: true
-        default: 'village'
+        default: 'beach'
         type: choice
         options:
-          - village
           - beach
+          - village
       push_scene:
         description: 'Commit aligned scene + generated meshes back to this branch'
         required: true
@@ -35,7 +35,6 @@ jobs:
     name: Align on self-hosted Unity
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
     runs-on: [self-hosted, Windows]
     timeout-minutes: 90
@@ -90,16 +89,17 @@ jobs:
       - name: Run arena pipeline in Unity batchmode
         shell: powershell
         run: |
-          $map = "${{ github.event_name == 'workflow_dispatch' && inputs.map || 'village' }}"
-          $method = if ($map -eq 'beach') {
-            'PitStriker.EditorTools.ArenaPipeline.RunBeachAlign'
-          } else {
+          $map = "${{ github.event_name == 'workflow_dispatch' && inputs.map || 'beach' }}"
+          $method = if ($map -eq 'village') {
             'PitStriker.EditorTools.ArenaPipeline.RunVillageAlign'
+          } else {
+            'PitStriker.EditorTools.ArenaPipeline.RunBeachAlign'
           }
           $unity = 'C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe'
           $log = Join-Path $pwd 'unity_align.log'
           if (Test-Path $log) { Remove-Item $log -Force }
           New-Item -ItemType File -Path $log | Out-Null
+          Write-Host "map=$map"
           Write-Host "executeMethod $method"
           $proc = Start-Process -FilePath $unity -ArgumentList @(
             '-batchmode',
@@ -148,6 +148,14 @@ jobs:
             Write-Host 'Pipeline result:'
             Get-Content $result
           }
+          $beach = 'pitstricker/Assets/_Project/Scenes/SC_Beach_Graphics_Test.unity'
+          if ($map -eq 'beach' -and -not (Test-Path $beach)) {
+            Write-Error "Beach scene was not created: $beach"
+            exit 1
+          }
+          if (Test-Path $beach) {
+            Write-Host "Beach scene ready: $beach"
+          }
 
       - name: Upload Unity log
         if: always()
@@ -159,18 +167,27 @@ jobs:
           retention-days: 14
 
       - name: Commit aligned scene back to branch
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.push_scene }}
+        if: success()
         shell: powershell
         run: |
+          $shouldPush = $true
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.push_scene }}' -eq 'false') {
+            $shouldPush = $false
+          }
+          if (-not $shouldPush) {
+            Write-Host 'push_scene=false, skip commit.'
+            exit 0
+          }
           git config user.name "pitstriker-self-hosted"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- "pitstricker/Assets/_Project/Scenes/*.unity" `
-                    "pitstricker/Assets/_Project/Art/Environments/Village/*" `
-                    "pitstricker/Assets/_Project/Art/Environments/Beach/*"
+          git add -- "pitstricker/Assets/_Project/Scenes" `
+                    "pitstricker/Assets/_Project/Art/Environments/Village" `
+                    "pitstricker/Assets/_Project/Art/Environments/Beach" `
+                    "pitstricker/ProjectSettings/EditorBuildSettings.asset"
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
             Write-Host "No scene/art changes to commit."
             exit 0
           }
-          git commit -m "Align village/beach scene to ArenaFrame 0/12/24 [skip ci]"
+          git commit -m "Add playable SC_Beach_Graphics_Test aligned to ArenaFrame 0/12/24 [skip ci]"
           git push origin HEAD:${{ github.ref_name }}
