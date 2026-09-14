@@ -6,8 +6,7 @@ using UnityEngine;
 namespace PitStriker.EditorTools
 {
     /// <summary>
-    /// Drops concept-art village dressing into SC_Village_Graphics_Test:
-    /// paddy water both sides, lane fences, bank grass.
+    /// Concept village dressing: full dirt lane, paddy water, side fences.
     /// Does not touch pits, marbles, colliders, or HUD.
     /// </summary>
     public static class VillageConceptDress
@@ -31,11 +30,14 @@ namespace PitStriker.EditorTools
             var root = new GameObject(RootName);
             Undo.RegisterCreatedObjectUndo(root, "Concept village dress");
 
+            var dirt = MakeMat("M_Concept_DirtLane", new Color(0.31f, 0.135f, 0.052f, 1f), 0.96f);
             var water = MakeMat("M_Concept_PaddyWater", new Color(0.12f, 0.38f, 0.32f, 1f), 0.12f);
             var paddy = MakeMat("M_Concept_PaddyField", new Color(0.16f, 0.46f, 0.10f, 1f), 0.88f);
             var wood = MakeMat("M_Concept_FenceWood", new Color(0.22f, 0.085f, 0.028f, 1f), 0.87f);
 
-            // y must sit ABOVE the dirt slab or Game view only shows sand.
+            // Full play-lane soil: launch through pit 3. Width stays inside the fences.
+            Box("Dirt_Lane", root.transform, new Vector3(0f, 0.025f, 11.5f), new Vector3(6.7f, 0.05f, 34f), dirt);
+
             Box("Paddy_Water_L", root.transform, new Vector3(-6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
             Box("Paddy_Water_R", root.transform, new Vector3(6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
             Box("Paddy_Field_L", root.transform, new Vector3(-10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
@@ -64,7 +66,7 @@ namespace PitStriker.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Selection.activeGameObject = root;
-            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Paddy water raised to y=0.14. Select Paddy_Water_L in Scene view to confirm.</color>");
+            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Dirt lane now spans launch through pit 3 (z=-5.5..28.5).</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Village Dress", false, 23)]
