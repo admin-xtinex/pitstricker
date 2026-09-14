@@ -1,5 +1,9 @@
 name: Align Arena on Self-Hosted Windows
 
+concurrency:
+  group: align-arena-self-hosted
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -31,6 +35,7 @@ jobs:
     name: Align on self-hosted Unity
     if: |
       github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
     runs-on: [self-hosted, Windows]
     timeout-minutes: 90
@@ -38,23 +43,40 @@ jobs:
       contents: write
 
     steps:
-      - name: Stop leftover Unity
+      - name: Stop leftover Unity and compilers
         shell: powershell
         run: |
-          $procs = Get-Process -Name Unity -ErrorAction SilentlyContinue
-          if ($procs) {
-            Write-Host "Stopping leftover Unity PIDs: $($procs.Id -join ', ')"
-            $procs | Stop-Process -Force
-            Start-Sleep -Seconds 3
-          } else {
-            Write-Host 'No leftover Unity.exe'
+          $names = @('Unity','UnityCrashHandler64','UnityCrashHandler32','UnityShaderCompiler','VBCSCompiler')
+          foreach ($n in $names) {
+            $procs = Get-Process -Name $n -ErrorAction SilentlyContinue
+            if ($procs) {
+              Write-Host "Stopping $n PIDs: $($procs.Id -join ', ')"
+              $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+            }
           }
+          Start-Sleep -Seconds 4
+          Write-Host 'Process cleanup done.'
 
       - name: Checkout branch
         uses: actions/checkout@v4
         with:
           lfs: false
           ref: ${{ github.ref }}
+
+      - name: Clear locked Bee updater files
+        shell: powershell
+        run: |
+          $paths = @(
+            'pitstricker\Library\Bee\artifacts\mvdfrm',
+            'pitstricker\Temp'
+          )
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              Write-Host "Removing $p"
+              Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          Write-Host 'Bee/Temp cleanup done.'
 
       - name: Locate Unity 6000.6.0f1
         shell: cmd
@@ -83,6 +105,7 @@ jobs:
             '-batchmode',
             '-nographics',
             '-quit',
+            '-disable-assembly-updater',
             '-projectPath', 'pitstricker',
             '-executeMethod', $method,
             '-logfile', $log
