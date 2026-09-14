@@ -1,6 +1,14 @@
 name: Align Arena on Self-Hosted Windows
 
 on:
+  push:
+    branches:
+      - dev-isotrophic
+    paths:
+      - 'pitstricker/Assets/_Project/Scripts/Core/**'
+      - 'pitstricker/Assets/_Project/Scenes/**'
+      - 'Tools/Blender/**'
+      - '.github/workflows/align-arena-self-hosted.yml'
   workflow_dispatch:
     inputs:
       map:
@@ -11,7 +19,6 @@ on:
         options:
           - village
           - beach
-          - village-and-apk
       push_scene:
         description: 'Commit aligned scene + generated meshes back to this branch'
         required: true
@@ -21,6 +28,9 @@ on:
 jobs:
   align:
     name: Align on self-hosted Unity
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
     runs-on: [self-hosted, Windows]
     timeout-minutes: 60
     permissions:
@@ -48,9 +58,9 @@ jobs:
       - name: Run arena pipeline in Unity batchmode
         shell: powershell
         run: |
-          $method = switch ("${{ inputs.map }}") {
+          $map = "${{ github.event_name == 'workflow_dispatch' && inputs.map || 'village' }}"
+          $method = switch ($map) {
             "beach" { "PitStriker.EditorTools.ArenaPipeline.RunBeachAlign" }
-            "village-and-apk" { "PitStriker.EditorTools.ArenaPipeline.RunVillageAlignAndBuildApk" }
             default { "PitStriker.EditorTools.ArenaPipeline.RunVillageAlign" }
           }
           $log = Join-Path $pwd "unity_align.log"
@@ -84,19 +94,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload APK if built
-        if: ${{ inputs.map == 'village-and-apk' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: PitStriker-Aligned-Android-v${{ github.run_number }}
-          path: |
-            Builds/Android/*.apk
-            pitstricker/Builds/Android/*.apk
-          if-no-files-found: warn
-          retention-days: 14
-
       - name: Commit aligned scene back to branch
-        if: ${{ inputs.push_scene }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.push_scene }}
         shell: powershell
         run: |
           git config user.name "pitstriker-self-hosted"
