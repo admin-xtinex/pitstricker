@@ -1,5 +1,14 @@
 from dataclasses import dataclass
 
+# Canonical gameplay frame (must match Unity PitStriker.Core.ArenaFrame):
+#   pits at Y = 0 / 12 / 24, launch at Y = -4, radius 0.18, marble 0.16
+#   play lane 14 m, side bands 3 m, arena 20 x 34
+# Blender is Z-up, Y-forward. Unity is Y-up, Z-forward.
+# FBX export: axis_forward=-Z, axis_up=Y.
+# Unity then rotates the graphics root 180 deg around Y so:
+#   Blender +Y  -> Unity +Z (down the pits)
+#   Blender -X  -> Unity +X (right bank; left stays camera-reserved)
+
 
 PLAY_LANE_WIDTH = 14.0
 SIDE_BAND_WIDTH = 3.0
