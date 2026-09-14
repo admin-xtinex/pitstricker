@@ -38,21 +38,32 @@ jobs:
       contents: write
 
     steps:
+      - name: Stop leftover Unity
+        shell: powershell
+        run: |
+          $procs = Get-Process -Name Unity -ErrorAction SilentlyContinue
+          if ($procs) {
+            Write-Host "Stopping leftover Unity PIDs: $($procs.Id -join ', ')"
+            $procs | Stop-Process -Force
+            Start-Sleep -Seconds 3
+          } else {
+            Write-Host 'No leftover Unity.exe'
+          }
+
       - name: Checkout branch
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
           ref: ${{ github.ref }}
 
       - name: Locate Unity 6000.6.0f1
-        id: unity
         shell: cmd
         run: |
           if not exist "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe" (
             echo Unity 6000.6.0f1 not found.
             exit /b 1
           )
-          echo unity=C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe>> "%GITHUB_OUTPUT%"
+          echo Unity found.
 
       - name: Run arena pipeline in Unity batchmode
         shell: powershell
@@ -65,6 +76,8 @@ jobs:
           }
           $unity = 'C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe'
           $log = Join-Path $pwd 'unity_align.log'
+          if (Test-Path $log) { Remove-Item $log -Force }
+          New-Item -ItemType File -Path $log | Out-Null
           Write-Host "executeMethod $method"
           $proc = Start-Process -FilePath $unity -ArgumentList @(
             '-batchmode',
@@ -73,15 +86,36 @@ jobs:
             '-projectPath', 'pitstricker',
             '-executeMethod', $method,
             '-logfile', $log
-          ) -PassThru -Wait -NoNewWindow
-          $code = $proc.ExitCode
-          Write-Host "Unity exit code: $code"
-          if (Test-Path $log) {
-            Write-Host '---- unity log tail ----'
-            Get-Content $log -Tail 160
-          } else {
-            Write-Host 'unity_align.log was not created'
+          ) -PassThru -WindowStyle Hidden
+          $offset = 0
+          $deadline = (Get-Date).AddMinutes(60)
+          while (-not $proc.HasExited) {
+            if ((Get-Date) -gt $deadline) {
+              Write-Host 'Unity exceeded 60 minutes. Killing.'
+              Stop-Process -Id $proc.Id -Force
+              Start-Sleep -Seconds 2
+              throw 'Unity batchmode timed out'
+            }
+            Start-Sleep -Seconds 20
+            if (Test-Path $log) {
+              $lines = Get-Content $log -ErrorAction SilentlyContinue
+              if ($lines -and $lines.Count -gt $offset) {
+                $lines[$offset..($lines.Count - 1)] | ForEach-Object { Write-Host $_ }
+                $offset = $lines.Count
+              } else {
+                Write-Host "[wait] Unity PID $($proc.Id) still running, log lines=$offset"
+              }
+            }
           }
+          $proc.Refresh()
+          $code = $proc.ExitCode
+          if (Test-Path $log) {
+            $lines = Get-Content $log -ErrorAction SilentlyContinue
+            if ($lines -and $lines.Count -gt $offset) {
+              $lines[$offset..($lines.Count - 1)] | ForEach-Object { Write-Host $_ }
+            }
+          }
+          Write-Host "Unity exit code: $code"
           if ($null -eq $code -or $code -ne 0) {
             Write-Error "Unity arena pipeline failed with exit code $code"
             exit 1
