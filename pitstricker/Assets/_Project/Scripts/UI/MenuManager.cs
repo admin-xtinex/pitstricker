@@ -6,16 +6,6 @@ using PitStriker.Gameplay;
 
 namespace PitStriker.UI
 {
-    /// <summary>
-    /// Coordinates all primary game navigation screens:
-    /// 1. Home Screen (Play, How to Play, Exit)
-    /// 2. Match Setup (Choose 2/3/4 Players, toggle Real Player vs AI Bot per slot)
-    /// 3. How to Play Rules Modal
-    /// 4. In-Game Pause Menu
-    ///
-    /// Features automatic programmatic UI construction so screens exist and function
-    /// seamlessly across all scenes and standalone APK builds without manual setup.
-    /// </summary>
     public partial class MenuManager : MonoBehaviour
     {
         public static MenuManager Instance { get; private set; }
@@ -78,6 +68,7 @@ namespace PitStriker.UI
             }
 
             EnsureUIHierarchy();
+            BuildMapSelectUI();
             BindButtons();
         }
 
@@ -93,6 +84,7 @@ namespace PitStriker.UI
             UpdateSlotRowsUI();
             ShowScreen(ScreenType.Home);
             StartCoroutine(PlaySplashScreenRoutine());
+            ConsumePendingStartIfNeeded();
         }
 
         public enum ScreenType
@@ -108,7 +100,8 @@ namespace PitStriker.UI
             CreateMatch,
             JoinMatch,
             OnlineLobby,
-            OnlineResult
+            OnlineResult,
+            MapSelect
         }
 
         public void ShowScreen(ScreenType screen)
@@ -121,6 +114,7 @@ namespace PitStriker.UI
             if (_choosePlayersPanel != null) _choosePlayersPanel.SetActive(screen == ScreenType.ChoosePlayers);
             if (_rulesModal != null) _rulesModal.SetActive(screen == ScreenType.Rules);
             if (_pauseModal != null) _pauseModal.SetActive(screen == ScreenType.Pause);
+            ApplyMapScreen(screen);
 
             bool isPlaying = (screen == ScreenType.InGame || screen == ScreenType.Pause);
             if (_hudRoot != null)
@@ -139,7 +133,7 @@ namespace PitStriker.UI
 
             if (PitStriker.Audio.AudioManager.Instance != null && _splashHasPlayed)
             {
-                if (screen == ScreenType.Home || screen == ScreenType.ChoosePlayers || (screen == ScreenType.Rules && _rulesReturn != ScreenType.Pause))
+                if (screen == ScreenType.Home || screen == ScreenType.ChoosePlayers || screen == ScreenType.MapSelect || (screen == ScreenType.Rules && _rulesReturn != ScreenType.Pause))
                 {
                     PitStriker.Audio.AudioManager.Instance.PlayStartMusic();
                 }
@@ -212,7 +206,7 @@ namespace PitStriker.UI
             if (_startMatchButton != null)
             {
                 _startMatchButton.onClick.RemoveAllListeners();
-                _startMatchButton.onClick.AddListener(HandleStartMatchClicked);
+                _startMatchButton.onClick.AddListener(() => ShowScreen(ScreenType.MapSelect));
             }
 
             if (_backToHomeButton != null)
@@ -291,13 +285,11 @@ namespace PitStriker.UI
 
         private void HandleHomePlayClicked()
         {
-            Debug.Log("<color=#00FFAA><b>[MENU]</b> PLAY MATCH button clicked -> Navigating to Choose Players...</color>");
             ShowScreen(ScreenType.ChoosePlayers);
         }
 
         private void HandleStartMatchClicked()
         {
-            Debug.Log($"<color=#00FFAA><b>[MENU]</b> START MATCH button clicked! Configuring match for {_selectedPlayerCount} players...</color>");
             bool[] configuredIsAI = new bool[_selectedPlayerCount];
             string[] names = new string[_selectedPlayerCount];
             for (int i = 0; i < _selectedPlayerCount; i++)
@@ -311,11 +303,10 @@ namespace PitStriker.UI
             if (tm != null)
             {
                 tm.ConfigureAndStartMatch(_selectedPlayerCount, configuredIsAI, names);
-                Debug.Log("<color=#00FF88><b>[MENU]</b> Match successfully launched via TurnManager!</color>");
             }
             else
             {
-                Debug.LogError("<color=#FF0044><b>[MENU ERROR]</b> TurnManager could not be found anywhere in the scene!</color>");
+                Debug.LogError("[MENU ERROR] TurnManager could not be found anywhere in the scene!");
             }
         }
 
