@@ -1,4 +1,4 @@
-﻿"""Generate Beach arena matching Unity greybox scale, then save + export."""
+"""Generate Beach arena at the current village gameplay scale, then save + export."""
 import os
 import sys
 import bpy
@@ -18,14 +18,14 @@ BLEND = os.path.join(OUT_DIR, "pit_striker_beach.blend")
 GLB = os.path.join(OUT_DIR, "pit_striker_beach.glb")
 FBX = os.path.join(OUT_DIR, "pit_striker_beach.fbx")
 
-# Unity SandboxBuilder-ish scale (playable experience)
+# Same lock as village: 20x34 arena, 3 pits at 12 m, r=0.18.
 config = ArenaConfig(
     map_name="beach",
-    pit_radius=0.50,
-    pit_depth=0.28,
-    pit_spacing=14.0,
-    marble_radius=0.25,
-    launch_distance=9.0,
+    pit_radius=0.18,
+    pit_depth=0.12,
+    pit_spacing=12.0,
+    marble_radius=0.16,
+    launch_distance=4.0,
     seed=17,
 )
 

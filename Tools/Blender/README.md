@@ -60,3 +60,18 @@ This guarantees all three pits remain perfectly collinear regardless of spacing.
 ## Notes
 
 This is intended as a procedural blockout/foundation. Replace generated primitive props with production assets later while retaining the same gameplay coordinates and dimensions.
+
+## Beach map (same gameplay as village)
+
+Beach uses the same frame as `rough_soil`: 20 m wide, 34 m long, pits at 0 / 12 / 24, radius 0.18.
+Only the dressing changes — ocean + wet sand on the right and far end, low dunes on the left camera bank, driftwood rails, hut, boat, lighthouse.
+
+```bash
+blender --background --python Tools/Blender/generate_arena.py -- --map beach --output Art/Generated/pit_striker_beach.blend
+blender --background --python Tools/Blender/export_beach_graphics.py
+```
+
+Unity menu (visual only, no pit/marble edits):
+
+- `Pit Striker / Create Beach Graphics Test Scene`
+- `Pit Striker / Apply Concept Beach Dress (Ocean + Driftwood)`
