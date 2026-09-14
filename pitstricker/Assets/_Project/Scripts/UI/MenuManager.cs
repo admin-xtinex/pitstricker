@@ -12,7 +12,7 @@ namespace PitStriker.UI
     /// 2. Match Setup (Choose 2/3/4 Players, toggle Real Player vs AI Bot per slot)
     /// 3. How to Play Rules Modal
     /// 4. In-Game Pause Menu
-    /// 
+    ///
     /// Features automatic programmatic UI construction so screens exist and function
     /// seamlessly across all scenes and standalone APK builds without manual setup.
     /// </summary>
@@ -41,10 +41,10 @@ namespace PitStriker.UI
         [SerializeField] private Image _img4Players;
 
         [Header("Player Slot Configuration Cards")]
-        [SerializeField] private GameObject[] _playerSlotRows; // Rows for P1, P2, P3, P4
+        [SerializeField] private GameObject[] _playerSlotRows;
         [SerializeField] private Text[] _playerSlotNameTexts;
-        [SerializeField] private Text[] _playerSlotRoleTexts;  // "REAL PLAYER" or "AI BOT"
-        [SerializeField] private Button[] _playerSlotToggleButtons; // Toggles AI vs Real
+        [SerializeField] private Text[] _playerSlotRoleTexts;
+        [SerializeField] private Button[] _playerSlotToggleButtons;
 
         [Header("Match Setup Actions")]
         [SerializeField] private Button _startMatchButton;
@@ -59,9 +59,8 @@ namespace PitStriker.UI
         [SerializeField] private Button _pauseRestartButton;
         [SerializeField] private Button _pauseHomeButton;
 
-        // Configuration State
         private int _selectedPlayerCount = 2;
-        private bool[] _isAISlot = new bool[] { false, true, true, true }; // P1 Human, P2-P4 default AI
+        private bool[] _isAISlot = new bool[] { false, true, true, true };
 
         private readonly Color _colorActiveTab = new Color(0.78f, 0.46f, 0.13f, 1f);
         private readonly Color _colorInactiveTab = new Color(0.10f, 0.21f, 0.21f, 1f);
@@ -92,10 +91,7 @@ namespace PitStriker.UI
             LoadSetup();
             UpdatePlayerCountUI();
             UpdateSlotRowsUI();
-
-            // Default startup: Show Home Screen, hide match & pause panels
             ShowScreen(ScreenType.Home);
-
             StartCoroutine(PlaySplashScreenRoutine());
         }
 
@@ -105,7 +101,14 @@ namespace PitStriker.UI
             ChoosePlayers,
             InGame,
             Rules,
-            Pause
+            Pause,
+            PlayModeSelect,
+            OnlineMenu,
+            QuickMatch,
+            CreateMatch,
+            JoinMatch,
+            OnlineLobby,
+            OnlineResult
         }
 
         public void ShowScreen(ScreenType screen)
@@ -134,7 +137,6 @@ namespace PitStriker.UI
                 _hudPauseButton.gameObject.SetActive(screen == ScreenType.InGame);
             }
 
-            // Music orchestration: Start / Menu music on main menus, Toss / Gameplay music during match
             if (PitStriker.Audio.AudioManager.Instance != null && _splashHasPlayed)
             {
                 if (screen == ScreenType.Home || screen == ScreenType.ChoosePlayers || (screen == ScreenType.Rules && _rulesReturn != ScreenType.Pause))
@@ -157,7 +159,6 @@ namespace PitStriker.UI
 
         private void BindButtons()
         {
-            // Home Screen
             if (_homePlayButton != null)
             {
                 _homePlayButton.onClick.RemoveAllListeners();
@@ -176,14 +177,12 @@ namespace PitStriker.UI
                 _homeExitButton.onClick.AddListener(HandleExitClicked);
             }
 
-            // Rules Screen
             if (_closeRulesButton != null)
             {
                 _closeRulesButton.onClick.RemoveAllListeners();
                 _closeRulesButton.onClick.AddListener(() => ShowScreen(_rulesReturn));
             }
 
-            // Player Count Tabs
             if (_btn2Players != null)
             {
                 _btn2Players.onClick.RemoveAllListeners();
@@ -200,7 +199,6 @@ namespace PitStriker.UI
                 _btn4Players.onClick.AddListener(() => SetPlayerCount(4));
             }
 
-            // Player Slot Toggles (Slot 0 is P1 - human, Slot 1..3 are P2..P4)
             for (int i = 0; i < 4; i++)
             {
                 int index = i;
@@ -211,7 +209,6 @@ namespace PitStriker.UI
                 }
             }
 
-            // Match Setup Actions
             if (_startMatchButton != null)
             {
                 _startMatchButton.onClick.RemoveAllListeners();
@@ -224,7 +221,6 @@ namespace PitStriker.UI
                 _backToHomeButton.onClick.AddListener(() => ShowScreen(ScreenType.Home));
             }
 
-            // Pause Modal
             if (_hudPauseButton != null)
             {
                 _hudPauseButton.onClick.RemoveAllListeners();
@@ -260,7 +256,6 @@ namespace PitStriker.UI
         private void ToggleSlotRole(int slotIndex)
         {
             if (slotIndex <= 0 || slotIndex >= _isAISlot.Length) return;
-
             _isAISlot[slotIndex] = !_isAISlot[slotIndex];
             UpdateSlotRowsUI();
         }
@@ -277,21 +272,14 @@ namespace PitStriker.UI
             for (int i = 0; i < 4; i++)
             {
                 bool slotVisible = i < _selectedPlayerCount;
-
                 if (_playerSlotRows != null && i < _playerSlotRows.Length && _playerSlotRows[i] != null)
-                {
                     _playerSlotRows[i].SetActive(slotVisible);
-                }
 
                 if (slotVisible)
                 {
                     bool isBot = _isAISlot[i];
-
                     if (_playerSlotNameTexts != null && i < _playerSlotNameTexts.Length && _playerSlotNameTexts[i] != null)
-                    {
                         _playerSlotNameTexts[i].text = isBot ? $"Bot {i + 1}" : $"Player {i + 1}";
-                    }
-
                     if (_playerSlotRoleTexts != null && i < _playerSlotRoleTexts.Length && _playerSlotRoleTexts[i] != null)
                     {
                         _playerSlotRoleTexts[i].text = i == 0 ? "YOU / HUMAN" : isBot ? "COMPUTER  >" : "HUMAN  >";
@@ -312,16 +300,13 @@ namespace PitStriker.UI
             Debug.Log($"<color=#00FFAA><b>[MENU]</b> START MATCH button clicked! Configuring match for {_selectedPlayerCount} players...</color>");
             bool[] configuredIsAI = new bool[_selectedPlayerCount];
             string[] names = new string[_selectedPlayerCount];
-
             for (int i = 0; i < _selectedPlayerCount; i++)
             {
                 configuredIsAI[i] = _isAISlot[i];
                 names[i] = configuredIsAI[i] ? $"Bot {i + 1}" : $"Player {i + 1}";
             }
-
             SaveSetup();
             ShowScreen(ScreenType.InGame);
-
             TurnManager tm = TurnManager.Instance != null ? TurnManager.Instance : UnityEngine.Object.FindAnyObjectByType<TurnManager>();
             if (tm != null)
             {
@@ -337,40 +322,28 @@ namespace PitStriker.UI
         private void HandlePauseClicked()
         {
             TurnManager tm = TurnManager.Instance != null ? TurnManager.Instance : UnityEngine.Object.FindAnyObjectByType<TurnManager>();
-            if (tm != null)
-            {
-                tm.SetPaused(true);
-            }
+            if (tm != null) tm.SetPaused(true);
             ShowScreen(ScreenType.Pause);
         }
 
         private void HandleResumeClicked()
         {
             TurnManager tm = TurnManager.Instance != null ? TurnManager.Instance : UnityEngine.Object.FindAnyObjectByType<TurnManager>();
-            if (tm != null)
-            {
-                tm.SetPaused(false);
-            }
+            if (tm != null) tm.SetPaused(false);
             ShowScreen(ScreenType.InGame);
         }
 
         private void HandleRestartClicked()
         {
             TurnManager tm = TurnManager.Instance != null ? TurnManager.Instance : UnityEngine.Object.FindAnyObjectByType<TurnManager>();
-            if (tm != null)
-            {
-                tm.RestartMatch();
-            }
+            if (tm != null) tm.RestartMatch();
             ShowScreen(ScreenType.InGame);
         }
 
         public void HandleHomeClicked()
         {
             TurnManager tm = TurnManager.Instance != null ? TurnManager.Instance : UnityEngine.Object.FindAnyObjectByType<TurnManager>();
-            if (tm != null)
-            {
-                tm.ReturnToMainMenu();
-            }
+            if (tm != null) tm.ReturnToMainMenu();
             ShowScreen(ScreenType.Home);
         }
 
@@ -383,9 +356,6 @@ namespace PitStriker.UI
 #endif
         }
 
-        /// <summary>
-        /// Ensures all screens exist in the scene hierarchy; builds them programmatically if missing.
-        /// </summary>
         private void EnsureUIHierarchy() { BuildModernUI(); }
 
         private static GameObject CreatePanel(string name, Transform parent, Color color)
@@ -397,7 +367,6 @@ namespace PitStriker.UI
             rect.anchorMax = Vector2.one;
             rect.sizeDelta = Vector2.zero;
             rect.anchoredPosition = Vector2.zero;
-
             Image img = obj.AddComponent<Image>();
             img.color = color;
             return obj;
@@ -418,7 +387,6 @@ namespace PitStriker.UI
             GameObject obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
             obj.AddComponent<RectTransform>();
-
             Text t = obj.AddComponent<Text>();
             t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             t.text = text;
@@ -432,15 +400,26 @@ namespace PitStriker.UI
             return obj;
         }
 
+        private static Text MultilineLabel(Transform parent, string text, float x, float y, float w, float h, int size, Color color, TextAnchor align = TextAnchor.UpperLeft)
+        {
+            var obj = CreateText("MultilineLabel", parent, text, size, FontStyle.Normal, color, align);
+            var rect = obj.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(w, h);
+            rect.anchoredPosition = new Vector2(x, y);
+            var t = obj.GetComponent<Text>();
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            return t;
+        }
+
         private static GameObject CreateButton(string name, Transform parent, string label, Color bgColor, int fontSize)
         {
             GameObject btnObj = new GameObject(name);
             btnObj.transform.SetParent(parent, false);
             btnObj.AddComponent<RectTransform>();
-
             Image img = btnObj.AddComponent<Image>();
             img.color = bgColor;
-
             Button btn = btnObj.AddComponent<Button>();
             ColorBlock cb = btn.colors;
             btn.targetGraphic = img;
@@ -450,14 +429,12 @@ namespace PitStriker.UI
             cb.selectedColor = Color.white;
             cb.fadeDuration = 0.08f;
             btn.colors = cb;
-
             GameObject textObj = CreateText("Text", btnObj.transform, label, fontSize, FontStyle.Bold, Color.white, TextAnchor.MiddleCenter);
             RectTransform textRect = textObj.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.sizeDelta = Vector2.zero;
             textRect.anchoredPosition = Vector2.zero;
-
             return btnObj;
         }
 
