@@ -31,14 +31,15 @@ namespace PitStriker.EditorTools
             var root = new GameObject(RootName);
             Undo.RegisterCreatedObjectUndo(root, "Concept village dress");
 
-            var water = MakeMat("M_Concept_PaddyWater", new Color(0.07f, 0.22f, 0.16f, 1f), 0.15f);
-            var paddy = MakeMat("M_Concept_PaddyField", new Color(0.10f, 0.38f, 0.07f, 1f), 0.92f);
+            var water = MakeMat("M_Concept_PaddyWater", new Color(0.12f, 0.38f, 0.32f, 1f), 0.12f);
+            var paddy = MakeMat("M_Concept_PaddyField", new Color(0.16f, 0.46f, 0.10f, 1f), 0.88f);
             var wood = MakeMat("M_Concept_FenceWood", new Color(0.22f, 0.085f, 0.028f, 1f), 0.87f);
 
-            Box("Paddy_Water_L", root.transform, new Vector3(-5.15f, -0.06f, 12f), new Vector3(2.6f, 0.10f, 34f), water);
-            Box("Paddy_Water_R", root.transform, new Vector3(5.15f, -0.06f, 12f), new Vector3(2.6f, 0.10f, 34f), water);
-            Box("Paddy_Field_L", root.transform, new Vector3(-8.35f, 0.02f, 12f), new Vector3(3.6f, 0.06f, 36f), paddy);
-            Box("Paddy_Field_R", root.transform, new Vector3(8.35f, 0.02f, 12f), new Vector3(3.6f, 0.06f, 36f), paddy);
+            // y must sit ABOVE the dirt slab or Game view only shows sand.
+            Box("Paddy_Water_L", root.transform, new Vector3(-6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
+            Box("Paddy_Water_R", root.transform, new Vector3(6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
+            Box("Paddy_Field_L", root.transform, new Vector3(-10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
+            Box("Paddy_Field_R", root.transform, new Vector3(10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
 
             const float y0 = -5.2f;
             const float y1 = 28.4f;
@@ -62,7 +63,8 @@ namespace PitStriker.EditorTools
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Paddy canals + lane fences applied. Pits/marbles/HUD unchanged.</color>");
+            Selection.activeGameObject = root;
+            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Paddy water raised to y=0.14. Select Paddy_Water_L in Scene view to confirm.</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Village Dress", false, 23)]
