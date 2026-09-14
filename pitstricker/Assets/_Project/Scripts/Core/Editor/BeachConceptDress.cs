@@ -3,13 +3,16 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using PitStriker.Core;
+using PitStriker.Gameplay;
+using PitStriker.Physics;
 
 namespace PitStriker.EditorTools
 {
     /// <summary>
     /// Beach concept dress at the same gameplay footprint as the village map:
     /// 20x34 arena, pits 0/12/24, r=0.18, left bank reserved for camera.
-    /// Visual only. Does not touch pits, marbles, colliders, or HUD.
+    /// Visual only except playfield collider repair (old village hole mesh swallows marbles).
     /// </summary>
     public static class BeachConceptDress
     {
@@ -23,7 +26,29 @@ namespace PitStriker.EditorTools
             "Environment_Blender_Village_Graphics",
             "Environment_Concept_Dress",
             "Environment_Village_Dressing",
-            "VillageMap_Visuals"
+            "VillageMap_Visuals",
+            "VillageMap_Visuals_Runtime",
+            "Village_Foliage",
+            "Village_Scenery",
+            "Village_Reference_Polish"
+        };
+
+        static readonly string[] HideNameBits =
+        {
+            "village",
+            "paddy",
+            "foliage",
+            "laterite",
+            "hedge",
+            "reed",
+            "vis_home",
+            "vis_stone",
+            "vis_barr",
+            "vis_base",
+            "vis_s1",
+            "vis_s2",
+            "ground_bank",
+            "brightred_pitlip"
         };
 
         [MenuItem("Pit Striker/Apply Concept Beach Dress (Ocean + Driftwood)", false, 24)]
@@ -39,24 +64,19 @@ namespace PitStriker.EditorTools
         public static void CreateBeachScene()
         {
             if (!System.IO.File.Exists(VillageScene))
-            {
-                Debug.LogError("[BEACH DRESS] Village scene missing: " + VillageScene);
-                return;
-            }
+                throw new System.InvalidOperationException("[BEACH DRESS] Village scene missing: " + VillageScene);
 
             if (!System.IO.File.Exists(BeachScene))
             {
                 if (!AssetDatabase.CopyAsset(VillageScene, BeachScene))
-                {
-                    Debug.LogError("[BEACH DRESS] Could not copy village scene to beach scene.");
-                    return;
-                }
+                    throw new System.InvalidOperationException("[BEACH DRESS] Could not copy village scene to beach scene.");
                 AssetDatabase.Refresh();
             }
 
             var scene = EditorSceneManager.OpenScene(BeachScene, OpenSceneMode.Single);
             Apply(scene, save: true);
-            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Scene ready: " + BeachScene + ". Same pits/marbles. Village props hidden.</color>");
+            EnsureBuildSettings();
+            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Scene ready: " + BeachScene + ". Village props hidden. Playfield holes closed.</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Beach Dress", false, 26)]
@@ -76,20 +96,12 @@ namespace PitStriker.EditorTools
         public static void Apply(Scene scene, bool save)
         {
             if (!scene.IsValid())
-            {
-                Debug.LogError("[BEACH DRESS] Invalid scene.");
-                return;
-            }
+                throw new System.InvalidOperationException("[BEACH DRESS] Invalid scene.");
 
             EnsureMatFolder();
-
-            foreach (var name in HideRoots)
-            {
-                var go = GameObject.Find(name);
-                if (!go) continue;
-                foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
-                    renderer.enabled = false;
-            }
+            HideVillageDress();
+            RepairPlayfieldColliders();
+            SnapPitsToFrame();
 
             var old = GameObject.Find(RootName);
             if (old) Undo.DestroyObjectImmediate(old);
@@ -111,6 +123,7 @@ namespace PitStriker.EditorTools
             var red = MakeMat("M_Beach_LighthouseStripe", new Color(0.62f, 0.12f, 0.08f, 1f), 0.55f);
             var rock = MakeMat("M_Beach_Rock", new Color(0.32f, 0.30f, 0.26f, 1f), 0.95f);
 
+            Box("Sand_PlayLane", root.transform, new Vector3(0f, -0.03f, ArenaFrame.MidZ), new Vector3(ArenaFrame.PlayLaneWidth, 0.06f, ArenaFrame.ArenaLength), sand);
             Box("Sand_Verge_L", root.transform, new Vector3(-5.9f, 0.02f, 12f), new Vector3(4.4f, 0.05f, 33f), sand);
             Box("Sand_Verge_R", root.transform, new Vector3(5.4f, 0.02f, 12f), new Vector3(3.2f, 0.05f, 33f), sand);
             Box("Dune_Left", root.transform, new Vector3(-7.6f, 0.18f, 12f), new Vector3(4.4f, 0.36f, 36f), dune);
@@ -125,7 +138,7 @@ namespace PitStriker.EditorTools
             const float y1 = 28.4f;
             float mid = (y0 + y1) * 0.5f;
             float length = y1 - y0;
-            foreach (float x in new[] { -3.55f, 3.55f })
+            foreach (float x in new[] { -ArenaFrame.LaneHalf + 3.45f, ArenaFrame.LaneHalf - 3.45f })
             {
                 string side = x < 0 ? "L" : "R";
                 for (int i = 0; i < 18; i++)
@@ -188,7 +201,111 @@ namespace PitStriker.EditorTools
                 EditorSceneManager.SaveScene(scene);
             }
 
-            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Ocean, dunes, hut, boat, lighthouse, palms. Pits/marbles/HUD unchanged.</color>");
+            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Village dress hidden. Ocean/dunes/hut on. Pits snapped 0/12/24. Old holes closed.</color>");
+        }
+
+        static void HideVillageDress()
+        {
+            foreach (var name in HideRoots)
+            {
+                var go = GameObject.Find(name);
+                if (go) MuteVisualTree(go);
+            }
+
+            foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (!t) continue;
+                if (IsProtectedGameplay(t.gameObject)) continue;
+                if (t.gameObject.name == RootName || t.IsChildOf(GameObject.Find(RootName) ? GameObject.Find(RootName).transform : t))
+                    continue;
+
+                string n = t.gameObject.name.ToLowerInvariant();
+                bool hide = false;
+                for (int i = 0; i < HideNameBits.Length; i++)
+                {
+                    if (n.Contains(HideNameBits[i])) { hide = true; break; }
+                }
+                if (n.Contains("grass") && !n.Contains("beach")) hide = true;
+                if (n.Contains("fence") || n.Contains("rail_wood") || n.Contains("stone_wall"))
+                    hide = true;
+                if (hide) MuteVisualTree(t.gameObject);
+            }
+        }
+
+        static void MuteVisualTree(GameObject go)
+        {
+            if (!go || go.name == RootName) return;
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+                renderer.enabled = false;
+            foreach (var col in go.GetComponentsInChildren<Collider>(true))
+            {
+                if (IsProtectedGameplay(col.gameObject)) continue;
+                col.enabled = false;
+            }
+        }
+
+        static bool IsProtectedGameplay(GameObject go)
+        {
+            if (!go) return false;
+            if (go.GetComponent<PitZone>()) return true;
+            if (go.GetComponent<MarbleController>()) return true;
+            if (go.GetComponent<Camera>()) return true;
+            if (go.GetComponent<TurnManager>()) return true;
+            string n = go.name;
+            if (n.StartsWith("Pit_")) return true;
+            if (n.StartsWith("Marble") || n.StartsWith("Player")) return true;
+            if (n.Contains("HUD") || n.Contains("Menu")) return true;
+            return false;
+        }
+
+        static void RepairPlayfieldColliders()
+        {
+            string[] holeMeshes =
+            {
+                "Ground_Center_Fairway",
+                "Fairway_Road_With_Pits",
+                "Unified_Arena_Ground"
+            };
+            foreach (var name in holeMeshes)
+            {
+                var go = GameObject.Find(name);
+                if (!go) continue;
+                var meshCol = go.GetComponent<MeshCollider>();
+                if (meshCol) Object.DestroyImmediate(meshCol);
+                var box = go.GetComponent<BoxCollider>();
+                if (!box) box = go.AddComponent<BoxCollider>();
+                box.center = new Vector3(0f, -0.05f, ArenaFrame.MidZ);
+                box.size = new Vector3(ArenaFrame.ArenaWidth, 0.12f, ArenaFrame.ArenaLength + 8f);
+                box.enabled = true;
+            }
+        }
+
+        static void SnapPitsToFrame()
+        {
+            var zones = Object.FindObjectsByType<PitZone>(FindObjectsInactive.Include);
+            foreach (var zone in zones)
+            {
+                if (!zone) continue;
+                int n = zone.PitNumber;
+                if (n < 1 || n > 3) continue;
+                zone.transform.position = ArenaFrame.PitPosition(n);
+                zone.transform.rotation = Quaternion.identity;
+                EditorUtility.SetDirty(zone);
+            }
+        }
+
+        static void EnsureBuildSettings()
+        {
+            var scenes = EditorBuildSettings.scenes;
+            for (int i = 0; i < scenes.Length; i++)
+            {
+                if (scenes[i].path == BeachScene) return;
+            }
+            var list = new System.Collections.Generic.List<EditorBuildSettingsScene>(scenes)
+            {
+                new EditorBuildSettingsScene(BeachScene, true)
+            };
+            EditorBuildSettings.scenes = list.ToArray();
         }
 
         static void TintPlayGround(Material sand)
@@ -197,10 +314,8 @@ namespace PitStriker.EditorTools
             {
                 if (!renderer) continue;
                 string n = renderer.gameObject.name.ToLowerInvariant();
-                if (n.Contains("ground") || n.Contains("playfield") || n.Contains("arena_floor") || n.Contains("soil"))
-                {
+                if (n.Contains("ground") || n.Contains("playfield") || n.Contains("arena_floor") || n.Contains("soil") || n.Contains("fairway"))
                     renderer.sharedMaterial = sand;
-                }
             }
         }
 
