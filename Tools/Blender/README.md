@@ -43,9 +43,21 @@ blender --background --python Tools/Blender/generate_arena.py -- --map rough_soi
 
 ## Coordinate convention
 
-- X = arena width
+Blender authoring:
+
+- X = arena width (negative X is left in Blender, and becomes Unity +X after the 180 Y bake)
 - Y = forward direction / pit progression
 - Z = up
+
+Unity play space (`PitStriker.Core.ArenaFrame`):
+
+- X = arena width (negative X is the camera bank; keep it low)
+- Y = up
+- Z = forward / pit progression
+- Pits at Z = 0 / 12 / 24
+- Launch at Z = -4
+- Graphics FBX root rotation Y = 180
+
 
 Pit centers are generated at:
 
