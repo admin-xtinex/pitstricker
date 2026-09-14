@@ -9,14 +9,10 @@ using PitStriker.Physics;
 
 namespace PitStriker.EditorTools
 {
-    /// <summary>
-    /// Beach concept dress at the same gameplay footprint as the village map:
-    /// 20x34 arena, pits 0/12/24, r=0.18, left bank reserved for camera.
-    /// Visual only except playfield collider repair (old village hole mesh swallows marbles).
-    /// </summary>
     public static class BeachConceptDress
     {
         public const string RootName = "Environment_Concept_Beach_Dress";
+        public const string SolidGroundName = "Beach_SolidGround";
         const string VillageScene = "Assets/_Project/Scenes/SC_Village_Graphics_Test.unity";
         public const string BeachScene = "Assets/_Project/Scenes/SC_Beach_Graphics_Test.unity";
         const string MatFolder = "Assets/_Project/Art/Environments/Beach/";
@@ -35,20 +31,9 @@ namespace PitStriker.EditorTools
 
         static readonly string[] HideNameBits =
         {
-            "village",
-            "paddy",
-            "foliage",
-            "laterite",
-            "hedge",
-            "reed",
-            "vis_home",
-            "vis_stone",
-            "vis_barr",
-            "vis_base",
-            "vis_s1",
-            "vis_s2",
-            "ground_bank",
-            "brightred_pitlip"
+            "village", "paddy", "foliage", "laterite", "hedge", "reed",
+            "vis_home", "vis_stone", "vis_barr", "vis_base", "vis_s1", "vis_s2",
+            "ground_bank"
         };
 
         [MenuItem("Pit Striker/Apply Concept Beach Dress (Ocean + Driftwood)", false, 24)]
@@ -76,19 +61,16 @@ namespace PitStriker.EditorTools
             var scene = EditorSceneManager.OpenScene(BeachScene, OpenSceneMode.Single);
             Apply(scene, save: true);
             EnsureBuildSettings();
-            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Scene ready: " + BeachScene + ". Village props hidden. Playfield holes closed.</color>");
+            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Scene ready: " + BeachScene + "</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Beach Dress", false, 26)]
         public static void Remove()
         {
             var old = GameObject.Find(RootName);
-            if (!old)
-            {
-                Debug.LogWarning("[BEACH DRESS] Nothing to remove.");
-                return;
-            }
-            Undo.DestroyObjectImmediate(old);
+            if (old) Undo.DestroyObjectImmediate(old);
+            var ground = GameObject.Find(SolidGroundName);
+            if (ground) Undo.DestroyObjectImmediate(ground);
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
         }
@@ -100,8 +82,8 @@ namespace PitStriker.EditorTools
 
             EnsureMatFolder();
             HideVillageDress();
-            RepairPlayfieldColliders();
-            SnapPitsToFrame();
+            BuildSolidPlayfield();
+            RepairPits();
 
             var old = GameObject.Find(RootName);
             if (old) Undo.DestroyObjectImmediate(old);
@@ -124,21 +106,21 @@ namespace PitStriker.EditorTools
             var rock = MakeMat("M_Beach_Rock", new Color(0.32f, 0.30f, 0.26f, 1f), 0.95f);
 
             Box("Sand_PlayLane", root.transform, new Vector3(0f, -0.03f, ArenaFrame.MidZ), new Vector3(ArenaFrame.PlayLaneWidth, 0.06f, ArenaFrame.ArenaLength), sand);
-            Box("Sand_Verge_L", root.transform, new Vector3(-5.9f, 0.02f, 12f), new Vector3(4.4f, 0.05f, 33f), sand);
-            Box("Sand_Verge_R", root.transform, new Vector3(5.4f, 0.02f, 12f), new Vector3(3.2f, 0.05f, 33f), sand);
-            Box("Dune_Left", root.transform, new Vector3(-7.6f, 0.18f, 12f), new Vector3(4.4f, 0.36f, 36f), dune);
-            Box("WetSand_Right", root.transform, new Vector3(4.55f, 0.01f, 12f), new Vector3(1.6f, 0.04f, 34f), wet);
-            Box("Ocean_Right", root.transform, new Vector3(7.6f, -0.10f, 12f), new Vector3(5.6f, 0.12f, 38f), water);
-            Box("Foam_Right", root.transform, new Vector3(5.40f, 0.02f, 12f), new Vector3(0.38f, 0.03f, 34f), foam);
+            Box("Sand_Verge_L", root.transform, new Vector3(-8.2f, 0.02f, 12f), new Vector3(4.0f, 0.05f, 33f), sand);
+            Box("Sand_Verge_R", root.transform, new Vector3(8.2f, 0.02f, 12f), new Vector3(4.0f, 0.05f, 33f), sand);
+            Box("Dune_Left", root.transform, new Vector3(-9.2f, 0.18f, 12f), new Vector3(3.2f, 0.36f, 36f), dune);
+            Box("WetSand_Right", root.transform, new Vector3(8.6f, 0.01f, 12f), new Vector3(2.2f, 0.04f, 34f), wet);
+            Box("Ocean_Right", root.transform, new Vector3(11.4f, -0.10f, 12f), new Vector3(5.6f, 0.12f, 38f), water);
+            Box("Foam_Right", root.transform, new Vector3(9.4f, 0.02f, 12f), new Vector3(0.38f, 0.03f, 34f), foam);
             Box("Ocean_Far", root.transform, new Vector3(2.2f, -0.12f, 36.5f), new Vector3(24f, 0.14f, 12f), water);
             Box("Foam_Far", root.transform, new Vector3(1.0f, 0.02f, 30.6f), new Vector3(18f, 0.03f, 0.55f), foam);
-            Box("Background_Sand", root.transform, new Vector3(0f, 0.03f, 29.8f), new Vector3(16f, 0.06f, 5.0f), sand);
 
+            float railX = ArenaFrame.LaneHalf;
             const float y0 = -5.2f;
             const float y1 = 28.4f;
             float mid = (y0 + y1) * 0.5f;
             float length = y1 - y0;
-            foreach (float x in new[] { -ArenaFrame.LaneHalf + 3.45f, ArenaFrame.LaneHalf - 3.45f })
+            foreach (float x in new[] { -railX, railX })
             {
                 string side = x < 0 ? "L" : "R";
                 for (int i = 0; i < 18; i++)
@@ -150,45 +132,29 @@ namespace PitStriker.EditorTools
                 Box($"Driftwood_Rail_{side}", root.transform, new Vector3(x, 0.42f, mid), new Vector3(0.18f, 0.18f, length), wood);
             }
 
-            Box("Beach_Hut_Body", root.transform, new Vector3(7.5f, 1.15f, 8.2f), new Vector3(3.2f, 2.3f, 4.2f), plaster);
-            Box("Beach_Hut_Roof", root.transform, new Vector3(7.5f, 2.55f, 8.2f), new Vector3(3.8f, 0.55f, 4.8f), thatch);
-            Box("Beach_Hut_Deck", root.transform, new Vector3(6.2f, 0.22f, 8.2f), new Vector3(1.2f, 0.12f, 4.0f), wood);
-            Box("Beach_Hut_Post_A", root.transform, new Vector3(5.75f, 0.85f, 6.6f), new Vector3(0.12f, 1.5f, 0.12f), wood);
-            Box("Beach_Hut_Post_B", root.transform, new Vector3(5.75f, 0.85f, 9.8f), new Vector3(0.12f, 1.5f, 0.12f), wood);
-
-            Box("Fishing_Boat_Hull", root.transform, new Vector3(8.4f, 0.35f, 22.0f), new Vector3(1.1f, 0.55f, 3.6f), wood);
-            Box("Fishing_Boat_Cabin", root.transform, new Vector3(8.4f, 0.85f, 21.4f), new Vector3(0.7f, 0.55f, 1.1f), plaster);
-
-            Box("Lighthouse_Island", root.transform, new Vector3(9.6f, 0.35f, 33.5f), new Vector3(3.4f, 0.7f, 3.4f), rock);
-            Cyl("Lighthouse_Shaft", root.transform, new Vector3(9.6f, 3.4f, 33.5f), new Vector3(1.1f, 6.4f, 1.1f), white);
-            Cyl("Lighthouse_Stripe", root.transform, new Vector3(9.6f, 3.6f, 33.5f), new Vector3(1.16f, 1.1f, 1.16f), red);
-            Box("Lighthouse_Lamp", root.transform, new Vector3(9.6f, 6.8f, 33.5f), new Vector3(1.3f, 0.7f, 1.3f), foam);
+            Box("Beach_Hut_Body", root.transform, new Vector3(9.2f, 1.15f, 8.2f), new Vector3(3.2f, 2.3f, 4.2f), plaster);
+            Box("Beach_Hut_Roof", root.transform, new Vector3(9.2f, 2.55f, 8.2f), new Vector3(3.8f, 0.55f, 4.8f), thatch);
+            Box("Beach_Hut_Deck", root.transform, new Vector3(7.8f, 0.22f, 8.2f), new Vector3(1.2f, 0.12f, 4.0f), wood);
+            Box("Fishing_Boat_Hull", root.transform, new Vector3(10.2f, 0.35f, 22.0f), new Vector3(1.1f, 0.55f, 3.6f), wood);
+            Box("Fishing_Boat_Cabin", root.transform, new Vector3(10.2f, 0.85f, 21.4f), new Vector3(0.7f, 0.55f, 1.1f), plaster);
+            Box("Lighthouse_Island", root.transform, new Vector3(11.2f, 0.35f, 33.5f), new Vector3(3.4f, 0.7f, 3.4f), rock);
+            Cyl("Lighthouse_Shaft", root.transform, new Vector3(11.2f, 3.4f, 33.5f), new Vector3(1.1f, 6.4f, 1.1f), white);
+            Cyl("Lighthouse_Stripe", root.transform, new Vector3(11.2f, 3.6f, 33.5f), new Vector3(1.16f, 1.1f, 1.16f), red);
+            Box("Lighthouse_Lamp", root.transform, new Vector3(11.2f, 6.8f, 33.5f), new Vector3(1.3f, 0.7f, 1.3f), foam);
 
             float[][] palms =
             {
-                new[] { -7.2f, -2.0f, 4.8f },
-                new[] { -7.4f, 5.4f, 5.2f },
-                new[] { -7.8f, 18.5f, 5.0f },
-                new[] { -6.6f, 27.2f, 4.6f },
-                new[] { 6.6f, -1.2f, 5.0f },
-                new[] { 7.4f, 15.0f, 5.4f },
-                new[] { 6.8f, 26.6f, 4.8f },
-                new[] { 4.6f, 30.4f, 4.4f }
+                new[] { -8.4f, -2.0f, 4.8f },
+                new[] { -8.6f, 5.4f, 5.2f },
+                new[] { -8.8f, 18.5f, 5.0f },
+                new[] { -8.2f, 27.2f, 4.6f },
+                new[] { 8.4f, -1.2f, 5.0f },
+                new[] { 8.8f, 15.0f, 5.4f },
+                new[] { 8.4f, 26.6f, 4.8f },
+                new[] { 7.6f, 30.4f, 4.4f }
             };
             for (int i = 0; i < palms.Length; i++)
                 Palm(root.transform, new Vector3(palms[i][0], 0f, palms[i][1]), palms[i][2], trunk, leaf, i);
-
-            Vector3[] rocks =
-            {
-                new Vector3(-6.4f, 0.18f, 2.2f),
-                new Vector3(-6.8f, 0.22f, 11.5f),
-                new Vector3(-5.9f, 0.16f, 21.0f),
-                new Vector3(5.2f, 0.14f, 1.8f),
-                new Vector3(5.6f, 0.18f, 16.4f),
-                new Vector3(6.1f, 0.20f, 27.8f)
-            };
-            for (int i = 0; i < rocks.Length; i++)
-                Box($"Beach_Rock_{i}", root.transform, rocks[i], new Vector3(0.55f, 0.32f, 0.48f), rock);
 
             TintPlayGround(sand);
 
@@ -201,7 +167,66 @@ namespace PitStriker.EditorTools
                 EditorSceneManager.SaveScene(scene);
             }
 
-            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Village dress hidden. Ocean/dunes/hut on. Pits snapped 0/12/24. Old holes closed.</color>");
+            Debug.Log("<color=#00DDFF><b>[BEACH DRESS]</b> Solid ground on. Pits 0/12/24 are triggers. Rails at lane edge. Village dress hidden.</color>");
+        }
+
+        static void BuildSolidPlayfield()
+        {
+            string[] holeOwners =
+            {
+                "Ground_Center_Fairway", "Fairway_Road_With_Pits", "Unified_Arena_Ground",
+                "Ground_Center_Start", "Ground_Center_Bridge_1_2", "Ground_Center_Bridge_2_3", "Ground_Center_End"
+            };
+            foreach (var name in holeOwners)
+            {
+                var go = GameObject.Find(name);
+                if (!go) continue;
+                foreach (var col in go.GetComponents<Collider>())
+                    col.enabled = false;
+            }
+
+            var existing = GameObject.Find(SolidGroundName);
+            if (existing) Object.DestroyImmediate(existing);
+
+            var ground = new GameObject(SolidGroundName);
+            ground.transform.position = new Vector3(0f, 0f, ArenaFrame.MidZ);
+            var box = ground.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, -0.12f, 0f);
+            box.size = new Vector3(ArenaFrame.PlayLaneWidth, 0.24f, ArenaFrame.ArenaLength + 10f);
+            box.enabled = true;
+        }
+
+        static void RepairPits()
+        {
+            var zones = Object.FindObjectsByType<PitZone>(FindObjectsInactive.Include);
+            foreach (var zone in zones)
+            {
+                if (!zone) continue;
+                int n = zone.PitNumber;
+                if (n < 1 || n > 3) continue;
+
+                zone.transform.position = ArenaFrame.PitPosition(n);
+                zone.transform.rotation = Quaternion.identity;
+
+                foreach (var meshCol in zone.GetComponentsInChildren<MeshCollider>(true))
+                    meshCol.enabled = false;
+
+                var sphere = zone.GetComponent<SphereCollider>();
+                if (!sphere) sphere = zone.gameObject.AddComponent<SphereCollider>();
+                sphere.isTrigger = true;
+                sphere.center = new Vector3(0f, 0.08f, 0f);
+                sphere.radius = 0.42f;
+                sphere.enabled = true;
+
+                zone.SetPitNumber(n);
+                var so = new SerializedObject(zone);
+                var maxSpd = so.FindProperty("_maxCaptureSpeed");
+                if (maxSpd != null) maxSpd.floatValue = 2.2f;
+                var pitNum = so.FindProperty("_pitNumber");
+                if (pitNum != null) pitNum.intValue = n;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(zone);
+            }
         }
 
         static void HideVillageDress()
@@ -216,25 +241,20 @@ namespace PitStriker.EditorTools
             {
                 if (!t) continue;
                 if (IsProtectedGameplay(t.gameObject)) continue;
-                if (t.gameObject.name == RootName || t.IsChildOf(GameObject.Find(RootName) ? GameObject.Find(RootName).transform : t))
-                    continue;
-
+                if (t.gameObject.name == RootName || t.gameObject.name == SolidGroundName) continue;
                 string n = t.gameObject.name.ToLowerInvariant();
                 bool hide = false;
                 for (int i = 0; i < HideNameBits.Length; i++)
-                {
                     if (n.Contains(HideNameBits[i])) { hide = true; break; }
-                }
                 if (n.Contains("grass") && !n.Contains("beach")) hide = true;
-                if (n.Contains("fence") || n.Contains("rail_wood") || n.Contains("stone_wall"))
-                    hide = true;
+                if (n.Contains("fence") || n.Contains("stone_wall")) hide = true;
                 if (hide) MuteVisualTree(t.gameObject);
             }
         }
 
         static void MuteVisualTree(GameObject go)
         {
-            if (!go || go.name == RootName) return;
+            if (!go || go.name == RootName || go.name == SolidGroundName) return;
             foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
                 renderer.enabled = false;
             foreach (var col in go.GetComponentsInChildren<Collider>(true))
@@ -252,55 +272,18 @@ namespace PitStriker.EditorTools
             if (go.GetComponent<Camera>()) return true;
             if (go.GetComponent<TurnManager>()) return true;
             string n = go.name;
+            if (n == SolidGroundName) return true;
             if (n.StartsWith("Pit_")) return true;
             if (n.StartsWith("Marble") || n.StartsWith("Player")) return true;
             if (n.Contains("HUD") || n.Contains("Menu")) return true;
             return false;
         }
 
-        static void RepairPlayfieldColliders()
-        {
-            string[] holeMeshes =
-            {
-                "Ground_Center_Fairway",
-                "Fairway_Road_With_Pits",
-                "Unified_Arena_Ground"
-            };
-            foreach (var name in holeMeshes)
-            {
-                var go = GameObject.Find(name);
-                if (!go) continue;
-                var meshCol = go.GetComponent<MeshCollider>();
-                if (meshCol) Object.DestroyImmediate(meshCol);
-                var box = go.GetComponent<BoxCollider>();
-                if (!box) box = go.AddComponent<BoxCollider>();
-                box.center = new Vector3(0f, -0.05f, ArenaFrame.MidZ);
-                box.size = new Vector3(ArenaFrame.ArenaWidth, 0.12f, ArenaFrame.ArenaLength + 8f);
-                box.enabled = true;
-            }
-        }
-
-        static void SnapPitsToFrame()
-        {
-            var zones = Object.FindObjectsByType<PitZone>(FindObjectsInactive.Include);
-            foreach (var zone in zones)
-            {
-                if (!zone) continue;
-                int n = zone.PitNumber;
-                if (n < 1 || n > 3) continue;
-                zone.transform.position = ArenaFrame.PitPosition(n);
-                zone.transform.rotation = Quaternion.identity;
-                EditorUtility.SetDirty(zone);
-            }
-        }
-
         static void EnsureBuildSettings()
         {
             var scenes = EditorBuildSettings.scenes;
             for (int i = 0; i < scenes.Length; i++)
-            {
                 if (scenes[i].path == BeachScene) return;
-            }
             var list = new System.Collections.Generic.List<EditorBuildSettingsScene>(scenes)
             {
                 new EditorBuildSettingsScene(BeachScene, true)
@@ -314,7 +297,7 @@ namespace PitStriker.EditorTools
             {
                 if (!renderer) continue;
                 string n = renderer.gameObject.name.ToLowerInvariant();
-                if (n.Contains("ground") || n.Contains("playfield") || n.Contains("arena_floor") || n.Contains("soil") || n.Contains("fairway"))
+                if (n.Contains("ground") || n.Contains("playfield") || n.Contains("fairway") || n.Contains("soil"))
                     renderer.sharedMaterial = sand;
             }
         }
