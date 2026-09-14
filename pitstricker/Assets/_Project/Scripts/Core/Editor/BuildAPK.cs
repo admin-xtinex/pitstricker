@@ -69,22 +69,20 @@ namespace PitStriker.EditorTools
         [MenuItem("Pit Striker/Export Android APK", false, 1)]
         public static void BuildAndroidPlayer()
         {
-
             Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Initiating Android APK build process...</color>");
 
-            // Ensure NetworkMatchState prefab and registration exist
-            MultiplayerSmokeTest.EnsureNetworkMatchStatePrefab();
+            Type smoke = Type.GetType("PitStriker.EditorTools.MultiplayerSmokeTest");
+            smoke?.GetMethod("EnsureNetworkMatchStatePrefab")?.Invoke(null, null);
 
             string productionScene = "Assets/_Project/Scenes/SC_Village_Graphics_Test.unity";
             if (File.Exists(productionScene))
             {
-                var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(productionScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(productionScene, UnityEditor.SceneManagement.OpenSceneMode.Single);
                 Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Target production village scene: " + productionScene + "</color>");
             }
 
             Unity.Burst.BurstCompiler.Options.EnableBurstCompilation = false;
 
-            // 1. Ensure output directory exists
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string fullOutputDir = Path.Combine(projectRoot, BuildOutputDirectory);
             if (!Directory.Exists(fullOutputDir))
@@ -103,7 +101,6 @@ namespace PitStriker.EditorTools
                 Directory.CreateDirectory(apkDir);
             }
 
-            // 2. Configure Player Settings for Android
             PlayerSettings.productName = "Pit Striker";
             PlayerSettings.companyName = "xtinex";
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.xtinex.pitstriker");
@@ -118,7 +115,6 @@ namespace PitStriker.EditorTools
             PlayerSettings.allowedAutorotateToPortrait = false;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
 
-            // 2b. Ensure single pipeline consistency across GraphicsSettings and all Quality levels
             var rpAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.RenderPipelineAsset>("Assets/Settings/Mobile_RPAsset.asset");
             if (rpAsset != null)
             {
@@ -133,7 +129,6 @@ namespace PitStriker.EditorTools
                 Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Verified RenderPipelineAsset: {rpAsset.name} across GraphicsSettings and all {qualityCount} quality levels.</color>");
             }
 
-            // 3. Keystore Signing Configuration
             string keystorePath = Environment.GetEnvironmentVariable("ANDROID_KEYSTORE_PATH");
             if (string.IsNullOrEmpty(keystorePath) || !File.Exists(keystorePath))
             {
@@ -162,7 +157,6 @@ namespace PitStriker.EditorTools
                 Debug.LogWarning($"[BUILD APK] Custom keystore not found at {keystorePath}, using default signing.");
             }
 
-            // 4. Assemble scene list from EditorBuildSettings (or fallback to active scene)
             string[] scenePaths = GetBuildScenes();
             if (scenePaths.Length == 0)
             {
@@ -173,7 +167,6 @@ namespace PitStriker.EditorTools
             Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Building scenes ({scenePaths.Length}): {string.Join(", ", scenePaths)}</color>");
             Debug.Log($"<color=#00FFAA><b>[BUILD APK]</b> Target APK Output: {apkPath}</color>");
 
-            // 4. Build Player Options
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions
             {
                 scenes = scenePaths,
@@ -183,7 +176,6 @@ namespace PitStriker.EditorTools
                 options = BuildOptions.None
             };
 
-            // Clear any stale Bee lock file from prior runs
             try
             {
                 string tundraLock = Path.Combine(projectRoot, "Library", "Bee", "tundra.lock");
@@ -191,7 +183,6 @@ namespace PitStriker.EditorTools
             }
             catch { }
 
-            // 5. Execute Build Pipeline
             Debug.Log("<color=#00FFAA><b>[BUILD APK]</b> Executing build...</color>");
             BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
             BuildSummary summary = report.summary;
@@ -204,21 +195,19 @@ namespace PitStriker.EditorTools
                 if (!Application.isBatchMode) EditorUtility.RevealInFinder(apkPath);
                 return;
             }
-            else
+
+            Debug.LogError($"<color=#FF0044><b>[BUILD FAILED]</b> Android build finished with status {summary.result} ({summary.totalErrors} errors).</color>");
+            foreach (var step in report.steps)
             {
-                Debug.LogError($"<color=#FF0044><b>[BUILD FAILED]</b> Android build finished with status {summary.result} ({summary.totalErrors} errors).</color>");
-                foreach (var step in report.steps)
+                foreach (var msg in step.messages)
                 {
-                    foreach (var msg in step.messages)
+                    if (msg.type == LogType.Error || msg.type == LogType.Exception)
                     {
-                        if (msg.type == LogType.Error || msg.type == LogType.Exception)
-                        {
-                            Debug.LogError($"[BUILD STEP ERROR] {step.name}: {msg.content}");
-                        }
+                        Debug.LogError($"[BUILD STEP ERROR] {step.name}: {msg.content}");
                     }
                 }
-                throw new InvalidOperationException($"Android build failed with status {summary.result} ({summary.totalErrors} errors).");
             }
+            throw new InvalidOperationException($"Android build failed with status {summary.result} ({summary.totalErrors} errors).");
         }
 
         private static string[] GetBuildScenes()
