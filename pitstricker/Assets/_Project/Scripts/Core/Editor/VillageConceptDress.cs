@@ -2,11 +2,13 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using PitStriker.Core;
 
 namespace PitStriker.EditorTools
 {
     /// <summary>
-    /// Concept village dressing: full dirt lane, paddy water, side fences.
+    /// Concept village dressing aligned to ArenaFrame.
+    /// Dirt lane = 14 m play lane. Paddy and fences sit outside plus/minus 7 m.
     /// Does not touch pits, marbles, colliders, or HUD.
     /// </summary>
     public static class VillageConceptDress
@@ -35,27 +37,32 @@ namespace PitStriker.EditorTools
             var paddy = MakeMat("M_Concept_PaddyField", new Color(0.16f, 0.46f, 0.10f, 1f), 0.88f);
             var wood = MakeMat("M_Concept_FenceWood", new Color(0.22f, 0.085f, 0.028f, 1f), 0.87f);
 
-            Box("Dirt_Lane", root.transform, new Vector3(0f, 0.025f, 11.5f), new Vector3(6.7f, 0.05f, 34f), dirt);
-            Box("Paddy_Water_L", root.transform, new Vector3(-6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
-            Box("Paddy_Water_R", root.transform, new Vector3(6.4f, 0.14f, 12f), new Vector3(3.4f, 0.12f, 34f), water);
-            Box("Paddy_Field_L", root.transform, new Vector3(-10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
-            Box("Paddy_Field_R", root.transform, new Vector3(10.2f, 0.08f, 12f), new Vector3(4.2f, 0.10f, 36f), paddy);
+            float mid = ArenaFrame.MidZ;
+            float length = ArenaFrame.ArenaLength;
+            float lane = ArenaFrame.PlayLaneWidth;
+            float half = ArenaFrame.LaneHalf;
+            float y0 = ArenaFrame.DressMinZ;
+            float y1 = ArenaFrame.DressMaxZ;
+            float fenceLen = y1 - y0;
+            float fenceMid = (y0 + y1) * 0.5f;
 
-            const float y0 = -5.2f;
-            const float y1 = 28.4f;
-            float mid = (y0 + y1) * 0.5f;
-            float length = y1 - y0;
-            foreach (float x in new[] { -3.45f, 3.45f })
+            Box("Dirt_Lane", root.transform, new Vector3(0f, 0.025f, mid), new Vector3(lane, 0.05f, length), dirt);
+            Box("Paddy_Water_L", root.transform, new Vector3(-(half + 1.7f), 0.14f, mid), new Vector3(3.4f, 0.12f, length), water);
+            Box("Paddy_Water_R", root.transform, new Vector3(half + 1.7f, 0.14f, mid), new Vector3(3.4f, 0.12f, length), water);
+            Box("Paddy_Field_L", root.transform, new Vector3(-(half + 5.2f), 0.08f, mid), new Vector3(4.2f, 0.10f, length + 2f), paddy);
+            Box("Paddy_Field_R", root.transform, new Vector3(half + 5.2f, 0.08f, mid), new Vector3(4.2f, 0.10f, length + 2f), paddy);
+
+            foreach (float x in new[] { -half, half })
             {
                 string side = x < 0 ? "L" : "R";
                 for (int i = 0; i < 25; i++)
                 {
                     float t = i / 24f;
-                    float z = y0 + t * length;
+                    float z = y0 + t * fenceLen;
                     Box($"LaneFence_Post_{side}_{i}", root.transform, new Vector3(x, 0.62f, z), new Vector3(0.09f, 1.24f, 0.09f), wood);
                 }
-                Box($"LaneFence_Rail_{side}_Lo", root.transform, new Vector3(x, 0.38f, mid), new Vector3(0.06f, 0.06f, length), wood);
-                Box($"LaneFence_Rail_{side}_Hi", root.transform, new Vector3(x, 0.86f, mid), new Vector3(0.06f, 0.06f, length), wood);
+                Box($"LaneFence_Rail_{side}_Lo", root.transform, new Vector3(x, 0.38f, fenceMid), new Vector3(0.06f, 0.06f, fenceLen), wood);
+                Box($"LaneFence_Rail_{side}_Hi", root.transform, new Vector3(x, 0.86f, fenceMid), new Vector3(0.06f, 0.06f, fenceLen), wood);
             }
 
             foreach (var col in root.GetComponentsInChildren<Collider>(true))
@@ -64,7 +71,7 @@ namespace PitStriker.EditorTools
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Selection.activeGameObject = root;
-            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Applied on " + scenePath + "</color>");
+            Debug.Log("<color=#00FF88><b>[CONCEPT DRESS]</b> Applied on " + scenePath + " using ArenaFrame 0/12/24, lane +/- " + half + "</color>");
         }
 
         [MenuItem("Pit Striker/Remove Concept Village Dress", false, 23)]
