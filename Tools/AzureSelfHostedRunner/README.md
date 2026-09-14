@@ -1,14 +1,16 @@
 # PitStriker Azure self-hosted Windows builder
 
 The GitHub-hosted APK job fails because Unity license secrets are empty.
-This VM is meant to run the `self-hosted (Windows PC)` job in
-`.github/workflows/build-android-apk.yml`.
+This VM runs two workflow_dispatch jobs on labels `self-hosted`, `Windows`, `X64`:
 
-That job hard-requires:
+- `Build and Upload Android APK` → runner type **self-hosted (Windows PC)**
+- `Align Arena on Self-Hosted Windows` → snaps pits to 0/12/24, rebuilds ground holes, applies dress
+
+Hard requirements:
 
 ```
 C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe
-labels: self-hosted, windows
+labels: self-hosted, Windows, X64
 ```
 
 ## Recommended Azure size
@@ -45,7 +47,12 @@ cd $env:USERPROFILE\Desktop
 ```
 
 7. Confirm the runner shows **Idle / Online** on the GitHub runners page.
-8. Run the workflow:
+8. Align the arena (does the Unity editor menus for you):
+   Actions → Align Arena on Self-Hosted Windows → Run workflow
+   - Branch: `dev-isotrophic`
+   - map: `village` (or `beach`, or `village-and-apk`)
+   - push_scene: true
+9. APK only:
    Actions → Build and Upload Android APK → Run workflow
    - Branch: `dev-isotrophic`
    - Runner type: `self-hosted (Windows PC)`

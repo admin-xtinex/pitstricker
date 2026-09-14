@@ -1,0 +1,113 @@
+name: Align Arena on Self-Hosted Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      map:
+        description: 'Dress to apply after snapping pits to 0/12/24'
+        required: true
+        default: 'village'
+        type: choice
+        options:
+          - village
+          - beach
+          - village-and-apk
+      push_scene:
+        description: 'Commit aligned scene + generated meshes back to this branch'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  align:
+    name: Align on self-hosted Unity
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          ref: ${{ github.ref }}
+
+      - name: Locate Unity 6000.6.0f1
+        id: unity
+        shell: powershell
+        run: |
+          $unityPath = "C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe"
+          if (-not (Test-Path $unityPath)) {
+            Write-Error "Unity 6000.6.0f1 not found at $unityPath. Sign in to Unity Hub on this VM and install that editor with Android modules."
+            exit 1
+          }
+          Write-Host "Using $unityPath"
+          "unity=$unityPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Run arena pipeline in Unity batchmode
+        shell: powershell
+        run: |
+          $method = switch ("${{ inputs.map }}") {
+            "beach" { "PitStriker.EditorTools.ArenaPipeline.RunBeachAlign" }
+            "village-and-apk" { "PitStriker.EditorTools.ArenaPipeline.RunVillageAlignAndBuildApk" }
+            default { "PitStriker.EditorTools.ArenaPipeline.RunVillageAlign" }
+          }
+          $log = Join-Path $pwd "unity_align.log"
+          Write-Host "executeMethod $method"
+          & "${{ steps.unity.outputs.unity }}" `
+            -batchmode -nographics -quit `
+            -projectPath pitstricker `
+            -executeMethod $method `
+            -logfile $log
+          $code = $LASTEXITCODE
+          if (Test-Path $log) {
+            Write-Host "---- unity log tail ----"
+            Get-Content $log -Tail 80
+          }
+          if ($code -ne 0) {
+            Write-Error "Unity arena pipeline failed with exit code $code"
+            exit $code
+          }
+          $result = "pitstricker/Library/ArenaPipeline.result"
+          if (Test-Path $result) {
+            Write-Host "Pipeline result:"
+            Get-Content $result
+          }
+
+      - name: Upload Unity log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-align-log-${{ github.run_number }}
+          path: unity_align.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload APK if built
+        if: ${{ inputs.map == 'village-and-apk' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PitStriker-Aligned-Android-v${{ github.run_number }}
+          path: |
+            Builds/Android/*.apk
+            pitstricker/Builds/Android/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit aligned scene back to branch
+        if: ${{ inputs.push_scene }}
+        shell: powershell
+        run: |
+          git config user.name "pitstriker-self-hosted"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "pitstricker/Assets/_Project/Scenes/*.unity" `
+                    "pitstricker/Assets/_Project/Art/Environments/Village/*" `
+                    "pitstricker/Assets/_Project/Art/Environments/Beach/*"
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "No scene/art changes to commit."
+            exit 0
+          }
+          git commit -m "Align village/beach scene to ArenaFrame 0/12/24 [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}
