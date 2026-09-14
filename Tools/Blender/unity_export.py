@@ -57,6 +57,7 @@ def create_unity_anchors(config):
 def default_unity_fbx_path(script_dir, map_name):
     """Place generated FBX inside the real Unity project folder."""
     repo_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
+    theme = "Beach" if map_name == "beach" else "Village"
     models_dir = os.path.join(
         repo_root,
         "pitstricker",
@@ -64,7 +65,7 @@ def default_unity_fbx_path(script_dir, map_name):
         "_Project",
         "Art",
         "Environments",
-        "Village",
+        theme,
         "Generated",
     )
     os.makedirs(models_dir, exist_ok=True)
