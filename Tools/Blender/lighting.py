@@ -18,7 +18,6 @@ def _set_render_engine(scene):
         except (TypeError, ValueError):
             continue
 
-    # Last-resort fallback so scene generation still completes.
     try:
         scene.render.engine = "BLENDER_WORKBENCH"
         print("Pit Striker render engine: BLENDER_WORKBENCH (fallback)")
@@ -35,9 +34,6 @@ def setup_world_and_lighting(config):
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
 
-    # The previous blockout was under-exposed in Blender 5.x. Keep the warm
-    # cinematic contrast, but lift overall exposure so grass, dirt and props
-    # remain readable in both Rendered viewport and F12 output.
     try:
         scene.view_settings.view_transform = "AgX"
     except Exception:
@@ -60,16 +56,22 @@ def setup_world_and_lighting(config):
     scene.world = world
     world.use_nodes = True
     bg = world.node_tree.nodes.get("Background")
-    # Bright sky fill: blue enough to balance the orange sun, but not night-like.
-    bg.inputs["Color"].default_value = (0.30, 0.46, 0.72, 1.0)
-    bg.inputs["Strength"].default_value = 0.72
+    if getattr(config, "map_name", "") == "beach":
+        bg.inputs["Color"].default_value = (0.42, 0.68, 0.88, 1.0)
+        bg.inputs["Strength"].default_value = 0.85
+    else:
+        bg.inputs["Color"].default_value = (0.30, 0.46, 0.72, 1.0)
+        bg.inputs["Strength"].default_value = 0.72
 
-    # Low warm sun for the long late-afternoon shadows seen in the reference.
     bpy.ops.object.light_add(type="SUN", location=(-8.0, -10.0, 8.0))
     sun = bpy.context.object
     sun.name = "Sun_Golden_Hour"
-    sun.data.energy = 3.6
-    sun.data.color = (1.0, 0.67, 0.40)
+    if getattr(config, "map_name", "") == "beach":
+        sun.data.energy = 4.2
+        sun.data.color = (1.0, 0.82, 0.55)
+    else:
+        sun.data.energy = 3.6
+        sun.data.color = (1.0, 0.67, 0.40)
     sun.data.angle = math.radians(5.0)
     sun.rotation_euler = (
         math.radians(54.0),
@@ -77,8 +79,6 @@ def setup_world_and_lighting(config):
         math.radians(-42.0),
     )
 
-    # Large cool fill from above/front. This is intentionally strong enough to
-    # keep the house facade and grass verges visible without flattening shadows.
     bpy.ops.object.light_add(type="AREA", location=(1.5, config.pit_spacing * 0.72, 10.5))
     fill = bpy.context.object
     fill.name = "Sky_Soft_Fill"
@@ -88,8 +88,6 @@ def setup_world_and_lighting(config):
     fill.data.size = 13.0
     _look_at(fill, (0.0, config.pit_spacing * 0.85, 0.0))
 
-    # Warm bounce from the house side gives the foreground the same sunlit,
-    # earthy feel as the target image.
     bpy.ops.object.light_add(type="AREA", location=(-6.5, 5.0, 4.8))
     bounce = bpy.context.object
     bounce.name = "Warm_Village_Bounce"
@@ -100,8 +98,6 @@ def setup_world_and_lighting(config):
     bounce.data.size_y = 8.0
     _look_at(bounce, (-2.0, 9.0, 0.9))
 
-    # A subtle front fill prevents the near dirt lane from becoming a black
-    # silhouette when the golden-hour sun is behind the scene.
     bpy.ops.object.light_add(type="AREA", location=(0.0, -5.5, 3.0))
     front = bpy.context.object
     front.name = "Gameplay_Front_Fill"
