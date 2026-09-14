@@ -7,6 +7,7 @@ on:
     paths:
       - 'pitstricker/Assets/_Project/Scripts/Core/**'
       - 'pitstricker/Assets/_Project/Scenes/**'
+      - 'pitstricker/Packages/manifest.json'
       - 'Tools/Blender/**'
       - '.github/workflows/align-arena-self-hosted.yml'
   workflow_dispatch:
@@ -77,7 +78,7 @@ jobs:
           Write-Host "Unity exit code: $code"
           if (Test-Path $log) {
             Write-Host '---- unity log tail ----'
-            Get-Content $log -Tail 120
+            Get-Content $log -Tail 160
           } else {
             Write-Host 'unity_align.log was not created'
           }
